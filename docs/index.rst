@@ -12,23 +12,23 @@ The package contains functions that:
   * create time series and save in csv-format
   * generate statistics (tables, diagrams etc)
 
-Installing **metocean_engine**
+Installing **metocean-stats**
 =============================================
 1. Install anaconda3 or miniconda3
-2. Clone metocean_engine:
+2. Clone metocean-stats:
 
 .. code-block:: bash
 
-   $ git clone https://github.com/MET-OM/metocean_engine.git
-   $ cd metocean_engine/
+   $ git clone https://github.com/MET-OM/metocean-stats.git
+   $ cd metocean-stats/
 
-3. Create environment with the required dependencies and install metocean_engine
+3. Create environment with the required dependencies and install metocean-stats
 
 .. code-block:: bash
 
   $ conda config --add channels conda-forge
   $ conda env create -f environment.yml
-  $ conda activate metocean_engine
+  $ conda activate metocean-stats
   $ pip install -e .
   
 To update the enviroment using a new environment.yml, run:
@@ -43,7 +43,7 @@ This section document the **ts-module**. The ts-object is initialized with the f
 
 .. code-block:: python
 
-   from metocean_engine import ts
+   from metocean_stats import ts
    ts = ts.TimeSeries(lon=1.320, lat=53.324,
                       start_time='1989-01-01', end_time='2022-12-31' , 
                       product='NORA3_wind_wave') 
