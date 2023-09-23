@@ -7,27 +7,24 @@ here = os.path.abspath(os.path.dirname(__file__))
 exec(open(os.path.join(here, 'version.py')).read())
 
 setuptools.setup(
-    name        = 'metocean-engine',
-    description = 'metocean-engine - Tool for generation of metocean statistics based on NORA3 data',
+    name        = 'metocean-stats',
+    description = 'metocean-stats - Tool for generation of metocean statistics',
     author      = 'Konstantinos Christakos MET Norway & NTNU',
-    url         = 'https://github.com/MET-OM/metocean-engine',
-    download_url = 'https://github.com/MET-OM/metocean-engine',
+    url         = 'https://github.com/MET-OM/metocean-stats',
+    download_url = 'https://github.com/MET-OM/metocean-stats',
     version = __version__,
-    license = 'GPLv2',
+    license = 'GPLv3',
     install_requires = [
-        'numpy',
-        'python',
-        'matplotlib',
+        'numpy>=1.17',
+        'matplotlib>=3.1',
         'pandas',
         'xarray',
         'pip',
-        'nco',
         'scipy',
-        'virocon',
         'xclim',
-        'netcdf4',
-        'time',
-        'pip'
+        'pip',
+        'seaborn>=0.12.2',
+        'metocean-api'
     ],
     packages = setuptools.find_packages(),
     include_package_data = True,
