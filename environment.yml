@@ -1,0 +1,19 @@
+name: metocean-stats
+channels:
+  - conda-forge
+dependencies:
+  - python=>3.9
+  - matplotlib>=3.1
+  - numpy>=1.17
+  - pandas
+  - xarray
+  - pip
+  - scipy
+  - netcdf4
+  - scipy
+  - pytest
+  - windrose
+  - virocon
+  - xclim
+  - seaborn>=0.12.2
+  - metocean-api
