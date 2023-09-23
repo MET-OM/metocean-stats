@@ -18,7 +18,6 @@ setuptools.setup(
         'numpy>=1.17',
         'matplotlib>=3.1',
         'pandas',
-        'xarray',
         'pip',
         'scipy',
         'xclim',
