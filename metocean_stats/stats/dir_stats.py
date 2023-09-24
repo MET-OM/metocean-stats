@@ -51,14 +51,14 @@ def directional_min_mean_max(data, direction, intensity, output_file) :
         dic_time[str(int(bins_dir[i]))] = [] 
     
     for i in range(len(intensity)): 
-        if 345 <= direction[i] :
+        if 345 <= direction.iloc[i] :
             dic_time[str(int(bins_dir[0]))].append(time[i])
-            dic_Hs[str(int(bins_dir[0]))].append(intensity[i]) 
+            dic_Hs[str(int(bins_dir[0]))].append(intensity.iloc[i]) 
         else: 
             for j in range(len(bins_dir)): 
-                if bins_dir[j]-15 <= direction[i] < bins_dir[j] + 15 : # -15 --> +345 
+                if bins_dir[j]-15 <= direction.iloc[i] < bins_dir[j] + 15 : # -15 --> +345 
                     dic_time[str(int(bins_dir[j]))].append(time[i])
-                    dic_Hs[str(int(bins_dir[j]))].append(intensity[i]) 
+                    dic_Hs[str(int(bins_dir[j]))].append(intensity.iloc[i]) 
                     
     # write to file 
     with open(temp_file, 'w') as f :
@@ -97,11 +97,13 @@ def directional_min_mean_max(data, direction, intensity, output_file) :
 
     return
 
-def monthly_var_rose(direction,intensity,output_file) : 
+def monthly_var_rose(data, direction,intensity,output_file) : 
 
     # this function make monthly wind/wave rose
     # direction, intensity: panda series 
     # get month from panda series 
+    direction = data[direction]
+    intensity = data[intensity]
     M = intensity.index.month.values
     
     # get month names 
@@ -119,8 +121,8 @@ def monthly_var_rose(direction,intensity,output_file) :
         
     for i in range(len(intensity)) : 
         m_idx = int(M[i]-1)
-        dic_intensity[months[m_idx]].append(intensity[i])
-        dic_direction[months[m_idx]].append(direction[i])
+        dic_intensity[months[m_idx]].append(intensity.iloc[i])
+        dic_direction[months[m_idx]].append(direction.iloc[i])
         
     for j in range(12):
         fig = plt.figure(figsize = (8,8))

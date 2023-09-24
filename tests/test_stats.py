@@ -1,5 +1,5 @@
 from metocean_api import ts
-from metocean_stats.stats import general_stats
+from metocean_stats.stats import general_stats, dir_stats
 import os
 
 # Define TimeSeries-object
@@ -23,5 +23,12 @@ def test_table_monthly_min_mean_max(ds=ds):
     general_stats.table_monthly_min_mean_max(data=ds.data, var='hs', output_file='test.csv')
     os.remove('test.csv')
 
+def test_rose(ds=ds):
+    dir_stats.var_rose(ds.data, 'thq','hs','test.png',method='overall')
+    os.remove('test.png')
+
+def test_directional_min_mean_max(ds=ds):
+    dir_stats.directional_min_mean_max(ds.data,'thq','hs','test.csv')
+    os.remove('test.csv')
 
 
