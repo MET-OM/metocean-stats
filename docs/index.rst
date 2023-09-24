@@ -1,15 +1,14 @@
-.. metocean_engine documentation master file, created by
+.. metocean_stats documentation master file, created by
    sphinx-quickstart on Thu Sep 14 10:18:36 2023.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to metocean_engine's documentation!
+Welcome to metocean_stats's documentation!
 =====================================
 
-**metocean_engine** is a Python package for metocean analysis of NORA3 (wind and wave) hindcast.
+**metocean_stats** is a Python package for metocean analysis of NORA3 (wind and wave) hindcast.
 
 The package contains functions that:
-  * create time series and save in csv-format
   * generate statistics (tables, diagrams etc)
 
 Installing **metocean-stats**
@@ -37,50 +36,29 @@ To update the enviroment using a new environment.yml, run:
 
    $ conda env update --file environment.yml --prune
 
-Creating a TimeSeries-object
+Download metocean data
 =====================================
-This section document the **ts-module**. The ts-object is initialized with the following command:
+Use metocean-api to download some sample data:
 
 .. code-block:: python
 
-   from metocean_stats import ts
-   ts = ts.TimeSeries(lon=1.320, lat=53.324,
-                      start_time='1989-01-01', end_time='2022-12-31' , 
-                      product='NORA3_wind_wave') 
+   from metocean_api import ts
+   ds = ts.TimeSeries(lon=1.320, lat=53.324,
+                      start_time='2000-01-01', 
+                      end_time='2000-12-31', 
+                      product='NORA3_wind_wave')
 
-Several options for **product** are available:
-
-.. code-block:: bash
-  
-  # For combined wind and wave NORA3 data: product='NORA3_wind_wave'
-  # For wind NORA3 data: product='NORA3_wind_sub'
-  # For wave NORA3 data: product='NORA3_wave_sub'
-  # For coastal wave NORA3 data: product='NORA3C_wave'
-  # ERA5???
-
-Import data from server to **ts-object** and save it as csv:
+Import data from server and save it as csv:
 
 .. code-block:: python
 
-   ts.import_ts(save_csv=True)
+   ds.import_data(save_csv=True)
 
-Data is saved in:
-
-.. code-block:: python
-
-   print(ts.datafile)  
-   'NORA3_wind_wave_lon1.32_lat53.324_19890101_20221231.csv' 
-
-To import data from a local csv-file to **ts-object**:
+Or import data from a local csv-file:
 
 .. code-block:: python
 
-   ts.load_ts(local_file=ts.datafile)  
-   print(ts.data)
-
-.. image:: ts.data.png
-  :width: 800
-
+   ds.load_data(local_file=ts.datafile)  
 
 General Statistics
 =====================================
@@ -88,14 +66,15 @@ To generate general/basic stastistics, import general_stats module:
 
 .. code-block:: python
    
-   from metocean_engine.stats import general_stats as stats
+   from metocean_stats.stats import general_stats
 
 Create scatter Hs-Tp diagram:
 
 .. code-block:: python
    
-   stats.scatter_diagram(var1=ts.data['hs'], step_var1=1, 
-                     var2=ts.data['tp'], step_var2=2, 
+   general_stats.scatter_diagram(data=ts.data, 
+                     var1='hs', step_var1=1, 
+                     var2='tp', step_var2=2, 
                      output_file='scatter_hs_tp_diagram.png')
 
 .. image:: scatter_hs_tp_diagram.png
@@ -105,7 +84,7 @@ Create table with monthly percentiles:
 
 .. code-block:: python
 
-   stats.table_monthly_percentile(data=ts.data, var='hs', output_file='hs_monthly_perc.csv')
+   general_stats.table_monthly_percentile(data=ts.data, var='hs', output_file='hs_monthly_perc.csv')
 
 .. csv-table:: 
    :header-rows: 1
@@ -129,7 +108,7 @@ Create table with monthly min, mean, and max values:
 
 .. code-block:: python
 
-   stats.table_monthly_min_mean_max(data=ts.data, var='hs',output_file='hs_montly_min_mean_max.csv')
+   general_stats.table_monthly_min_mean_max(data=ts.data, var='hs',output_file='hs_montly_min_mean_max.csv')
 
 .. csv-table:: 
    :header-rows: 1
@@ -153,7 +132,7 @@ Create table with sorted statistics by Hs:
 
 .. code-block:: python
 
-   stats.table_var_sorted_by_Hs(data=ts.data, var='tp', output_file='tp_sorted_by_hs.csv')
+   general_stats.table_var_sorted_by_Hs(data=ts.data, var='tp', output_file='tp_sorted_by_hs.csv')
 
 .. csv-table:: 
    :header-rows: 1
@@ -176,20 +155,20 @@ To generate directional stastistics, import dir_stats module:
 
 .. code-block:: python
    
-   from metocean_engine.stats import dir_stats as dir
+   from metocean_stats.stats import dir_stats
 
 Create rose for overall data (**method='overall'**) or for each month (**method='monthly'**):
 
 .. code-block:: python
    
-   dir.var_rose(ts.data, 'thq','hs','waverose.png',method='overall')
+   dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='overall')
 
 .. image:: waverose.png
   :width: 300
 
 .. code-block:: python
    
-   dir.var_rose(ts.data, 'thq','hs','waverose.png',method='monthly')
+   dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='monthly')
 
 .. image:: monthly_waveroses.png
   :width: 500
@@ -198,7 +177,7 @@ Create table with min, mean, and maximum values as a function direction:
 
 .. code-block:: python
 
-   dir.directional_min_mean_max(ts.data,'thq','hs','hs_dir_min_mean_max.csv')
+   dir_stats.directional_min_mean_max(ts.data,'thq','hs','hs_dir_min_mean_max.csv')
 
 .. csv-table:: 
    :header-rows: 1
@@ -223,20 +202,7 @@ Extreme Statistics
 
 To generate extreme stastistics, import extreme_stats module: 
 
-.. code-block:: python
-   
-   from metocean_engine.stats import extreme_stats as extr
-
-Compute a joint contour for  given return periods:
-
-.. code-block:: python
-   
-   extr.joint_2D_contour(ts.data['hs'],ts.data['tp'], 
-                         return_periods=[50,100,1000],
-                         image_path='hs_tp_joint_2D_contour.png')
-
-.. image:: hs_tp_joint_2D_contour.png
-  :width: 500
+...
 
 .. toctree::
    :maxdepth: 2
