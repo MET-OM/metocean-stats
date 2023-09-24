@@ -10,14 +10,15 @@ import calendar
 
 from .aux_funcs import convert_latexTab_to_csv, Tp_correction
 
-
-def scatter_diagram(var1, step_var1, var2, step_var2, output_file):  
+def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):  
     """
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
     step_var: size of bin e.g., 0.5m for hs and 1s for Tp
     cmap: colormap, default is 'Blues'
     outputfile: name of output file with extrensition e.g., png, eps or pdf 
      """   
+    var1 = data[var1]
+    var2 = data[var2]
     bins_var1 = np.arange(math.floor(np.min(var1)),math.ceil(np.max(var1))+step_var1,step_var1) # one cell more 
     bins_var2 = np.arange(math.floor(np.min(var2)),math.ceil(np.max(var2))+step_var2,step_var2) # one cell at beginning and ending 
     tbl = np.zeros([len(bins_var1)-1,len(bins_var2)-1])
