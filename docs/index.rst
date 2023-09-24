@@ -1,12 +1,12 @@
-.. metocean_stats documentation master file, created by
+.. metocean-stats documentation master file, created by
    sphinx-quickstart on Thu Sep 14 10:18:36 2023.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to metocean_stats's documentation!
+Welcome to metocean-stats's documentation!
 =====================================
 
-**metocean_stats** is a Python package for metocean analysis of NORA3 (wind and wave) hindcast.
+**metocean-stats** is a Python package (under developement) for metocean analysis of NORA3 (wind and wave) hindcast.
 
 The package contains functions that:
   * generate statistics (tables, diagrams etc)
