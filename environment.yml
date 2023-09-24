@@ -10,6 +10,5 @@ dependencies:
   - scipy
   - pytest
   - windrose
-  - xclim
   - seaborn>=0.12.2
   - metocean-api

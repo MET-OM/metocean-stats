@@ -20,7 +20,6 @@ setuptools.setup(
         'pandas',
         'pip',
         'scipy',
-        'xclim',
         'pip',
         'seaborn>=0.12.2',
         'metocean-api'
