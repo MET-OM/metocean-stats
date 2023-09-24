@@ -28,7 +28,7 @@ def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
     for i in range(N):
         for row in range(row_var1) : 
             for col in range(col_var2) : 
-                if (bins_var1[row] <= var1[i] < bins_var1[row+1]) and (bins_var2[col] <= var2[i] < bins_var2[col+1]):
+                if (bins_var1[row] <= var1.iloc[i] < bins_var1[row+1]) and (bins_var2[col] <= var2.iloc[i] < bins_var2[col+1]):
                     tbl[row,col] += 1 
     
     tbl = tbl/N*100                 
@@ -66,7 +66,7 @@ def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
     
     dfout.fillna(dfout.max().max()+1, inplace=True)
     max_val = dfout.max().max()
-    hi = sns.heatmap(data=dfout.where(dfout<max_val), annot=True, cbar=True, cmap='Blues', fmt=".1f")
+    hi = sns.heatmap(data=dfout.where(dfout<max_val), cbar=True, cmap='Blues', fmt=".1f")
     plt.ylabel(var1.name)
     plt.xlabel(var2.name)
     plt.tight_layout()
@@ -93,8 +93,8 @@ def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
     N = len(Hs)
     for i in range(N):
         for j in range(len(binsHs)-1) : 
-            if binsHs[j] <= Hs[i] < binsHs[j+1] : 
-                Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))].append(Var[i])
+            if binsHs[j] <= Hs.iloc[i] < binsHs[j+1] : 
+                Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))].append(Var.iloc[i])
     
     with open(temp_file, 'w') as f:
         f.write('\\begin{tabular}{l p{1.5cm}|p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
@@ -162,7 +162,7 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
     
     for i in range(len(Var)) : 
         m_idx = int(M[i]-1) 
-        monthlyVar[months[m_idx]].append(Var[i])  
+        monthlyVar[months[m_idx]].append(Var.iloc[i])  
         
         
     with open(temp_file, 'w') as f:
