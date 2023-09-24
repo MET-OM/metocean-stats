@@ -140,7 +140,6 @@ def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
 def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):  
     """
     this function will sort variable var e.g., hs by month and calculate percentiles 
-    it then writes to Latex file 
     data : panda series 
     output_file: extension .txt for latex table or .csv for csv table
     """
