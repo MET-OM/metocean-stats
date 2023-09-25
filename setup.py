@@ -21,6 +21,7 @@ setuptools.setup(
         'pip',
         'scipy',
         'pip',
+        'windrose',
         'seaborn>=0.12.2',
         'metocean-api'
     ],
