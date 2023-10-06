@@ -4,8 +4,8 @@
 
 def return_levels_pot(data,var,periods):
     """
-    Subroutine created by Clio (July 2023)
-    Goal: calculates the return levels (rl) from a time series (ts) for different return periods (periods)
+    Subroutine written by clio-met (July 2023)
+    Purpose: calculates the return levels (rl) from a time series (ts) for different return periods (periods)
     - Inputs:
     1) ts is an xarray with time enabled containing the time series of the daily or monthly maximum of the variable of interest (ex: wind speed)
     2) periods is a numpy array containing the return periods (in years) of interest (ex: np.array([20,30,50,100]))
