@@ -5,7 +5,7 @@ from metocean_stats.stats import general_stats, dir_stats, extreme_stats
 ds = ts.TimeSeries(lon=109.94, lat=15.51,start_time='2000-01-01', end_time='2010-12-31' , product='ERA5')
 
 
-# Import data from thredds.met.no and save it as csv
+# Import data using cdsapi and save it as csv
 #ds.import_data(save_csv=True)
 # Load data from local file
 ds.load_data('tests/data/'+ds.datafile)
