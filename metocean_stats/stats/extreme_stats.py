@@ -114,7 +114,7 @@ def plot_return_levels(data,var,rl,periods, output_file,it_selected_max=[]):
     fig, ax = plt.subplots(figsize=(12,6))
     data[var].plot(color='lightgrey')
     for i in range(len(rl)):
-        ax.hlines(y=rl[i], xmin=data[var].index[0], xmax=data[var].index[-1],color=color[i] ,linestyle='dashed', linewidth=2,label=str(rl[i].round(1))+' ('+str(int(periods[i]))+'y)' )
+        ax.hlines(y=rl[i], xmin=data[var].index[0], xmax=data[var].index[-1],color=color[i] ,linestyle='dashed', linewidth=2,label=str(rl[i].round(2))+' ('+str(int(periods[i]))+'y)' )
 
     plt.scatter(data[var][it_selected_max].index,data[var].loc[it_selected_max],s=10,marker='o',color='black',zorder=2)
     #plt.scatter(data[var].index[it_selected_max],data[var].iloc[it_selected_max],s=10,marker='o',color='black',zorder=2)

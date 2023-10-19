@@ -17,7 +17,7 @@ ds.load_data('tests/data/'+ds.datafile)
 #general_stats.table_monthly_min_mean_max(data=ds.data, var='hs',output_file='hs_montly_min_mean_max.csv')#
 #dir_stats.var_rose(ds.data, 'thq','hs','windrose.png',method='overall')
 #dir_stats.directional_min_mean_max(ds.data,'thq','hs','hs_dir_min_mean_max.csv')
-rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', periods=[20,50,100,1000], output_file='return_levels_POT.pdf')
-rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,50,100,1000],method='GEV',output_file='return_levels_GEV.pdf')
+rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', periods=[20,50,100,1000], output_file='return_levels_POT.png')
+rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,50,100,1000],method='GEV',output_file='return_levels_GEV.png')
 
 
