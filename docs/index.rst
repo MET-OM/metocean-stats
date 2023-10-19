@@ -202,7 +202,29 @@ Extreme Statistics
 
 To generate extreme stastistics, import extreme_stats module: 
 
-...
+.. code-block:: python
+   
+   from metocean_stats.stats import extreme_stats
+
+Create time series of Hs with return levels using POT and Annual Maximum(GEV):
+
+.. code-block:: python
+   
+   rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', 
+            periods=[20,50,100,1000], 
+            output_file='return_levels_POT.png')
+
+.. image:: return_levels_POT.png
+  :width: 500
+
+.. code-block:: python
+   
+   rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', 
+           periods=[20,50,100,1000],method='GEV',
+           output_file='return_levels_GEV.png')
+
+.. image:: return_levels_GEV.png
+  :width: 500
 
 .. toctree::
    :maxdepth: 2
