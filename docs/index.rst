@@ -215,7 +215,7 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
             output_file='return_levels_POT.png')
 
 .. image:: return_levels_POT.png
-  :width: 500
+  :width: 700
 
 .. code-block:: python
    
@@ -224,7 +224,7 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
            output_file='return_levels_GEV.png')
 
 .. image:: return_levels_GEV.png
-  :width: 500
+  :width: 700
 
 .. toctree::
    :maxdepth: 2
