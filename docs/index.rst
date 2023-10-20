@@ -238,7 +238,7 @@ Estimate and plot mean wind profile:
 
 .. code-block:: python
    
-   profile_stats.mean_profile(data = ds.data, vars = 
+   mean_prof = profile_stats.mean_profile(data = ds.data, vars = 
                 ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
                 'wind_speed_100m','wind_speed_250m','wind_speed_500m',
                 'wind_speed_750m'],
