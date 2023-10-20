@@ -132,7 +132,7 @@ Create table with sorted statistics by Hs:
 
 .. code-block:: python
 
-   general_stats.table_var_sorted_by_Hs(data=ts.data, var='tp', output_file='tp_sorted_by_hs.csv')
+   general_stats.table_var_sorted_by_hs(data=ts.data, var='tp', var_hs='hs', output_file='tp_sorted_by_hs.csv')
 
 .. csv-table:: 
    :header-rows: 1
@@ -202,7 +202,52 @@ Extreme Statistics
 
 To generate extreme stastistics, import extreme_stats module: 
 
-...
+.. code-block:: python
+   
+   from metocean_stats.stats import extreme_stats
+
+Create time series of Hs with return levels using POT and Annual Maximum(GEV):
+
+.. code-block:: python
+   
+   rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', 
+            periods=[20,50,100,1000], 
+            output_file='return_levels_POT.png')
+
+.. image:: return_levels_POT.png
+  :width: 700
+
+.. code-block:: python
+   
+   rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', 
+           periods=[20,50,100,1000],method='GEV',
+           output_file='return_levels_GEV.png')
+
+.. image:: return_levels_GEV.png
+  :width: 700
+
+Profile Statistics
+=====================================
+To generate profile stastistics, import profile_stats module: 
+
+.. code-block:: python
+   
+   from metocean_stats.stats import profile_stats
+
+Estimate and plot mean wind profile:
+
+.. code-block:: python
+   
+   mean_prof = profile_stats.mean_profile(data = ds.data, vars = 
+                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
+                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
+                'wind_speed_750m'],
+                height_levels=[10,20,50,100,250,500,750],
+                perc=[25,75], 
+                output_file='wind_profile.png')
+
+.. image:: wind_profile.png
+  :height: 500
 
 .. toctree::
    :maxdepth: 2

@@ -12,6 +12,7 @@ from .aux_funcs import convert_latexTab_to_csv, Tp_correction
 
 def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):  
     """
+    The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
     step_var: size of bin e.g., 0.5m for hs and 1s for Tp
     cmap: colormap, default is 'Blues'
@@ -71,17 +72,21 @@ def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
     plt.xlabel(var2.name)
     plt.tight_layout()
     plt.savefig(output_file)
+    plt.close()
     
     return hi 
 
 
-def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
+def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
     """
+    The function is written by dung-manh-nguyen and KonstantinChri.
     This will sort variable var e.g., 'tp' by 1 m interval og hs
     then calculate min, percentile 5, mean, percentile 95 and max
+    data : panda series 
+    var  : variable 
     output_file: extension .txt for latex table or .csv for csv table
     """
-    Hs = data['hs']
+    Hs = data[var_hs]
     Var = data[var]
     binsHs = np.arange(0.,math.ceil(np.max(Hs))+0.1) # +0.1 to get the last one   
     temp_file = output_file.split('.')[0]
@@ -139,8 +144,10 @@ def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
 
 def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):  
     """
+    The function is written by dung-manh-nguyen and KonstantinChri.
     this function will sort variable var e.g., hs by month and calculate percentiles 
     data : panda series 
+    var  : variable 
     output_file: extension .txt for latex table or .csv for csv table
     """
 
@@ -194,6 +201,14 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
 
 
 def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') :  
+    """
+    The function is written by dung-manh-nguyen and KonstantinChri.
+    It calculates min, mean, max in each month  and the omni values 
+    data : panda series
+    var  : variable 
+    output_file: extension .txt for latex table or .csv for csv table
+    """
+        
     var = data[var]
     temp_file  = output_file.split('.')[0]
     months = calendar.month_name[1:] # eliminate the first insane one 
