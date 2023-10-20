@@ -132,7 +132,7 @@ Create table with sorted statistics by Hs:
 
 .. code-block:: python
 
-   general_stats.table_var_sorted_by_Hs(data=ts.data, var='tp', output_file='tp_sorted_by_hs.csv')
+   general_stats.table_var_sorted_by_hs(data=ts.data, var='tp', var_hs='hs', output_file='tp_sorted_by_hs.csv')
 
 .. csv-table:: 
    :header-rows: 1
