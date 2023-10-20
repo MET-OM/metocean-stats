@@ -32,7 +32,8 @@ def var_rose(data, direction,intensity, output_file, method='overall'):
 
     elif method == 'monthly':
         monthly_var_rose(direction,intensity,output_file)
-        
+    
+    plt.close()
     return 
 
 def directional_min_mean_max(data, direction, intensity, output_file) : 
@@ -133,4 +134,5 @@ def monthly_var_rose(data, direction,intensity,output_file) :
         size = 5
         ax.figure.set_size_inches(size, size)
         plt.savefig(months[j]+'_'+output_file,dpi=100,facecolor='white',bbox_inches='tight')
+        plt.close()
     return

@@ -126,5 +126,6 @@ def plot_return_levels(data,var,rl,periods, output_file,it_selected_max=[]):
     plt.title(output_file.split('.')[0],fontsize=18)
     plt.tight_layout()
     plt.savefig(output_file)
+    plt.close()
     
     return

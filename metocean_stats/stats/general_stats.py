@@ -72,11 +72,12 @@ def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
     plt.xlabel(var2.name)
     plt.tight_layout()
     plt.savefig(output_file)
+    plt.close()
     
     return hi 
 
 
-def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
+def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
     This will sort variable var e.g., 'tp' by 1 m interval og hs
@@ -85,7 +86,7 @@ def table_var_sorted_by_hs(data,var,output_file='var_sorted_by_Hs.txt'):
     var  : variable 
     output_file: extension .txt for latex table or .csv for csv table
     """
-    Hs = data['hs']
+    Hs = data[var_hs]
     Var = data[var]
     binsHs = np.arange(0.,math.ceil(np.max(Hs))+0.1) # +0.1 to get the last one   
     temp_file = output_file.split('.')[0]
