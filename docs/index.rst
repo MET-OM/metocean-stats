@@ -226,6 +226,29 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 .. image:: return_levels_GEV.png
   :width: 700
 
+Profile Statistics
+=====================================
+To generate profile stastistics, import profile_stats module: 
+
+.. code-block:: python
+   
+   from metocean_stats.stats import profile_stats
+
+Plot and print mean wind profile:
+
+.. code-block:: python
+   
+   profile_stats.mean_profile(data = ds.data, vars = 
+                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
+                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
+                'wind_speed_750m'],
+                height_levels=[10,20,50,100,250,500,750],
+                perc=[25,75], 
+                output_file='wind_profile.png')
+
+.. image:: wind_profile.png
+  :width: 500
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
