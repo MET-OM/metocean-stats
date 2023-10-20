@@ -234,7 +234,7 @@ To generate profile stastistics, import profile_stats module:
    
    from metocean_stats.stats import profile_stats
 
-Plot and print mean wind profile:
+Estimate and plot mean wind profile:
 
 .. code-block:: python
    
