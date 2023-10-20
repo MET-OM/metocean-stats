@@ -247,7 +247,7 @@ Plot and print mean wind profile:
                 output_file='wind_profile.png')
 
 .. image:: wind_profile.png
-  :width: 500
+  :height: 500
 
 .. toctree::
    :maxdepth: 2
