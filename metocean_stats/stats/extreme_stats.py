@@ -51,6 +51,8 @@ def return_levels_pot(data,var,threshold=None,periods=[50,100], output_file='ret
         pass
     else:
         plot_return_levels(data,var,rl,periods,output_file,it_selected_max=ts.iloc[it_selected_max].index)
+    
+    probplot(data=sel_val.values, sparams=(shape, loc, scale))
 
     return rl
 
@@ -93,8 +95,7 @@ def return_levels_annual_max(data,var='hs',periods=[50,100,1000],method='GEV',ou
         pass
     else:
         plot_return_levels(data,var,rl,periods,output_file,it_selected_max)
-
-
+    
     return rl
 
 def get_threshold_os(data,var):
@@ -128,4 +129,15 @@ def plot_return_levels(data,var,rl,periods, output_file,it_selected_max=[]):
     plt.savefig(output_file)
     plt.close()
     
+    return
+
+
+def probplot(data, sparams):    
+    import scipy.stats as stats
+    stats.probplot(data,sparams=sparams, dist=stats.genpareto,fit=True, plot=plt)
+    plt.grid()
+    plt.axline((data[0], data[0]), slope=1,label='y=x')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
     return
