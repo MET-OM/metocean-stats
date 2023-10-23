@@ -13,7 +13,20 @@ The package contains functions that:
 
 Installing **metocean-stats**
 =============================================
-1. Install anaconda3 or miniconda3
+Alternative 1: Using Mambaforge (alternative to Miniconda)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
+2. Set up a *Python 3* environment for metocean-stats and install metocean-stats
+
+.. code-block:: bash
+
+   $ mamba create -n metocean-stats python=3 metocean-stats
+   $ conda activate metocean-stats
+
+Alternative 2: Using Mambaforge (alternative to Miniconda) and Git
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
 2. Clone metocean-stats:
 
 .. code-block:: bash
@@ -25,16 +38,17 @@ Installing **metocean-stats**
 
 .. code-block:: bash
 
-  $ conda config --add channels conda-forge
-  $ conda env create -f environment.yml
+  $ mamba env create -f environment.yml
   $ conda activate metocean-stats
-  $ pip install -e .
-  
-To update the enviroment using a new environment.yml, run:
+  $ pip install --no-deps -e .
+
+This installs the metocean-stats as an editable package. Therefore, you can directly make changes to the repository or fetch the newest changes with :code:`git pull`. 
+
+To update the local conda environment in case of new dependencies added to environment.yml:
 
 .. code-block:: bash
 
-   $ conda env update --file environment.yml --prune
+  $ mamba env update -f environment.yml
 
 Download metocean data
 =====================================
