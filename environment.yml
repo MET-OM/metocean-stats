@@ -12,3 +12,4 @@ dependencies:
   - windrose
   - seaborn>=0.12.2
   - metocean-api
+  - pyextremes
