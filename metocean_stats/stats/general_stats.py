@@ -6,11 +6,11 @@ import xarray as xr
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
-
+from math import floor
 
 from .aux_funcs import convert_latexTab_to_csv, Tp_correction
 
-def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):  
+def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
@@ -20,45 +20,49 @@ def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
      """   
     var1 = data[var1]
     var2 = data[var2]
-    bins_var1 = np.arange(math.floor(np.min(var1)),math.ceil(np.max(var1))+step_var1,step_var1) # one cell more 
-    bins_var2 = np.arange(math.floor(np.min(var2)),math.ceil(np.max(var2))+step_var2,step_var2) # one cell at beginning and ending 
+    v1min = np.min(var1)
+    v1max = np.max(var1)
+    v2min = np.min(var2)
+    v2max = np.max(var2)
+    bins_var1 = np.arange(math.floor(v1min),math.ceil(v1max)+step_var1,step_var1) # one cell more
+    bins_var2 = np.arange(math.floor(v2min),math.ceil(v2max)+step_var2,step_var2) # one cell at beginning and ending
     tbl = np.zeros([len(bins_var1)-1,len(bins_var2)-1])
     row_var1, col_var2 = tbl.shape
-    
-    N = len(var1)
-    for i in range(N):
-        for row in range(row_var1) : 
-            for col in range(col_var2) : 
-                if (bins_var1[row] <= var1.iloc[i] < bins_var1[row+1]) and (bins_var2[col] <= var2.iloc[i] < bins_var2[col+1]):
-                    tbl[row,col] += 1 
-    
-    tbl = tbl/N*100                 
-                    
+
+    for (v1,v2) in zip(var1,var2) :
+        row = floor(v1 / step_var1)
+        col = floor(v2 / step_var2)
+        # The maximum values will land outside the last bin, so we need to check for that
+        if row == row_var1 and v1 == v1max:
+            row -= 1
+        if col == col_var2 and v2 == v2max:
+            col -= 1
+
+        tbl[row,col] += 1
+
+    tbl = tbl/len(var1)*100
+
     sumcols = np.sum(tbl, axis=0)
     sumrows = np.sum(tbl, axis=1)
-    
+
     sumrows = np.around(sumrows, decimals=1)
     sumcols = np.around(sumcols, decimals=1)
-    
-    
+
+
     ## make rows and columns for table 
     rows = []
     for i in range(len(bins_var1)-1):
         rows.append('%04.1f' % bins_var1[i]+'-'+'%04.1f' % bins_var1[i+1]+' | '+'%04.1f' % sumrows[i]+'%')
     rows = rows[::-1]
     tbl = tbl[::-1,:]
-        
+
     cols = []
     for i in range(len(bins_var2)-1):
         cols.append(str(int(bins_var2[i]))+'-'+str(int(bins_var2[i+1]))+' | '+'%04.1f' % sumcols[i]+'%')
-        
-        
-    # Replace 0 by nan 
-    for i in range(tbl.shape[0]): 
-        for j in range(tbl.shape[1]):
-            if tbl[i,j]==0 : 
-                tbl[i,j]=np.nan
-    
+
+    # Replace 0 by nan
+    tbl[tbl==0] = np.nan
+
     # Assign to dataframe 
     dfout = pd.DataFrame()
     dfout.index = rows 
