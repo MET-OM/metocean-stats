@@ -2,84 +2,96 @@ import os
 import math
 import numpy as np
 import pandas as pd
-import xarray as xr
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
-from math import floor
+from math import floor,ceil
 
-from .aux_funcs import convert_latexTab_to_csv, Tp_correction
+from .aux_funcs import convert_latexTab_to_csv
 
-def scatter_diagram(data, var1, step_var1, var2, step_var2, output_file):
+def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
     """
-    The function is written by dung-manh-nguyen and KonstantinChri.
-    Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
+    Create scatter table of two variables (e.g, var1='hs', var2='tp')
     step_var: size of bin e.g., 0.5m for hs and 1s for Tp
-    cmap: colormap, default is 'Blues'
-    outputfile: name of output file with extrensition e.g., png, eps or pdf 
-     """   
+    The rows are the upper bin edges of var1 and the columns are the upper bin edges of var2
+     """
     var1 = data[var1]
     var2 = data[var2]
     v1min = np.min(var1)
     v1max = np.max(var1)
     v2min = np.min(var2)
     v2max = np.max(var2)
-    bins_var1 = np.arange(math.floor(v1min),math.ceil(v1max)+step_var1,step_var1) # one cell more
-    bins_var2 = np.arange(math.floor(v2min),math.ceil(v2max)+step_var2,step_var2) # one cell at beginning and ending
-    tbl = np.zeros([len(bins_var1)-1,len(bins_var2)-1])
-    row_var1, col_var2 = tbl.shape
+
+    # Find the the upper bin edges
+    max_bin_1 = ceil(v1max / step_var1)
+    max_bin_2 = ceil(v2max / step_var2)
+    min_bin_1 = ceil(v1min / step_var1)
+    min_bin_2 = ceil(v2min / step_var2)
+
+    var1_upper_bins = np.arange(min_bin_1, max_bin_1+step_var1, step_var1)
+    var2_upper_bins = np.arange(min_bin_2, max_bin_2+step_var2, step_var2)
+
+    row_size = len(var1_upper_bins)
+    col_size = len(var2_upper_bins)
+    data = np.zeros([row_size, col_size])
 
     for (v1,v2) in zip(var1,var2) :
-        row = floor(v1 / step_var1)
-        col = floor(v2 / step_var2)
-        # The maximum values will land outside the last bin, so we need to check for that
-        if row == row_var1 and v1 == v1max:
-            row -= 1
-        if col == col_var2 and v2 == v2max:
-            col -= 1
+        # Find the correct bin and sum up
+        row = floor(v1 / step_var1)-(min_bin_1-1)
+        col = floor(v2 / step_var2)-(min_bin_2-1)
+        data[row,col] += 1
 
-        tbl[row,col] += 1
+    return pd.DataFrame(data=data, index=var1_upper_bins, columns=var2_upper_bins)
 
-    tbl = tbl/len(var1)*100
+def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
+    """
+    The function is written by dung-manh-nguyen and KonstantinChri.
+    Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
+    step_var: size of bin e.g., 0.5m for hs and 1s for Tp
+    cmap: colormap, default is 'Blues'
+    outputfile: name of output file with extrensition e.g., png, eps or pdf 
+     """
 
+    sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
+
+    # Convert to percentage
+    tbl = sd.values
+    var1_data = data[var1]
+    tbl = tbl/len(var1_data)*100
+
+    # Then make new row and column labels with a summed percentage
     sumcols = np.sum(tbl, axis=0)
     sumrows = np.sum(tbl, axis=1)
 
     sumrows = np.around(sumrows, decimals=1)
     sumcols = np.around(sumcols, decimals=1)
 
+    bins_var1 = sd.index
+    bins_var2 = sd.columns
+    lower_bin_1 = bins_var1[0] - step_var1
+    lower_bin_2 = bins_var2[0] - step_var2
 
-    ## make rows and columns for table 
     rows = []
+    rows.append(f'{lower_bin_1:04.1f}-{bins_var1[0]:04.1f} | {sumrows[0]:04.1f}%')
     for i in range(len(bins_var1)-1):
-        rows.append('%04.1f' % bins_var1[i]+'-'+'%04.1f' % bins_var1[i+1]+' | '+'%04.1f' % sumrows[i]+'%')
-    rows = rows[::-1]
-    tbl = tbl[::-1,:]
+        rows.append(f'{bins_var1[i]:04.1f}-{bins_var1[i+1]:04.1f} | {sumrows[i+1]:04.1f}%')
 
     cols = []
+    cols.append(f'{int(lower_bin_2)}-{int(bins_var2[0])} | {sumcols[0]:04.1f}%')
     for i in range(len(bins_var2)-1):
-        cols.append(str(int(bins_var2[i]))+'-'+str(int(bins_var2[i+1]))+' | '+'%04.1f' % sumcols[i]+'%')
+        cols.append(f'{int(bins_var2[i])}-{int(bins_var2[i+1])} | {sumcols[i+1]:04.1f}%')
 
-    # Replace 0 by nan
-    tbl[tbl==0] = np.nan
-
-    # Assign to dataframe 
-    dfout = pd.DataFrame()
-    dfout.index = rows 
-    for i in range(len(cols)) : 
-        dfout[cols[i]] = tbl[:,i] 
-    
-    dfout.fillna(dfout.max().max()+1, inplace=True)
-    max_val = dfout.max().max()
-    hi = sns.heatmap(data=dfout.where(dfout<max_val), cbar=True, cmap='Blues', fmt=".1f")
-    plt.ylabel(var1.name)
-    plt.xlabel(var2.name)
+    rows = rows[::-1]
+    tbl = tbl[::-1,:]
+    dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
+    hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
+    plt.ylabel(var1)
+    plt.xlabel(var2)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
-    
-    return hi 
 
+    return hi
 
 def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
     """
