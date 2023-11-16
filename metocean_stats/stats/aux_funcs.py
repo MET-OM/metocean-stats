@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-import xarray as xr
 import pandas as pd
 import numpy as np
 import time
