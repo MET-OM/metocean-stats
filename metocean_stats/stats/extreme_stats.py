@@ -1,6 +1,8 @@
+from typing import Dict, Sequence
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import xarray as xr
 
 def return_levels_pot(data,var,threshold=None,periods=[50,100], output_file=False):
     """
@@ -16,9 +18,7 @@ def return_levels_pot(data,var,threshold=None,periods=[50,100], output_file=Fals
         threshold = get_threshold_os(data=data, var=var)
     else:
         pass
-    # Required modules
     periods = np.array(periods, dtype=float)
-    # Take yearly maximum
     ts = data[var]
     # select the values above the threshold in the timeseries ts
     it=np.where(ts.values>=threshold)[0]
@@ -168,8 +168,6 @@ def return_levels_exp(data,var='hs',periods=[50,100,1000],threshold=None, r="48H
     return return_levels
 
 
-
-
 def plot_return_levels(data,var,rl,periods, output_file,it_selected_max=[]):
     color = plt.cm.rainbow(np.linspace(0, 1, len(rl)))
     fig, ax = plt.subplots(figsize=(12,6))
@@ -213,7 +211,12 @@ def return_value_plot(obs_return_periods, obs_return_levels,model_return_periods
     plt.legend()
     plt.tight_layout()
     plt.show()
+    #alpha = 0.95
+    #cil, ciu = np.quantile(a=rl_sample, q=[(1 - alpha) / 2, (1 + alpha) / 2])
     return
+
+
+
 
 def get_empirical_return_levels(data,var,method="POT",block_size="365.2425D"):
     """
@@ -229,7 +232,7 @@ def get_empirical_return_levels(data,var,method="POT",block_size="365.2425D"):
     return rp['return period'], rp[var]
 
 
-def diagnostic_return_level_plot(data,var,model_method,periods,threshold=None):
+def diagnostic_return_level_plot(data,var,model_method,periods=np.arange(0.1,1000,0.1),threshold=None):
     if model_method == 'POT':
         return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
                           model_return_periods=periods, model_return_levels=return_levels_pot(data,var,threshold=threshold,periods=periods), model_method=model_method)
@@ -245,3 +248,85 @@ def diagnostic_return_level_plot(data,var,model_method,periods,threshold=None):
     elif model_method == 'EXP':
         return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
                           model_return_periods=periods, model_return_levels=return_levels_exp(data,var,threshold=threshold,periods=periods), model_method=model_method)
+        
+
+
+def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]) -> Sequence[Dict]:
+    """Compute a joint contour for the given return periods. 
+    Input:
+        data: pd.DataFrame
+        var1: e.g., 'hs'
+        var2: e.g., 'tp'
+        return_periods: A list of return periods in years, default [50,100]
+    Output:
+         contours : list of joint contours, 
+         i.e.,  number of contours based on given return_periods 
+    """
+    from virocon import get_OMAE2020_Hs_Tz,get_DNVGL_Hs_U,get_OMAE2020_Hs_Tz,get_OMAE2020_V_Hs, GlobalHierarchicalModel,IFORMContour, ISORMContour     
+    # Define 2D joint distribution model
+    dist_descriptions, fit_descriptions, _ = get_OMAE2020_Hs_Tz()
+    model = GlobalHierarchicalModel(dist_descriptions)
+    dt = (data.index[1]-data.index[0]).total_seconds()/3600  # duration in hours
+    data_2D =  np.transpose(np.array([data[var1],data[var2]]))
+    model.fit(data_2D, fit_descriptions=fit_descriptions)
+    contours = []
+    for rp in periods:
+        alpha = 1 / (rp * 365.25 * 24 / dt)
+        contour = IFORMContour(model, alpha)
+        coords = contour.coordinates
+        x = coords[:, 1].tolist()
+        y = coords[:, 0].tolist()
+        contours.append({
+            'return_period': rp,
+            'x': x,
+            'y': y
+        })
+    return contours, data_2D
+
+def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png') -> Sequence[Dict]:
+    contours, data_2D = get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
+    """Plot joint contours for the given return periods. 
+    Input:
+        data: pd.DataFrame
+        var1: e.g., 'hs'
+        var2: e.g., 'tp'
+        return_periods: A list of return periods in years, default [50,100]
+        output_file: Path to save the plot 
+    Output:
+         figure with 2Djoint contours
+    """
+    # Plot the contours and save the plot
+
+    fig, ax = plt.subplots()
+    if len(data_2D)>0:
+        import seaborn as sns
+        sns.set_theme(style="ticks")
+        sns.scatterplot(x=data_2D[:,1], y=data_2D[:,0], ax=ax, color='black')
+    else:
+        pass
+
+    color = plt.cm.rainbow(np.linspace(0, 1, len(periods)))
+    # Compute an IFORM contour with a return period of N years
+    #loop over contours, get index
+
+    for i,contour in enumerate(contours):
+        # Plot the contour
+        x = []
+        x.extend(contour['x'])
+        x.append(x[0])
+
+        y = []
+        y.extend(contour['y'])
+        y.append(y[0])
+
+        rp = contour['return_period']
+        ax.plot(x, y, color=color[i],label=str(rp)+'y')
+
+        ax.set_xlabel(var2,fontsize='16')
+        ax.set_ylabel(var1,fontsize='16')
+
+    plt.grid()
+    plt.title(output_file.split('.')[0],fontsize=18)
+    plt.legend()
+    plt.savefig(output_file,dpi=300)
+    return fig, ax

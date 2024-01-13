@@ -39,3 +39,8 @@ def test_return_levels_annual_max(ds=ds):
 
 def test_return_levels_annual_max(ds=ds):
     profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
+
+def test_joint_2D_contour(ds=ds):
+    extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[20,100], output_file='test.png')
+    os.remove('test.png')
+
