@@ -118,7 +118,7 @@ Create table with monthly percentiles:
    des , 0.4 , 1.3 , 1.4 , 2.8 , 3.5 
    Annual , 0.4 , 1.3 , 1.4 , 2.8 , 3.5
 
-Create table with monthly min, mean, and max values:
+Create table with monthly min, mean, and max based on monthly values:
 
 .. code-block:: python
 
@@ -238,16 +238,14 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
            output_file='return_levels_GEV.png')
 
 .. image:: return_levels_GEV.png
-  :width: 700
+  :width: 700   
+
+Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
 
 .. code-block:: python
    
-   from metocean_stats.stats import extreme_stats
-
- Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
-
-.. code-block:: python
-   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[20,50,100,1000], output_file='2D_contours.png')
+   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[50,100], 
+                                       output_file='2D_contours.png')
 
 .. image:: 2D_contours.png
   :width: 700
