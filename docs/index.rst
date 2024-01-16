@@ -240,6 +240,20 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 .. image:: return_levels_GEV.png
   :width: 700
 
+.. code-block:: python
+   
+   from metocean_stats.stats import extreme_stats
+
+ Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
+
+.. code-block:: python
+   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[20,50,100,1000], output_file='2D_contours.png')
+
+.. image:: 2D_contours.png
+  :width: 700
+
+
+
 Profile Statistics
 =====================================
 To generate profile stastistics, import profile_stats module: 
@@ -262,6 +276,9 @@ Estimate and plot mean wind profile:
 
 .. image:: wind_profile.png
   :height: 500
+
+
+
 
 .. toctree::
    :maxdepth: 2
