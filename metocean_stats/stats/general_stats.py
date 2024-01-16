@@ -229,7 +229,7 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
 def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') :  
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
-    It calculates min, mean, max in each month  and the omni values 
+    It calculates monthly min, mean, max based on monthly maxima. 
     data : panda series
     var  : variable 
     output_file: extension .txt for latex table or .csv for csv table
