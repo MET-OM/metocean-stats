@@ -13,7 +13,20 @@ The package contains functions that:
 
 Installing **metocean-stats**
 =============================================
-1. Install anaconda3 or miniconda3
+Alternative 1: Using Mambaforge (alternative to Miniconda)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
+2. Set up a *Python 3* environment for metocean-stats and install metocean-stats
+
+.. code-block:: bash
+
+   $ mamba create -n metocean-stats python=3 metocean-stats
+   $ conda activate metocean-stats
+
+Alternative 2: Using Mambaforge (alternative to Miniconda) and Git
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
 2. Clone metocean-stats:
 
 .. code-block:: bash
@@ -25,16 +38,17 @@ Installing **metocean-stats**
 
 .. code-block:: bash
 
-  $ conda config --add channels conda-forge
-  $ conda env create -f environment.yml
+  $ mamba env create -f environment.yml
   $ conda activate metocean-stats
-  $ pip install -e .
-  
-To update the enviroment using a new environment.yml, run:
+  $ pip install --no-deps -e .
+
+This installs the metocean-stats as an editable package. Therefore, you can directly make changes to the repository or fetch the newest changes with :code:`git pull`. 
+
+To update the local conda environment in case of new dependencies added to environment.yml:
 
 .. code-block:: bash
 
-   $ conda env update --file environment.yml --prune
+  $ mamba env update -f environment.yml
 
 Download metocean data
 =====================================
@@ -104,7 +118,7 @@ Create table with monthly percentiles:
    des , 0.4 , 1.3 , 1.4 , 2.8 , 3.5 
    Annual , 0.4 , 1.3 , 1.4 , 2.8 , 3.5
 
-Create table with monthly min, mean, and max values:
+Create table with monthly min, mean, and max based on monthly values:
 
 .. code-block:: python
 
@@ -224,7 +238,19 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
            output_file='return_levels_GEV.png')
 
 .. image:: return_levels_GEV.png
+  :width: 700   
+
+Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
+
+.. code-block:: python
+   
+   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[50,100], 
+                                       output_file='2D_contours.png')
+
+.. image:: 2D_contours.png
   :width: 700
+
+
 
 Profile Statistics
 =====================================
@@ -248,6 +274,9 @@ Estimate and plot mean wind profile:
 
 .. image:: wind_profile.png
   :height: 500
+
+
+
 
 .. toctree::
    :maxdepth: 2
