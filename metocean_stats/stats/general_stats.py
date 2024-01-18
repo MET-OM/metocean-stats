@@ -2,13 +2,12 @@ import os
 import math
 import numpy as np
 import pandas as pd
-import xarray as xr
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
-from math import floor, ceil
+from math import floor,ceil
 
-from .aux_funcs import convert_latexTab_to_csv, Tp_correction
+from .aux_funcs import convert_latexTab_to_csv
 
 def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
     """
@@ -101,7 +100,6 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     plt.close()
 
     return hi
-
 
 def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
     """
