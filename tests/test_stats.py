@@ -5,7 +5,8 @@ import os
 # Define TimeSeries-object for NORA3
 ds = ts.TimeSeries(lon=1.32, lat=53.324,start_time='2000-01-01', end_time='2010-12-31' , product='NORA3_wind_wave')
 # Import data from thredds.met.no and save it as csv
-ds.load_data('tests/data/'+ds.datafile)
+#ds.load_data('tests/data/'+ds.datafile)
+ds.load_data('/home/birgitterf/dev/github/metocean-stats/tests/data/'+ds.datafile)
 
 def test_scatter_diagram(ds=ds):
     general_stats.scatter_diagram(data=ds.data, var1='hs', step_var1=1, var2='tp', step_var2=1, output_file='test.png')
@@ -37,5 +38,10 @@ def test_return_levels_pot(ds=ds):
 def test_return_levels_annual_max(ds=ds):
     extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,100], output_file=False) 
 
-def test_return_levels_annual_max(ds=ds):
+def test_mean_profile(ds=ds):
     profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
+    
+def test_profile_shear(ds=ds):
+    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
+    
+    
