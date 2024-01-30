@@ -6,7 +6,7 @@ import os
 ds = ts.TimeSeries(lon=1.32, lat=53.324,start_time='2000-01-01', end_time='2010-12-31' , product='NORA3_wind_wave')
 # Import data from thredds.met.no and save it as csv
 #ds.load_data('tests/data/'+ds.datafile)
-ds.load_data('/home/birgitterf/dev/github/metocean-stats/tests/data/'+ds.datafile)
+ds.load_data('tests/data/'+ds.datafile)
 
 def test_scatter_diagram(ds=ds):
     general_stats.scatter_diagram(data=ds.data, var1='hs', step_var1=1, var2='tp', step_var2=1, output_file='test.png')
