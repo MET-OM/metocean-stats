@@ -260,7 +260,7 @@ To generate profile stastistics, import profile_stats module:
    
    from metocean_stats.stats import profile_stats
 
-Estimate and plot mean wind profile:
+Estimate and plot mean wind profile with percentiles in shaded region:
 
 .. code-block:: python
    
@@ -275,7 +275,20 @@ Estimate and plot mean wind profile:
 .. image:: wind_profile.png
   :height: 500
 
+Calculate the wind speed shear over any two heights of the input profile and plot in a histogram and output shear values. Percentiles are shown as shaded region.:
+.. code-block:: python
 
+profile_stats.profile_shear(data = ds.data, vars =       
+                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
+                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
+                'wind_speed_750m'],
+                height_levels=[10,20,50,100,250,500,750], 
+                z=[20,250], 
+                perc = [25,75], 
+                output_file='wind_profile_shear.png')
+
+.. image:: wind_profile_shear.png
+  :width: 500
 
 
 .. toctree::
