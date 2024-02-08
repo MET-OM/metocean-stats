@@ -44,3 +44,11 @@ def test_joint_2D_contour(ds=ds):
     extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[20,100], output_file='test.png')
     os.remove('test.png')
 
+def test_diagnostic_return_level_plot_multi(ds=ds):
+    extreme_stats.diagnostic_return_level_plot_multi(data=ds.data, 
+                                                     var='hs',
+                                                     model_method=['POT', 
+                                                                   'EXP'],
+                                                     yaxis='prob',
+                                                     output_file=None)
+
