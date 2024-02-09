@@ -51,4 +51,8 @@ def test_diagnostic_return_level_plot_multi(ds=ds):
                                                                    'EXP'],
                                                      yaxis='prob',
                                                      output_file=None)
+                                             
+def test_return_level_threshold_plot(ds=ds):
+    extreme_stats.return_level_threshold_plot(data=ds.data, var='hs', 
+                                thresholds=[1,1.5])
 

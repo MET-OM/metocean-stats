@@ -35,6 +35,7 @@ def return_levels_pot(data, var, threshold=None,
         del mxi
     # Get the selected values and time for the extreme value analysis
     sel_val=ts.iloc[it_selected_max]
+
     #sel_time=sel_val.index
     # Total number of selected values
     ns=len(sel_val)
@@ -46,7 +47,7 @@ def return_levels_pot(data, var, threshold=None,
     from scipy.stats import genpareto
     shape,loc,scale = genpareto.fit(sel_val.values-threshold)
     rl = genpareto.isf(1/(lambd*periods), shape, loc, scale) + threshold
-        
+
     # If the return level is unrealistic (usually very high), set rl to a special number
     rl=np.where(rl>=3*threshold,np.nan,rl)
     if output_file == False:
@@ -54,6 +55,7 @@ def return_levels_pot(data, var, threshold=None,
     else:
         plot_return_levels(data,var,rl,periods,output_file,it_selected_max=ts.iloc[it_selected_max].index)
         #probplot(data=sel_val.values, sparams=(shape, loc, scale))
+    
     return rl
 
 
@@ -127,18 +129,19 @@ def return_levels_weibull_2p(data,var,periods=[50,100,1000],threshold=None,r="48
     
     # Fit a 2-parameter Weibull distribution to the data
     shape, loc, scale = stats.weibull_min.fit(extremes, floc=0)
-       
+
     years = data.index.year
     yr_num = years[-1]-years[0]+1
     length_data = extremes.shape[0]
     time_step = yr_num*365.2422*24/length_data # in hours 
     return_period = np.array(periods)*24*365.2422/time_step # years is converted to K-th
-    
+
     # Calculate the 2-parameter Weibull return value
     return_value = stats.weibull_min.isf(1/return_period, shape, loc, scale)
     
-    for i in range(len(return_value)) : 
-        return_value[i] = round(return_value[i],1)
+    #for i in range(len(return_value)) : 
+    #    return_value[i] = round(return_value[i],1)
+    #    rl[i] = round(return_value[i],1)
     
     return return_value
 
@@ -250,23 +253,25 @@ def diagnostic_return_level_plot(data,var,model_method,periods=np.arange(0.1,100
                           model_return_periods=periods, model_return_levels=return_levels_exp(data,var,threshold=threshold,periods=periods), model_method=model_method)
    
 
-def diagnostic_return_level_plot_multi(data, var, model_method,
+def diagnostic_return_level_plot_multi(data, var, 
+                                       model_methods=['POT','EXP','Weibull_2P'],
                                        periods=np.arange(0.1, 1000, 0.1),
                                        threshold=None,
                                        yaxis='prob',
                                        output_file=None):
     """
-    Plot empirical value plot along model ones given one or several
+    Plots empirical value plot along model ones given one or several
     distributions to display.
 
     data (pd.DataFrame): dataframe containing the time series
     var (str): name of the variable
-    model_method (list of str): list of the names of the models to fit the
+    model_methods (list of str): list of the names of the models to fit the
                                 data and display
-    periods (1D-array): Range of periods to compute
+    periods (1D-array or list): Range of periods to compute
     threshold (float): Threshold used for POT methods
     yaxis (str): Either 'prob' (default) or 'rp', displays probability of
     non-exceedance or return period on yaxis respectively.
+    output_file (str): path of the output file to save the plot, else None.
     
     return: plot the return value plot
     """
@@ -288,22 +293,19 @@ def diagnostic_return_level_plot_multi(data, var, model_method,
     # Plot points (return level, return period) corresponding to
     # empirical values
     if yaxis == 'prob':
-
         # Troncate all series only to keep values corresponding to return 
         # period greater than 1 year
         periods_cut = [rp for rp in periods if rp >= 1]
         obs_return_periods_cut = [rp for rp in obs_return_periods if rp >= 1]
-        obs_return_levels_cut = [obs_return_levels[i]
+        obs_return_levels_cut = [obs_return_levels.iloc[i]
                                  for i, rp in enumerate(obs_return_periods)
                                  if rp >= 1]
-
         ax.scatter(obs_return_levels_cut,
                    obs_return_periods_cut,
                    marker="o", s=20, lw=1,
                    facecolor="k", edgecolor="w", zorder=20)
 
     elif yaxis == 'rp':
-
          ax.scatter(obs_return_levels,
                     obs_return_periods,
                     marker="o", s=20, lw=1,
@@ -313,34 +315,29 @@ def diagnostic_return_level_plot_multi(data, var, model_method,
     # Get return levels for the methods given as argument,
     method_rl_res={}
 
-    for met in model_method:
+    for met in model_methods:
 
         if met == 'POT':
-
             method_rl_res[met] = return_levels_pot(data, var,
                                                    threshold=threshold,
                                                    periods=periods)
 
         elif met == 'GEV':
-
             method_rl_res[met] = return_levels_annual_max(data, var,
                                                           method='GEV',
                                                           periods=periods)
 
         elif met == 'GUM':
-
             method_rl_res[met] = return_levels_annual_max(data, var,
                                                           method='GUM',
                                                           periods=periods)
 
         elif met == 'Weibull_2P':
-
             method_rl_res[met] = return_levels_weibull_2p(data, var,
                                                           threshold=threshold,
                                                           periods=periods)
 
         elif met == 'EXP':
-
             method_rl_res[met] = return_levels_exp(data, var,
                                                    threshold=threshold,
                                                    periods=periods)
@@ -353,13 +350,11 @@ def diagnostic_return_level_plot_multi(data, var, model_method,
 
         # Plot (return levels, return periods) lines corresponding
         if yaxis == 'prob':
-
             ax.plot(met_rl_cut,
                     periods_cut,
                     label=met)
 
         elif yaxis == 'rp':
-
             ax.plot(method_rl_res[met],
                     periods,
                     label=met)
@@ -370,17 +365,16 @@ def diagnostic_return_level_plot_multi(data, var, model_method,
     # Change label and ticklabels of y-axis, to display either probabilities
     # of non-exceedance or return period
     if yaxis == 'prob':
-
         ax.set_ylabel("Probability of non-exceedance")
         list_yticks = [1/0.9, 2, 10]\
-                    + [10**i for i in range(2, 5) if max(periods) > 10**i]\
-                    + [max(periods)]
+                    + [10**i for i in range(2, 5) if max(periods) > 10**i]
+        if max(periods) > max(list_yticks):
+            list_yticks = list_yticks + [max(periods)]
 
         ax.set_yticks(list_yticks)
         ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
 
     elif yaxis == 'rp':
-
         ax.set_ylabel("Return period")
 
     ax.set_xlabel("Return levels")
@@ -392,6 +386,86 @@ def diagnostic_return_level_plot_multi(data, var, model_method,
         plt.savefig(output_file)
     
     plt.show()
+
+
+def return_level_threshold_plot(data, var, thresholds, 
+                                model_methods=['POT','EXP','Weibull_2P'], 
+                                period=100,
+                                output_file=None):
+    """
+    Plots theoretical return level for given return period and distribution,
+    as a function of the threshold.
+
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    model_methods (list of str): list of the names of the models to fit the
+                                data and display
+    thresholds (float): Range of thresholds used for POT methods
+    period (int or float): Return period
+    output_file (str): path of the output file to save the plot, else None.
+    
+    return: plot return levels in function of the thresholds, for each method
+    """
+    
+    # Initialize the dictionnary with one key for each method
+    dict_rl = {met:[] for met in model_methods}
+
+    # For each threshold, and each method get the return value corresponding to 
+    # the input period and add it to the corresponding list in the dictionnary
+    for thresh in thresholds:
+        for met in model_methods:
+            if met == 'POT':
+                dict_rl[met].append(return_levels_pot(data, var,
+                                                   threshold=thresh,
+                                                   periods=[period])[0])
+
+            elif met == 'GEV':
+                dict_rl[met].append(return_levels_annual_max(data, var,
+                                                          method='GEV',
+                                                          periods=[period])[0])
+
+            elif met == 'GUM':
+                dict_rl[met].append(return_levels_annual_max(data, var,
+                                                          method='GUM',
+                                                          periods=[period])[0])
+
+            elif met == 'Weibull_2P':
+                dict_rl[met].append(return_levels_weibull_2p(data, var,
+                                                          threshold=thresh,
+                                                          periods=[period])[0])
+
+            elif met == 'EXP':
+                dict_rl[met].append(return_levels_exp(data, var,
+                                                   threshold=thresh,
+                                                   periods=[period])[0])
+
+    # Plotting the result
+    fig, ax = plt.subplots(1,1)
+
+    threshold_os = get_threshold_os(data, var)
+    
+    for met in dict_rl.keys():
+    
+        ax.plot(thresholds, dict_rl[met], label=met)
+
+    ax.axvline(threshold_os, color = 'black', 
+               label = 'Threshold Outten and Sobolowski (2021)',
+               alpha=0.5, linestyle = 'dashed')
+
+    ax.grid(True, which="both")
+    ax.set_xlabel("Threshold")
+    ax.set_ylabel(var)
+    ax.legend()
+    plt.title('{} year return value estimate'.format(period))
+
+    # Save the plot if a path is given
+    if output_file is not None:
+        plt.savefig(output_file)
+
+    plt.show()
+
+
+    return dict_rl, thresholds
 
 
 def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]) -> Sequence[Dict]:
