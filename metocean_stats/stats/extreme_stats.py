@@ -59,15 +59,26 @@ def return_levels_pot(data, var, threshold=None,
     return rl
 
 
-def return_levels_annual_max(data,var='hs',periods=[50,100,1000],method='GEV',output_file=False): 
-    """
-    The function is written by dung-manh-nguyen and KonstantinChri.
-    It calulates return value estimates for different periods using different methods 
-    data = pandas dataframe
-    var  = variable of the dataframe 
-    periods = [50, 100,1000]
-    methods = 'GEV', 'GUM' 
-    out: return_values
+def return_levels_annual_max(data, var='hs', periods=[50, 100, 1000], 
+                             method='GEV', output_file=False): 
+    """ 
+    Calulates return value estimates for different periods, fitting a 
+    Generalized Extreme Value ('GEV') or a Gumbel ('GUM') distribution to given 
+    data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable 
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    method (str): Distribution to fit to the data. Either 'GEV' for Generalized
+    Extreme Value or 'GUM' for Gumbel. 
+    output_file (str): If not False, save the plot of the return value 
+                       estimates at the given path.
+    
+    return (list of float): return value estimates corresponding to input
+                            periods 
+    
+    Function written by dung-manh-nguyen and KonstantinChri.   
     """
  
     #data_am = data[var].resample('Y').max() # get annual maximum with index YYYY-12
@@ -96,7 +107,8 @@ def return_levels_annual_max(data,var='hs',periods=[50,100,1000],method='GEV',ou
     if output_file == False:
         pass
     else:
-        plot_return_levels(data,var,rl,periods,output_file,it_selected_max)
+        plot_return_levels(data, var, rl, periods, 
+                           output_file, it_selected_max)
         #probplot(data=data[var].loc[it_selected_max], sparams=(shape, loc, scale))
 
     return rl
@@ -111,7 +123,7 @@ def get_threshold_os(data,var):
     
     return: Threshold as defined in Outten and Sobolowski (2021)    
     
-    Subroutine written by clio-met (July 2023)
+    Function written by clio-met (July 2023)
     """
     ts = data[var]
     yearly_max = ts.resample('YS').max()
@@ -120,7 +132,24 @@ def get_threshold_os(data,var):
     return min_ym
 
 
-def return_levels_weibull_2p(data,var,periods=[50,100,1000],threshold=None,r="48h"):
+def return_levels_weibull_2p(data, var, periods=[50, 100, 1000], 
+                             threshold=None, r="48h"):
+    """
+    Calulates return value estimates for different periods, fitting a 
+    2-parameters Weibull distribution to given data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable 
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    threshold (float): Threshold used to define the extrems
+    r (str): Minimum period of time between two peaks. Default 48h.
+    
+    return (list of float): return value estimates corresponding to input
+                            periods 
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
+    """                         
     import scipy.stats as stats
     from pyextremes import get_extremes
     # how to use, to test this 
@@ -152,7 +181,24 @@ def return_levels_weibull_2p(data,var,periods=[50,100,1000],threshold=None,r="48
     return return_value
 
 
-def return_levels_exp(data,var='hs',periods=[50,100,1000],threshold=None, r="48h"):
+def return_levels_exp(data, var='hs', periods=[50, 100, 1000], 
+                      threshold=None, r="48h"):
+    """
+    Calulates return value estimates for different periods, fitting an 
+    exponential distribution to given data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable 
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    threshold (float): Threshold used to define the extrems
+    r (str): Minimum period of time between two peaks. Default 48h.
+    
+    return (list of float): return value estimates corresponding to input
+                            periods 
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
+    """        
     from scipy.stats import expon
     from pyextremes import get_extremes
     # how to use this function 
@@ -179,26 +225,44 @@ def return_levels_exp(data,var='hs',periods=[50,100,1000],threshold=None, r="48h
     return return_levels
 
 
-def plot_return_levels(data,var,rl,periods, output_file,it_selected_max=[]):
+def plot_return_levels(data, var, rl, periods, 
+                       output_file, it_selected_max=[]):
+    """
+    Plots data, extremes from these data and associated return levels.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable 
+    rl (1D-array or list): Return level estimates
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    output_file (str):  Path to save the plot to.
+    it_selected_max (1D-array or list): Index corresponding to the extremes
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
+    """  
     color = plt.cm.rainbow(np.linspace(0, 1, len(rl)))
     fig, ax = plt.subplots(figsize=(12,6))
     data[var].plot(color='lightgrey')
     for i in range(len(rl)):
-        ax.hlines(y=rl[i], xmin=data[var].index[0], xmax=data[var].index[-1],color=color[i] ,linestyle='dashed', linewidth=2,label=str(rl[i].round(2))+' ('+str(int(periods[i]))+'y)' )
+        ax.hlines(y=rl[i], 
+                  xmin=data[var].index[0], 
+                  xmax=data[var].index[-1],
+                  color=color[i], linestyle='dashed', linewidth=2,
+                  label=str(rl[i].round(2))+' ('+str(int(periods[i]))+'y)')
 
-    plt.scatter(data[var][it_selected_max].index,data[var].loc[it_selected_max],s=10,marker='o',color='black',zorder=2)
+    plt.scatter(data[var][it_selected_max].index, 
+                data[var].loc[it_selected_max], 
+                s=10, marker='o', color='black', zorder=2)
     #plt.scatter(data[var].index[it_selected_max],data[var].iloc[it_selected_max],s=10,marker='o',color='black',zorder=2)
     
     plt.grid(linestyle='dotted')
-    plt.ylabel(var,fontsize=18)
-    plt.xlabel('time',fontsize=18)
+    plt.ylabel(var, fontsize=18)
+    plt.xlabel('time', fontsize=18)
     plt.legend(loc='center left')
-    plt.title(output_file.split('.')[0],fontsize=18)
+    plt.title(output_file.split('.')[0], fontsize=18)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
-    
-    return
 
 
 def probplot(data, sparams):    
@@ -211,10 +275,19 @@ def probplot(data, sparams):
     plt.show()
     return
 
-def return_value_plot(obs_return_periods, obs_return_levels,model_return_periods, model_return_levels, model_method=''):    
+def return_value_plot(obs_return_periods, obs_return_levels, 
+                      model_return_periods, model_return_levels, 
+                      model_method=''):    
+    
     fig, ax = plt.subplots()   
-    ax.scatter(obs_return_periods, obs_return_levels, marker="o",s=20,lw=1,facecolor="k",edgecolor="w",zorder=20)
-    ax.plot(model_return_periods, model_return_levels,color='red',label=model_method)
+    ax.scatter(obs_return_periods, 
+               obs_return_levels, 
+               marker="o", s=20, lw=1, facecolor="k", 
+               edgecolor="w", zorder=20)
+    ax.plot(model_return_periods, 
+            model_return_levels,
+            color='red',
+            label=model_method)
     ax.semilogx()
     ax.grid(True, which="both")
     ax.set_xlabel("Return period")
@@ -224,7 +297,6 @@ def return_value_plot(obs_return_periods, obs_return_levels,model_return_periods
     plt.show()
     #alpha = 0.95
     #cil, ciu = np.quantile(a=rl_sample, q=[(1 - alpha) / 2, (1 + alpha) / 2])
-    return
 
 
 def get_empirical_return_levels(data,var,method="POT",block_size="365.2425D"):
@@ -233,31 +305,58 @@ def get_empirical_return_levels(data,var,method="POT",block_size="365.2425D"):
     """
     from pyextremes import get_extremes, get_return_periods
     if method == 'BM':
-        extremes = get_extremes(ts=data[var],method=method,block_size=block_size)
-        rp = get_return_periods(ts=data[var],extremes=extremes,extremes_method=method,extremes_type="high",return_period_size=block_size)
+        extremes = get_extremes(ts=data[var], 
+                                method=method,
+                                block_size=block_size)
+        rp = get_return_periods(ts=data[var],
+                                extremes=extremes,
+                                extremes_method=method,
+                                extremes_type="high",
+                                return_period_size=block_size)
     elif method == 'POT':
-        extremes = get_extremes(ts=data[var],method=method,threshold=get_threshold_os(data=data, var=var))
-        rp = get_return_periods(ts=data[var],extremes=extremes,extremes_method=method,extremes_type="high")
+        extremes = get_extremes(ts=data[var],
+                                method=method,
+                                threshold=get_threshold_os(data=data, var=var))
+        rp = get_return_periods(ts=data[var],
+                                extremes=extremes,
+                                extremes_method=method,
+                                extremes_type="high")
     return rp['return period'], rp[var]
 
 
 def diagnostic_return_level_plot(data,var,model_method,periods=np.arange(0.1,1000,0.1),threshold=None):
     if model_method == 'POT':
-        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
-                          model_return_periods=periods, model_return_levels=return_levels_pot(data,var,threshold=threshold,periods=periods), model_method=model_method)
+        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], 
+                          obs_return_levels=get_empirical_return_levels(data,var)[1],
+                          model_return_periods=periods, 
+                          model_return_levels=return_levels_pot(data, var, 
+                                              threshold=threshold, periods=periods), 
+                                              model_method=model_method)
     elif model_method == 'GEV':
-        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
-                          model_return_periods=periods, model_return_levels=return_levels_annual_max(data,var,method='GEV',periods=periods), model_method=model_method)
+        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], 
+                          obs_return_levels=get_empirical_return_levels(data,var)[1],
+                          model_return_periods=periods, 
+                          model_return_levels=return_levels_annual_max(data,var,method='GEV',periods=periods),
+                          model_method=model_method)
     elif model_method == 'GUM':
-        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
-                          model_return_periods=periods, model_return_levels=return_levels_annual_max(data,var,method='GUM',periods=periods), model_method=model_method)
+        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], 
+                          obs_return_levels=get_empirical_return_levels(data,var)[1],
+                          model_return_periods=periods, 
+                          model_return_levels=return_levels_annual_max(data,var,method='GUM',periods=periods), 
+                          model_method=model_method)
     elif model_method == 'Weibull_2P':
-        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
-                          model_return_periods=periods, model_return_levels=return_levels_weibull_2p(data,var,threshold=threshold,periods=periods), model_method=model_method)
+        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], 
+                          obs_return_levels=get_empirical_return_levels(data,var)[1],
+                          model_return_periods=periods, 
+                          model_return_levels=return_levels_weibull_2p(data,var,threshold=threshold,periods=periods), 
+                          model_method=model_method)
     elif model_method == 'EXP':
-        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], obs_return_levels=get_empirical_return_levels(data,var)[1],
-                          model_return_periods=periods, model_return_levels=return_levels_exp(data,var,threshold=threshold,periods=periods), model_method=model_method)
-   
+        return_value_plot(obs_return_periods=get_empirical_return_levels(data,var)[0], 
+                          obs_return_levels=get_empirical_return_levels(data,var)[1],
+                          model_return_periods=periods, 
+                          model_return_levels=return_levels_exp(data,var,threshold=threshold,periods=periods), 
+                          model_method=model_method)
+                          
 
 def diagnostic_return_level_plot_multi(data, var, 
                                        model_methods=['POT','EXP','Weibull_2P'],
