@@ -103,9 +103,15 @@ def return_levels_annual_max(data,var='hs',periods=[50,100,1000],method='GEV',ou
 
 def get_threshold_os(data,var):
     """
+    Follows the method by Outten and Sobolowski (2021) to define the threshold 
+    to be used in subroutine return_levels_pot
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    
+    return: Threshold as defined in Outten and Sobolowski (2021)    
+    
     Subroutine written by clio-met (July 2023)
-    Follows the method by Outten and Sobolowski (2021) to define the threshold to be used 
-    in subroutine return_levels_pot
     """
     ts = data[var]
     yearly_max = ts.resample('YS').max()
@@ -388,25 +394,31 @@ def diagnostic_return_level_plot_multi(data, var,
     plt.show()
 
 
-def return_level_threshold_plot(data, var, thresholds, 
-                                model_methods=['POT','EXP','Weibull_2P'], 
-                                period=100,
-                                output_file=None):
+def return_level_threshold(data, var, thresholds, 
+                           model_methods=['POT','EXP','Weibull_2P'], 
+                           period=100,
+                           output_file=None):
     """
-    Plots theoretical return level for given return period and distribution,
-    as a function of the threshold.
+    Returns theoretical return level for given return period and distribution,
+    as a function of the threshold. Plots the return levels in function of the 
+    thresholds, for each method and saves the result into the given output_file
+    if output_file is not None.
 
     data (pd.DataFrame): dataframe containing the time series
     var (str): name of the variable
+    thresholds (float): Range of thresholds used for POT methods
     model_methods (list of str): list of the names of the models to fit the
                                 data and display
-    thresholds (float): Range of thresholds used for POT methods
     period (int or float): Return period
     output_file (str): path of the output file to save the plot, else None.
     
-    return: plot return levels in function of the thresholds, for each method
+    return: 
+        dict_rl (dict of list of floats): Contains the return levels 
+                                          corresponding to the given period for
+                                          each method (key) and each threshold
+        thresholds (float): Range of thresholds used for POT methods
     """
-    
+
     # Initialize the dictionnary with one key for each method
     dict_rl = {met:[] for met in model_methods}
 
@@ -439,13 +451,40 @@ def return_level_threshold_plot(data, var, thresholds,
                                                    threshold=thresh,
                                                    periods=[period])[0])
 
+
+
+    if output_file is not None:
+        plot_return_level_threshold(data, var, dict_rl, period,
+                                    thresholds, output_file)
+
+    return dict_rl, thresholds
+
+
+def plot_return_level_threshold(data, var, dict_rl, period,
+                                thresholds, output_file):
+    """
+    Plots theoretical return level for given return period and distribution,
+    as a function of the threshold.
+
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    period (int or float): Return period
+    dict_rl (dict of list of floats): Contains the return levels corresponding
+                                      to the given period for each method (key)
+                                      and each threshold
+    thresholds (float): Range of thresholds used for POT methods
+    output_file (str): path of the output file to save the plot
+
+    return: plots return levels in function of the thresholds, for each method 
+    and saves the result into the given output_file 
+    """
     # Plotting the result
     fig, ax = plt.subplots(1,1)
 
     threshold_os = get_threshold_os(data, var)
-    
+
     for met in dict_rl.keys():
-    
+
         ax.plot(thresholds, dict_rl[met], label=met)
 
     ax.axvline(threshold_os, color = 'black', 
@@ -459,13 +498,9 @@ def return_level_threshold_plot(data, var, thresholds,
     plt.title('{} year return value estimate'.format(period))
 
     # Save the plot if a path is given
-    if output_file is not None:
-        plt.savefig(output_file)
+    plt.savefig(output_file)
 
     plt.show()
-
-
-    return dict_rl, thresholds
 
 
 def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]) -> Sequence[Dict]:
