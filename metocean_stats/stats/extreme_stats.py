@@ -5,63 +5,76 @@ import matplotlib.pyplot as plt
 import xarray as xr
 
 
-def return_levels_pot(data, var, threshold=None, 
-                      periods=[50,100], output_file=False):
+def return_levels_pot(data, var, dist='Weibull_2P', 
+                      periods=[50, 100, 1000], 
+                      threshold=None, r="48h",
+                      output_file=False):
     """
-    Subroutine written by clio-met (July 2023)
-    Purpose: calculates the return levels (rl) from a time series (ts) and given threshold for different return periods (periods)
-    - Inputs:
-    1) data is a dataframe with time enabled containing the hourly time series of the variable of interest (ex: wind speed)
-    2) threshold is a scalar
-    3) periods is a numpy array containing the return periods (in years) of interest (ex: np.array([20,30,50,100]))
-    - Follows the POT method
+    Calulates return value estimates for different periods, fitting a 
+    given distribution to threshold excess values of the data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    dist (str): POT distribution to choose from 'GP' for Generalized Pareto,
+                'Weibull_2P' for Weibull 2-paremeters or 'EXP' for exponential
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    threshold (float): Threshold used to define the extremes
+    r (str): Minimum period of time between two peaks. Default 48h.
+    
+    return (list of float): return value estimates corresponding to input
+                            periods 
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
     """
+    import scipy.stats as stats
+    from pyextremes import get_extremes
+
     if threshold == None:
         threshold = get_threshold_os(data=data, var=var)
     else:
         pass
-    periods = np.array(periods, dtype=float)
-    ts = data[var]
-    # select the values above the threshold in the timeseries ts
-    it=np.where(ts.values>=threshold)[0]
-    # Group consecutive indices with a +/-2 days difference
-    # to select only one event and not consecutive timesteps with values above threshold
-    number_days_diff = 2
-    larrs=np.split(it,np.where(np.diff(it)>number_days_diff*24)[0]+1)
-    it_selected_max=[]
-    # Pick the maximum value of the variable within groups
-    for l in range(len(larrs)):
-        mxi=np.argmax(ts.iloc[larrs[l]].values) # If several values are equal to the max, argmax takes the first occurrence 
-        it_selected_max.append(larrs[l][mxi]) # index of points used in the analysis
-        del mxi
-    # Get the selected values and time for the extreme value analysis
-    sel_val=ts.iloc[it_selected_max]
+    
+    extremes = get_extremes(data[var], method="POT", threshold=threshold, r=r)
+    
+    years = data.index.year
+    yr_num = years[-1]-years[0]+1
+    length_data = extremes.shape[0]
+    # in hours 
+    time_step = yr_num*365.2422*24/length_data
+    # years is converted to K-th
+    return_periods = np.array(periods)*24*365.2422/time_step
+    
+    if dist == 'Weibull_2P':
+        shape, loc, scale = stats.weibull_min.fit(extremes-threshold, floc=0)
+        return_levels = stats.weibull_min.isf(1/return_periods, 
+                                              shape, loc, scale)\
+                                              + threshold
+    elif dist == 'EXP':
+        loc, scale = stats.expon.fit(extremes-threshold)
+        return_levels = stats.expon.isf(1/return_periods, loc, scale)\
+                                        + threshold
+    elif dist == 'GP':
+        shape, loc, scale = stats.genpareto.fit(extremes-threshold)
+        return_levels = stats.genpareto.isf(1/return_periods, 
+                                            shape, loc, scale)\
+                                            + threshold
+    else:
+        print ('please check method/distribution, must be one of: EXP, \
+                GP or Weibull_2P')
 
-    #sel_time=sel_val.index
-    # Total number of selected values
-    ns=len(sel_val)
-    # Number of selected values in each year
-    ns_yr=sel_val.resample("YS").count() # Should give an array of 30 values if 30 years are considered
-    # Expected rate of occurrence (mean number of occurrences per year)
-    lambd=np.mean(ns_yr.values,axis=0)
-    # Fit the Generalized Pareto distribution to the selected values
-    from scipy.stats import genpareto
-    shape,loc,scale = genpareto.fit(sel_val.values-threshold)
-    rl = genpareto.isf(1/(lambd*periods), shape, loc, scale) + threshold
-
-    # If the return level is unrealistic (usually very high), set rl to a special number
-    rl=np.where(rl>=3*threshold,np.nan,rl)
     if output_file == False:
         pass
     else:
-        plot_return_levels(data,var,rl,periods,output_file,it_selected_max=ts.iloc[it_selected_max].index)
-        #probplot(data=sel_val.values, sparams=(shape, loc, scale))
+        plot_return_levels(data, var, return_levels, 
+                           periods, output_file,
+                           it_selected_max=extremes.index.values)
 
-    return rl
-
+    return return_levels
+    
 
 def return_levels_annual_max(data, var='hs', periods=[50, 100, 1000], 
-                             method='GEV', output_file=False): 
+                             dist='GEV', output_file=False): 
     """ 
     Calulates return value estimates for different periods, fitting a 
     Generalized Extreme Value ('GEV') or a Gumbel ('GUM') distribution to given 
@@ -81,8 +94,6 @@ def return_levels_annual_max(data, var='hs', periods=[50, 100, 1000],
     
     Function written by dung-manh-nguyen and KonstantinChri.   
     """
-    # get annual maximum with index YYYY-12
-    #data_am = data[var].resample('Y').max() 
     it_selected_max = data.groupby(data.index.year)[var].idxmax().values
     # get annual maximum with actual dates that maximum occured
     data_am = data[var].loc[it_selected_max] 
@@ -91,18 +102,18 @@ def return_levels_annual_max(data, var='hs', periods=[50, 100, 1000],
         if periods[i] == 1 : 
             periods[i] = 1.6
 
-    if method == 'GEV' : 
+    if dist == 'GEV' :
         from scipy.stats import genextreme
         # fit data
         shape, loc, scale = genextreme.fit(data_am) 
         # Compute the return levels for several return periods       
-        rl = genextreme.isf(1/periods, shape, loc, scale)
+        return_levels = genextreme.isf(1/periods, shape, loc, scale)
 
-    elif method == 'GUM' : 
+    elif dist == 'GUM' : 
         from scipy.stats import gumbel_r 
         loc, scale = gumbel_r.fit(data_am) # fit data
         # Compute the return levels for several return periods.
-        rl = gumbel_r.isf(1/periods, loc, scale)
+        return_levels = gumbel_r.isf(1/periods, loc, scale)
 
     else : 
         print ('please check method/distribution, must be either GEV or GUM')
@@ -110,13 +121,55 @@ def return_levels_annual_max(data, var='hs', periods=[50, 100, 1000],
     if output_file == False:
         pass
     else:
-        plot_return_levels(data, var, rl, periods, 
+        plot_return_levels(data, var, return_levels, periods, 
                            output_file, it_selected_max)
-        #probplot(data=data[var].loc[it_selected_max], 
-        #         sparams=(shape, loc, scale))
 
-    return rl
+    return return_levels
 
+
+def return_levels_idm(data, var, dist='Weibull_3P', 
+                      periods=[50, 100, 1000],
+                      time_step=3,
+                      output_file=False):
+    """
+    Calulates return value estimates for different periods, fitting a 
+    given distribution to all available data (initial distribution method).  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    dist (str): 'Weibull_3P' for 3-parameters Weibull distribution
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    time_step (float): Average duration time of a state for the observed
+                       variable, in hours. Default 3, for sea state.
+    return (list of float): return value estimates corresponding to input
+                            periods 
+    
+    """
+    import scipy.stats as stats
+
+    # in hours
+    time_step = time_step 
+    # years is converted to K-th
+    return_periods = np.array(periods)*24*365.2422/time_step
+    
+    if dist == 'Weibull_3P':
+        shape, loc, scale = stats.weibull_min.fit(data['hs'])
+        return_levels = stats.weibull_min.isf(1/return_periods, 
+                                              shape, loc, scale)
+    else:
+        print ('please check method/distribution, must be one of: EXP, \
+                GP or Weibull_2P')
+
+    if output_file == False:
+        pass
+    else:
+        plot_return_levels(data, var, return_levels, 
+                           periods, output_file,
+                           it_selected_max=data['hs'].index.values)
+
+    return return_levels
+ 
 
 def get_threshold_os(data,var):
     """
@@ -134,6 +187,7 @@ def get_threshold_os(data,var):
     yearly_max = ts.resample('YS').max()
     # Take the minimum of the yearly maxima found
     min_ym=yearly_max.min()
+    
     return min_ym
 
 
@@ -379,11 +433,12 @@ def diagnostic_return_level_plot(data, var, model_method,
     obs_return_periods = empirical_rl_res[0]
     obs_return_levels = empirical_rl_res[1]
 
-    if model_method == 'POT':
+    if model_method == 'GP':
         return_value_plot(obs_return_periods=obs_return_periods, 
                           obs_return_levels=obs_return_levels,
                           model_return_periods=periods, 
                           model_return_levels=return_levels_pot(data, var, 
+                                                          dist='GP',
                                                           threshold=threshold, 
                                                           periods=periods), 
                           model_method=model_method)
@@ -394,7 +449,7 @@ def diagnostic_return_level_plot(data, var, model_method,
                           model_return_periods=periods, 
                           model_return_levels=return_levels_annual_max(data, 
                                                               var,
-                                                              method='GEV',
+                                                              dist='GEV',
                                                               periods=periods),
                           model_method=model_method)
 
@@ -404,7 +459,7 @@ def diagnostic_return_level_plot(data, var, model_method,
                           model_return_periods=periods, 
                           model_return_levels=return_levels_annual_max(data,
                                                               var,
-                                                              method='GUM',
+                                                              dist='GUM',
                                                               periods=periods), 
                           model_method=model_method)
 
@@ -412,8 +467,8 @@ def diagnostic_return_level_plot(data, var, model_method,
         return_value_plot(obs_return_periods=obs_return_periods, 
                           obs_return_levels=obs_return_levels,
                           model_return_periods=periods, 
-                          model_return_levels=return_levels_weibull_2p(data, 
-                                                           var,
+                          model_return_levels=return_levels_pot(data, var,
+                                                           dist='Weibull_2P',
                                                            threshold=threshold,
                                                            periods=periods), 
                           model_method=model_method)
@@ -422,8 +477,9 @@ def diagnostic_return_level_plot(data, var, model_method,
         return_value_plot(obs_return_periods=obs_return_periods, 
                           obs_return_levels=obs_return_levels,
                           model_return_periods=periods, 
-                          model_return_levels=return_levels_exp(data,
+                          model_return_levels=return_levels_pot(data,
                                                            var,
+                                                           dist='EXP',
                                                            threshold=threshold,
                                                            periods=periods), 
                           model_method=model_method)
@@ -491,28 +547,31 @@ def diagnostic_return_level_plot_multi(data, var,
 
     for met in model_methods:
 
-        if met == 'POT':
+        if met == 'GP':
             method_rl_res[met] = return_levels_pot(data, var,
+                                                   dist='GP',
                                                    threshold=threshold,
                                                    periods=periods)
 
         elif met == 'GEV':
             method_rl_res[met] = return_levels_annual_max(data, var,
-                                                          method='GEV',
+                                                          dist='GEV',
                                                           periods=periods)
 
         elif met == 'GUM':
             method_rl_res[met] = return_levels_annual_max(data, var,
-                                                          method='GUM',
+                                                          dist='GUM',
                                                           periods=periods)
 
         elif met == 'Weibull_2P':
-            method_rl_res[met] = return_levels_weibull_2p(data, var,
-                                                          threshold=threshold,
-                                                          periods=periods)
+            method_rl_res[met] = return_levels_pot(data, var,
+                                                   dist='Weibull_2P',
+                                                   threshold=threshold,
+                                                   periods=periods)
 
         elif met == 'EXP':
-            method_rl_res[met] = return_levels_exp(data, var,
+            method_rl_res[met] = return_levels_pot(data, var,
+                                                   dist='EXP',
                                                    threshold=threshold,
                                                    periods=periods)
 
@@ -563,7 +622,7 @@ def diagnostic_return_level_plot_multi(data, var,
 
 
 def return_level_threshold(data, var, thresholds, 
-                           model_methods=['POT','EXP','Weibull_2P'], 
+                           model_methods=['GP','EXP','Weibull_2P'], 
                            period=100,
                            output_file=None):
     """
@@ -593,30 +652,33 @@ def return_level_threshold(data, var, thresholds,
     # the input period and add it to the corresponding list in the dictionnary
     for thresh in thresholds:
         for met in model_methods:
-            if met == 'POT':
+            if met == 'GP':
                 dict_rl[met].append(return_levels_pot(data, var,
+                                                   dist='GP',
                                                    threshold=thresh,
                                                    periods=[period])[0])
 
             elif met == 'GEV':
                 dict_rl[met].append(return_levels_annual_max(data, var,
-                                                          method='GEV',
+                                                          dist='GEV',
                                                           periods=[period])[0])
 
             elif met == 'GUM':
                 dict_rl[met].append(return_levels_annual_max(data, var,
-                                                          method='GUM',
+                                                          dist='GUM',
                                                           periods=[period])[0])
 
             elif met == 'Weibull_2P':
-                dict_rl[met].append(return_levels_weibull_2p(data, var,
-                                                          threshold=thresh,
-                                                          periods=[period])[0])
+                dict_rl[met].append(return_levels_pot(data, var,
+                                                      dist='Weibull_2P',
+                                                      threshold=thresh,
+                                                      periods=[period])[0])
 
             elif met == 'EXP':
-                dict_rl[met].append(return_levels_exp(data, var,
-                                                   threshold=thresh,
-                                                   periods=[period])[0])
+                dict_rl[met].append(return_levels_pot(data, var,
+                                                      dist='EXP',
+                                                      threshold=thresh,
+                                                      periods=[period])[0])
 
     if output_file is not None:
         plot_return_level_threshold(data, var, dict_rl, period,
@@ -700,6 +762,7 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
         })
     return contours, data_2D
 
+
 def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png') -> Sequence[Dict]:
     contours, data_2D = get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
     """Plot joint contours for the given return periods. 
@@ -747,3 +810,61 @@ def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,10
     plt.legend()
     plt.savefig(output_file,dpi=300)
     return fig, ax
+    
+    
+
+def old_return_levels_GP(data, var, threshold=None, 
+                          periods=[50,100], output_file=False):
+    """
+    Subroutine written by clio-met (July 2023)
+    Purpose: calculates the return levels (rl) from a time series (ts) and given threshold for different return periods (periods)
+    - Inputs:
+    1) data is a dataframe with time enabled containing the hourly time series of the variable of interest (ex: wind speed)
+    2) threshold is a scalar
+    3) periods is a numpy array containing the return periods (in years) of interest (ex: np.array([20,30,50,100]))
+    - Follows the POT method
+    """
+    if threshold == None:
+        threshold = get_threshold_os(data=data, var=var)
+    else:
+        pass
+    periods = np.array(periods, dtype=float)
+    ts = data[var]
+    # select the values above the threshold in the timeseries ts
+    it=np.where(ts.values>=threshold)[0]
+    # Group consecutive indices with a +/-2 days difference
+    # to select only one event and not consecutive timesteps with values above threshold
+    number_days_diff = 2
+    larrs=np.split(it,np.where(np.diff(it)>number_days_diff*24)[0]+1)
+    it_selected_max=[]
+    # Pick the maximum value of the variable within groups
+    for l in range(len(larrs)):
+        mxi=np.argmax(ts.iloc[larrs[l]].values) # If several values are equal to the max, argmax takes the first occurrence 
+        it_selected_max.append(larrs[l][mxi]) # index of points used in the analysis
+        del mxi
+    # Get the selected values and time for the extreme value analysis
+    sel_val=ts.iloc[it_selected_max]
+
+    #sel_time=sel_val.index
+    # Total number of selected values
+    ns=len(sel_val)
+    # Number of selected values in each year
+    ns_yr=sel_val.resample("YS").count() # Should give an array of 30 values if 30 years are considered
+    # Expected rate of occurrence (mean number of occurrences per year)
+    lambd=np.mean(ns_yr.values,axis=0)
+    # Fit the Generalized Pareto distribution to the selected values
+    from scipy.stats import genpareto
+    shape,loc,scale = genpareto.fit(sel_val.values-threshold)
+    rl = genpareto.isf(1/(lambd*periods), shape, loc, scale) + threshold
+
+    # If the return level is unrealistic (usually very high), set rl to a special number
+    rl=np.where(rl>=3*threshold,np.nan,rl)
+    if output_file == False:
+        pass
+    else:
+      plot_return_levels(data,var,rl,periods,output_file,
+                         it_selected_max=ts.iloc[it_selected_max].index)
+        #probplot(data=sel_val.values, sparams=(shape, loc, scale))
+
+    return rl
+
