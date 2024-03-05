@@ -50,12 +50,12 @@ def test_joint_2D_contour(ds=ds):
 def test_diagnostic_return_level_plot_multi(ds=ds):
     extreme_stats.diagnostic_return_level_plot_multi(data=ds.data, 
                                                      var='hs',
-                                                     model_method=['POT', 
-                                                                   'EXP'],
+                                                     dist_list=['GP', 
+                                                                'EXP'],
                                                      yaxis='prob',
-                                                     output_file=None)
+                                                     output_file=False)
 
 def test_return_level_threshold(ds=ds):
-    extreme_stats.return_level_threshold_plot(data=ds.data, var='hs', 
-                                thresholds=[1,1.5])
+    extreme_stats.return_level_threshold(data=ds.data, var='hs', 
+                                              thresholds=[1,1.5])
 
