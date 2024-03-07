@@ -38,6 +38,9 @@ def test_return_levels_pot(ds=ds):
 def test_return_levels_annual_max(ds=ds):
     extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,100], output_file=False) 
 
+def test_return_levels_idm(ds=ds):
+    extreme_stats.return_levels_idm(data=ds.data, var='hs', periods=[20,100], output_file=False) 
+
 def test_mean_profile(ds=ds):
     profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
     
@@ -45,4 +48,16 @@ def test_profile_shear(ds=ds):
     profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
     
     
+
+def test_diagnostic_return_level_plot_multi(ds=ds):
+    extreme_stats.diagnostic_return_level_plot_multi(data=ds.data, 
+                                                     var='hs',
+                                                     dist_list=['GP', 
+                                                                'EXP'],
+                                                     yaxis='prob',
+                                                     output_file=False)
+
+def test_return_level_threshold(ds=ds):
+    extreme_stats.return_level_threshold(data=ds.data, var='hs', 
+                                              thresholds=[1,1.5])
 
