@@ -365,7 +365,8 @@ def diagnostic_return_level_plot_multi(data, var,
                                        periods=np.arange(0.1, 1000, 0.1),
                                        threshold=None,
                                        yaxis='prob',
-                                       output_file=False):
+                                       output_file=False,
+                                       display=False):
     """
     Plots empirical value plot along fitted distributions.
 
@@ -378,6 +379,7 @@ def diagnostic_return_level_plot_multi(data, var,
     yaxis (str): Either 'prob' (default) or 'rp', displays probability of
     non-exceedance or return period on yaxis respectively.
     output_file (str): path of the output file to save the plot, else None.
+    display (bool): if True, displays the figure
     
     return: plots the return value plot
     """
@@ -477,7 +479,8 @@ def diagnostic_return_level_plot_multi(data, var,
     else:
         plt.savefig(output_file)
 
-    plt.show()
+    if display:
+        plt.show()
 
 
 def return_level_threshold(data, var, thresholds, 
