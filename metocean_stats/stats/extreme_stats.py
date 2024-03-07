@@ -811,3 +811,83 @@ def old_return_levels_GP(data, var, threshold=None,
 
     return rl
 
+def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='Weibull3P',method='default',threshold='default'):
+    
+    # data : dataframe, should be daily or hourly
+    # period: a value, or an array return periods =np.array([1,10,100,10000],dtype=float)
+    # distribution: 'EXP', 'GEV', 'GUM', 'LoNo', 'Weibull2P' or 'Weibull3P'
+    # method: 'default', 'AM' or 'POT'
+    # threshold='default'(min anual maxima), or a value 
+
+    import scipy.stats as stats
+    from pyextremes import get_extremes
+    
+    it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
+    
+    df = dataframe[var]
+    
+    period = periods
+    # get data for fitting 
+    if method == 'default' : # all data 
+        data = df.values
+    elif method == 'AM' : # annual maxima
+        annual_maxima = df.resample('Y').max() # get annual maximum 
+        data = annual_maxima
+    elif method == 'POT' : # Peak over threshold 
+        if threshold == 'default' :
+            annual_maxima = df.resample('Y').max() 
+            threshold=annual_maxima.min()
+        data = get_extremes(df, method="POT", threshold=threshold, r="48H")
+    else:
+        print ('Please check the method of filtering data')
+    
+    # Return periods in K-th element 
+    try:
+        for i in range(len(period)) :
+            if period[i] == 1 : 
+                period[i] = 1.5873
+    except:
+        if period == 1 : 
+            period = 1.5873
+            
+    duration = (df.index[-1]-df.index[0]).days + 1 
+    length_data = data.shape[0]
+    interval = duration*24/length_data # in hours 
+    period = period*365.2422*24/interval # years is converted to K-th
+    
+    # Fit a distribution to the data
+    if distribution == 'EXP' : 
+        loc, scale = stats.expon.fit(data)
+        value = stats.expon.isf(1/period, loc, scale)
+        #value = stats.expon.ppf(1 - 1 / period, loc, scale)
+    elif distribution == 'GEV' :
+        shape, loc, scale = stats.genextreme.fit(data) # fit data   
+        value = stats.genextreme.isf(1/period, shape, loc, scale)
+        #value = stats.genextreme.ppf(1 - 1 / period, shape, loc, scale)
+    elif distribution == 'GUM' :
+        loc, scale = stats.gumbel_r.fit(data) # fit data
+        value = stats.gumbel_r.isf(1/period, loc, scale)
+        #value = stats.gumbel_r.ppf(1 - 1 / period, loc, scale)
+    elif distribution == 'LoNo' :
+        shape, loc, scale = stats.lognorm.fit(data)
+        value = stats.lognorm.isf(1/period, shape, loc, scale)
+        #value = stats.lognorm.ppf(1 - 1 / period, shape, loc, scale)
+    elif distribution == 'Weibull2P' :
+        shape, loc, scale = stats.weibull_min.fit(data, floc=0) # (ML)
+        value = stats.weibull_min.isf(1/period, shape, loc, scale)
+        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+    elif distribution == 'Weibull3P' : 
+        shape, loc, scale = stats.weibull_min.fit(data) # (ML)
+        value = stats.weibull_min.isf(1/period, shape, loc, scale)
+        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+    else:
+        print ('Please check the distribution')    
+        
+    if method == 'default' :  
+    	output_file= distribution + '.png'
+    else:
+        output_file= distribution + '(' + method + ')' + '.png'
+        
+    plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
+       
+    return 
