@@ -891,3 +891,205 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
     return 
+    
+    
+    
+def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):  
+    
+    # This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
+    # df : dataframe, must include hs and tp
+    # file_out: Hs-Tp joint distribution, optional
+    
+    
+    import scipy.stats as stats
+    from scipy.signal import find_peaks
+    from scipy.optimize import curve_fit
+    
+    
+    #df = readNora10File(file)
+    
+    # calculate lognormal and weibull parameters and plot the PDFs 
+    mu = np.mean(np.log(df.hs.values)) # mean of ln(Hs)
+    std = np.std(np.log(df.hs.values)) # standard deviation of ln(Hs)
+    alpha = mu
+    sigma = std
+    
+    h = np.linspace(start=0.001, stop=20, num=2000)
+    pdf_Hs1 = h*0
+    pdf_Hs2 = h*0
+    
+    pdf_Hs1 = 1/(np.sqrt(2*np.pi)*alpha*h)*np.exp(-(np.log(h)-sigma)**2/(2*alpha**2))
+    param = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
+    pdf_Hs2 = stats.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
+    
+    
+    # Find the index where two PDF cut, between P60 and P99 
+    for i in range(len(h)):
+        if abs(h[i]-np.percentile(df.hs.values,60)) < 0.1:
+            i1=i
+            
+        if abs(h[i]-np.percentile(df.hs.values,99)) < 0.1:
+            i2=i
+            
+    epsilon=abs(pdf_Hs1[i1:i2]-pdf_Hs2[i1:i2])
+    param = find_peaks(1/epsilon)
+    index = param[0][0]
+    index = index + i1
+    
+    
+    # Merge two functions and do smoothing around the cut 
+    eta = h[index]
+    pdf_Hs = h*0
+    for i in range(len(h)):
+        if h[i] < eta : 
+            pdf_Hs[i] = pdf_Hs1[i]
+        else:
+            pdf_Hs[i] = pdf_Hs2[i]
+            
+    for i in range(len(h)):
+        if eta-0.5 < h[i] < eta+0.5 : 
+            pdf_Hs[i] = np.mean(pdf_Hs[i-10:i+10])
+    
+            
+    #####################################################
+    # calcualte a1, a2, a3, b1, b2, b3 
+    # firstly calcualte mean_hs, mean_lnTp, variance_lnTp 
+    Tp = df.tp.values
+    Hs = df.hs.values
+    maxHs = max(Hs)
+    if maxHs<2 : 
+        intx=0.05
+    elif maxHs>=2 and maxHs<3 :
+        intx=0.1
+    elif maxHs>=3 and maxHs<4 :
+        intx=0.2
+    elif maxHs>=4 and maxHs<10 :
+        intx=0.5
+    else : 
+        intx=1.0;
+    
+    mean_hs = []
+    variance_lnTp = []
+    mean_lnTp = []
+    
+    hs_bin = np.arange(0,maxHs+intx,intx)
+    for i in range(len(hs_bin)-1):
+        idxs = np.where((hs_bin[i]<=Hs) & (Hs<hs_bin[i+1]))
+        if Hs[idxs].shape[0] > 15 : 
+            mean_hs.append(np.mean(Hs[idxs]))
+            mean_lnTp.append(np.mean(np.log(Tp[idxs])))
+            variance_lnTp.append(np.var(np.log(Tp[idxs])))
+    
+    mean_hs = np.asarray(mean_hs)
+    mean_lnTp = np.asarray(mean_lnTp)
+    variance_lnTp = np.asarray(variance_lnTp)
+    
+    # calcualte a1, a2, a3
+    def Gauss3(x, a1, a2):
+        y = a1 + a2*x**0.36
+        return y
+    parameters, covariance = curve_fit(Gauss3, mean_hs, mean_lnTp)
+    a1 = parameters[0]
+    a2 = parameters[1]
+    a3 = 0.36
+    
+    # calcualte b1, b2, b3 
+    def Gauss4(x, b2, b3):
+        y = 0.005 + b2*np.exp(-x*b3)
+        return y
+    start = 1
+    x = mean_hs[start:]
+    y = variance_lnTp[start:]
+    parameters, covariance = curve_fit(Gauss4, x, y)
+    b1 = 0.005
+    b2 = parameters[0]
+    b3 = parameters[1]
+    
+    
+    # calculate pdf Hs, Tp 
+    t = np.linspace(start=0.001, stop=35, num=3000)
+    
+    f_Hs_Tp = np.zeros((len(h), len(t)))
+    pdf_Hs_Tp=f_Hs_Tp*0
+    
+    for i in range(len(h)):
+        mu = a1 + a2*h[i]**a3
+        std2 = b1 + b2*np.exp(-b3*h[i])
+        std = np.sqrt(std2)
+        
+        f_Hs_Tp[i,:] = 1/(np.sqrt(2*np.pi)*std*t)*np.exp(-(np.log(t)-mu)**2/(2*std2))
+        pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
+        
+        
+        
+    ## Plot data 
+    param1 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=1)
+    param50 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=50)
+    param100 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t)
+    param500 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=500)
+
+
+    plt.figure(figsize=(8,6))
+    plt.plot(param1[0],param1[1],'b',label=str(param1[2])+'-year')
+    plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
+    plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
+    plt.plot(param500[0],param500[1],'r',label=str(param500[2])+'-year')
+    plt.scatter(df.tp.values,df.hs.values,s=5)
+    plt.xlabel('Tp - Peak Period[s]')
+    plt.ylabel('Hs - Significant Wave Height[m]')
+    plt.grid()
+    plt.legend() 
+    plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
+    
+    return 
+
+
+
+def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
+
+    # this is a part of joint_distribution_Hs_Tp function 
+    
+    import scipy.stats as stats
+    from scipy.signal import find_peaks
+    
+    # RVE of X years 
+    period=X*365.2422*24/3
+    shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
+    rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+    
+    # Find index of Hs=value
+    epsilon = abs(h - rve_X)
+    param = find_peaks(1/epsilon) # to find the index of bottom
+    index = param[0][0]     # the  index of Hs=value
+    
+    # Find peak of pdf at Hs=RVE of X year 
+    pdf_Hs_Tp_X = pdf_Hs_Tp[index,:] # Find pdf at RVE of X year 
+    param = find_peaks(pdf_Hs_Tp_X) # find the peak
+    index = param[0][0]
+    f_Hs_Tp_100=pdf_Hs_Tp_X[index]
+
+    
+    h1=[]
+    t1=[]
+    t2=[]
+    for i in range(len(h)):
+        f3_ = f_Hs_Tp_100/pdf_Hs[i]
+        f3 = f_Hs_Tp[i,:]
+        epsilon = abs(f3-f3_) # the difference 
+        para = find_peaks(1/epsilon) # to find the bottom
+        index = para[0]
+        if t[index].shape[0] == 2 :
+            h1.append(h[i])
+            t1.append(t[index][0])
+            t2.append(t[index][1])
+    
+    h1=np.asarray(h1)
+    t1=np.asarray(t1)
+    t2=np.asarray(t2)
+    t3 = np.concatenate((t1, t2[::-1])) # to get correct circle order 
+    h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
+    t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
+    h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
+
+    return t3,h3,X
+
