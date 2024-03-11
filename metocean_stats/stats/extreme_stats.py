@@ -903,11 +903,9 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     
     import scipy.stats as stats
     from scipy.signal import find_peaks
+    from matplotlib import pyplot as plt
     from scipy.optimize import curve_fit
-    
-    
-    #df = readNora10File(file)
-    
+   
     # calculate lognormal and weibull parameters and plot the PDFs 
     mu = np.mean(np.log(df.hs.values)) # mean of ln(Hs)
     std = np.std(np.log(df.hs.values)) # standard deviation of ln(Hs)
@@ -1021,20 +1019,140 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
         pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
         
         
+    def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
+        # RVE of X years 
+        period=X*365.2422*24/3
+        shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
+        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+        
+        # Find index of Hs=value
+        epsilon = abs(h - rve_X)
+        param = find_peaks(1/epsilon) # to find the index of bottom
+        index = param[0][0]     # the  index of Hs=value
+        
+        # Find peak of pdf at Hs=RVE of X year 
+        pdf_Hs_Tp_X = pdf_Hs_Tp[index,:] # Find pdf at RVE of X year 
+        param = find_peaks(pdf_Hs_Tp_X) # find the peak
+        index = param[0][0]
+        f_Hs_Tp_100=pdf_Hs_Tp_X[index]
+    
+        
+        h1=[]
+        t1=[]
+        t2=[]
+        for i in range(len(h)):
+            f3_ = f_Hs_Tp_100/pdf_Hs[i]
+            f3 = f_Hs_Tp[i,:]
+            epsilon = abs(f3-f3_) # the difference 
+            para = find_peaks(1/epsilon) # to find the bottom
+            index = para[0]
+            if t[index].shape[0] == 2 :
+                h1.append(h[i])
+                t1.append(t[index][0])
+                t2.append(t[index][1])
+        
+        h1=np.asarray(h1)
+        t1=np.asarray(t1)
+        t2=np.asarray(t2)
+        t3 = np.concatenate((t1, t2[::-1])) # to get correct circle order 
+        h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
+        t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
+        h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
+    
+        return t3,h3,X
+
+
+        
+    def DVN_steepness(df,h,t):
+        ## steepness 
+        X = 500 # get max 500 year 
+        period=X*365.2422*24/3
+        shape, loc, scale = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
+        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+        
+        h1=[]
+        t1=[]
+        g = 9.80665
+        j2 = 10000
+        for j in range(len(t)):
+            if t[j]<=8 :
+                Sp=1/15
+                temp = Sp * g * t[j]**2 /(2*np.pi)
+                h1.append(temp)
+                t1.append(t[j])
+                j1=j
+                h2=temp
+                t2=t[j]
+            elif t[j]>=15 :
+                Sp=1/25
+                temp = Sp * g * t[j]**2 /(2*np.pi)
+                if temp <= rve_X:
+                    h1.append(temp)
+                    t1.append(t[j])
+                if j < j2 :
+                    j2=j 
+                    h3=temp
+                    t3=t[j]
+                    
+        h_steepness=np.asarray(h1)
+        t_steepness=np.asarray(t1)
+        
+        return t_steepness, h_steepness
+        
+        
+        
+    def find_percentile(data,pdf_Hs_Tp,h,t,p=50):
+        ## find pecentile
+        # RVE of X years 
+        X = 500 # get max 500 year 
+        period=X*365.2422*24/3
+        shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
+        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+        epsilon = abs(h - rve_X)
+        param = find_peaks(1/epsilon) # to find the index of bottom
+        index_X = param[0][0]     # the  index of Hs=value
+        
+        
+        h1=[]
+        t1=[]
+        # Find peak of pdf at Hs=RVE of X year 
+        for i in range(index_X):
+            pdf_Hs_Tp_X = pdf_Hs_Tp[i,:] # Find pdf at RVE of X year 
+            sum_pdf = sum(pdf_Hs_Tp_X)
+            for j in range(len(pdf_Hs_Tp_X)):
+                if (sum(pdf_Hs_Tp_X[:j])/sum_pdf <= p/100) and (sum(pdf_Hs_Tp_X[:j+1])/sum_pdf >= p/100) : 
+                    #print (i, h[i],j,t[j])
+                    t1.append(t[j])
+                    h1.append(h[i])
+                    break 
+        h1=np.asarray(h1)
+        t1=np.asarray(t1)
+    
+        return t1,h1
+        
         
     ## Plot data 
     param1 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=1)
     param50 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=50)
     param100 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t)
     param500 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=500)
-
+    t_steepness, h_steepness = DVN_steepness(df,h,t)
+    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t)
+    percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5)
+    percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95)
+    
 
     plt.figure(figsize=(8,6))
-    plt.plot(param1[0],param1[1],'b',label=str(param1[2])+'-year')
+    plt.plot(param1[0],param1[1],'k',label=str(param1[2])+'-year')
     plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
     plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
     plt.plot(param500[0],param500[1],'r',label=str(param500[2])+'-year')
-    plt.scatter(df.tp.values,df.hs.values,s=5)
+    plt.plot(t_steepness,h_steepness,'k--',label='steepness')
+    plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)    
+    plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
+    plt.plot(percentile05[0],percentile05[1],'g--',label='Tp-5%',linewidth=2)
+    plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-50%',linewidth=2)
+
     plt.xlabel('Tp - Peak Period[s]')
     plt.ylabel('Hs - Significant Wave Height[m]')
     plt.grid()
@@ -1045,51 +1163,5 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
 
 
 
-def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
 
-    # this is a part of joint_distribution_Hs_Tp function 
-    
-    import scipy.stats as stats
-    from scipy.signal import find_peaks
-    
-    # RVE of X years 
-    period=X*365.2422*24/3
-    shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
-    rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
-    
-    # Find index of Hs=value
-    epsilon = abs(h - rve_X)
-    param = find_peaks(1/epsilon) # to find the index of bottom
-    index = param[0][0]     # the  index of Hs=value
-    
-    # Find peak of pdf at Hs=RVE of X year 
-    pdf_Hs_Tp_X = pdf_Hs_Tp[index,:] # Find pdf at RVE of X year 
-    param = find_peaks(pdf_Hs_Tp_X) # find the peak
-    index = param[0][0]
-    f_Hs_Tp_100=pdf_Hs_Tp_X[index]
-
-    
-    h1=[]
-    t1=[]
-    t2=[]
-    for i in range(len(h)):
-        f3_ = f_Hs_Tp_100/pdf_Hs[i]
-        f3 = f_Hs_Tp[i,:]
-        epsilon = abs(f3-f3_) # the difference 
-        para = find_peaks(1/epsilon) # to find the bottom
-        index = para[0]
-        if t[index].shape[0] == 2 :
-            h1.append(h[i])
-            t1.append(t[index][0])
-            t2.append(t[index][1])
-    
-    h1=np.asarray(h1)
-    t1=np.asarray(t1)
-    t2=np.asarray(t2)
-    t3 = np.concatenate((t1, t2[::-1])) # to get correct circle order 
-    h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
-    t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
-    h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
-
-    return t3,h3,X
 
