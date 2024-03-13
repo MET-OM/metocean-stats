@@ -61,3 +61,9 @@ def test_return_level_threshold(ds=ds):
     extreme_stats.return_level_threshold(data=ds.data, var='hs', 
                                               thresholds=[1,1.5])
 
+
+def test_joint_distribution_Hs_Tp(ds=ds):
+    extreme_stats.joint_distribution_Hs_Tp(data=ds.data, file_out='test.png')
+    os.remove('test.png')
+    
+    
