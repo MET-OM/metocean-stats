@@ -900,6 +900,25 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     # df : dataframe, must include hs and tp
     # file_out: Hs-Tp joint distribution, optional
     
+    # correct Tp from ocean model 
+    def Tp_correction(Tp):  ### Tp_correction
+
+        # This function will correct the Tp from ocean model which are vertical straight lines in Hs-Tp distribution 
+        # Example of how to use 
+        # 
+        # df = pd.read_csv('NORA3_wind_wave_lon3.21_lat56.55_19930101_20021231.csv',comment='#',index_col=0, parse_dates=True)
+        # df['tp_corr'] = df.tp.values # new Tp = old Tp
+        # Tp_correction(df.tp_corr.values) # make change to the new Tp
+        #
+
+        new_Tp=1+np.log(Tp/3.244)/0.09525
+        index = np.where(Tp>=3.2) # indexes of Tp
+        r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
+        Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
+    
+        return Tp 
+    
+    df['tp'] = Tp_correction(df.tp.values)
     
     import scipy.stats as stats
     from scipy.signal import find_peaks
