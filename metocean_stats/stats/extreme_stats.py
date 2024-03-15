@@ -920,6 +920,8 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     
     df['tp'] = Tp_correction(df.tp.values)
     
+    interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
+    
     import scipy.stats as stats
     from scipy.signal import find_peaks
     from matplotlib import pyplot as plt
@@ -1040,7 +1042,7 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
         
     def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
         # RVE of X years 
-        period=X*365.2422*24/3
+        period=X*365.2422*24/interval
         shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
@@ -1085,7 +1087,7 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     def DVN_steepness(df,h,t):
         ## steepness 
         X = 500 # get max 500 year 
-        period=X*365.2422*24/3
+        period=X*365.2422*24/interval
         shape, loc, scale = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
@@ -1124,7 +1126,7 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
         ## find pecentile
         # RVE of X years 
         X = 500 # get max 500 year 
-        period=X*365.2422*24/3
+        period=X*365.2422*24/interval
         shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         epsilon = abs(h - rve_X)
