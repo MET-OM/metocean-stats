@@ -10,10 +10,11 @@ def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
     var_origin: variable name (str) e.g., ['hs','tp','Pdir','hs_swell']
     ts_train: pandas DataFrame
     var_train: variable name (str) e.g., ['hs']
+    model = 'GBR', 'SVR_RBF', LSTM
     Output:
     ts_pred: pandas DataFrame
     """
-    Y_pred = ts_origin[var_train]*0
+    Y_pred = pd.DataFrame(columns=[var_train], index=ts_origin.index)
 
     # Add extension _x, _y
     ts_origin.columns = [col + '_x' for col in ts_origin.columns]
@@ -72,7 +73,7 @@ def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
         model.add(Dense(units=1))
         # Compile the model
         model.compile(optimizer=optimizer, loss='mean_squared_error')
-        model.fit(X_train, Y_train, epochs=100, batch_size=32, validation_data=(X_test, Y_test), verbose=1)
+        model.fit(X_train, Y_train, epochs=40, batch_size=32, validation_data=(X_test, Y_test), verbose=1)
         Y_pred[:] = model.predict(ts_origin[var_origin].values).reshape(-1, 1) 
 
     # remove back extension _x, _y
