@@ -933,11 +933,17 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     alpha = mu
     sigma = std
     
-    h = np.linspace(start=0.001, stop=20, num=2000)
+    h = np.linspace(start=0.01, stop=30, num=1500)
     pdf_Hs1 = h*0
     pdf_Hs2 = h*0
     
-    pdf_Hs1 = 1/(np.sqrt(2*np.pi)*alpha*h)*np.exp(-(np.log(h)-sigma)**2/(2*alpha**2))
+    if not np.isinf(mu) : 
+    	pdf_Hs1 = 1/(np.sqrt(2*np.pi)*alpha*h)*np.exp(-(np.log(h)-sigma)**2/(2*alpha**2))
+    else:
+    	param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
+    	pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
+    	pdf_Hs1 = pdf_lognorm
+    
     param = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
     pdf_Hs2 = stats.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
     
@@ -952,10 +958,15 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
             
     epsilon=abs(pdf_Hs1[i1:i2]-pdf_Hs2[i1:i2])
     param = find_peaks(1/epsilon)
-    index = param[0][0]
+    try:
+    	index = param[0][1]
+    except:
+    	try:
+    	    index = param[0][0]
+    	except:
+            index = np.where(epsilon == epsilon.min())[0]
     index = index + i1
-    
-    
+        
     # Merge two functions and do smoothing around the cut 
     eta = h[index]
     pdf_Hs = h*0
@@ -1026,7 +1037,7 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     
     
     # calculate pdf Hs, Tp 
-    t = np.linspace(start=0.001, stop=35, num=3000)
+    t = np.linspace(start=0.01, stop=40, num=2000)
     
     f_Hs_Tp = np.zeros((len(h), len(t)))
     pdf_Hs_Tp=f_Hs_Tp*0
@@ -1093,30 +1104,44 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
         
         h1=[]
         t1=[]
+        h2=[]
+        t2=[]
+        h3=[]
+        t3=[]
         g = 9.80665
-        j2 = 10000
+        j15 = 10000
         for j in range(len(t)):
             if t[j]<=8 :
                 Sp=1/15
                 temp = Sp * g * t[j]**2 /(2*np.pi)
                 h1.append(temp)
                 t1.append(t[j])
-                j1=j
-                h2=temp
-                t2=t[j]
+            
+                j8=j # t=8
+                h1_t8=temp
+                t8=t[j]
             elif t[j]>=15 :
-                Sp=1/25
+                Sp=1/25 
                 temp = Sp * g * t[j]**2 /(2*np.pi)
                 if temp <= rve_X:
-                    h1.append(temp)
-                    t1.append(t[j])
-                if j < j2 :
-                    j2=j 
-                    h3=temp
-                    t3=t[j]
-                    
-        h_steepness=np.asarray(h1)
-        t_steepness=np.asarray(t1)
+                    h3.append(temp)
+                    t3.append(t[j])
+                if j < j15 :
+                    j15=j # t=15
+                    h3_t15=temp
+                    t15=t[j]
+    
+        xp = [t8, t15]
+        fp = [h1_t8, h3_t15]
+        t2_=t[j8+1:j15]
+        h2_=np.interp(t2_, xp, fp)
+        for i in range(len(h2_)):
+            if h2_[i] <= rve_X:
+                h2.append(h2_[i])
+                t2.append(t2_[i])
+    
+        h_steepness=np.asarray(h1+h2+h3)
+        t_steepness=np.asarray(t1+t2+t3)
         
         return t_steepness, h_steepness
         
@@ -1164,15 +1189,19 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
     
 
     plt.figure(figsize=(8,6))
+    df = df[df['hs'] >= 0.1]
+    plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)    
+    
     plt.plot(param1[0],param1[1],'k',label=str(param1[2])+'-year')
     plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
     plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
     plt.plot(param500[0],param500[1],'r',label=str(param500[2])+'-year')
+    
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
-    plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)    
+    
     plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
     plt.plot(percentile05[0],percentile05[1],'g--',label='Tp-5%',linewidth=2)
-    plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-50%',linewidth=2)
+    plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-95%',linewidth=2)
 
     plt.xlabel('Tp - Peak Period[s]')
     plt.ylabel('Hs - Significant Wave Height[m]')
