@@ -15,14 +15,14 @@ def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
     ts_pred: pandas DataFrame
     """
     Y_pred = pd.DataFrame(columns=[var_train], index=ts_origin.index)
-
+    
     # Add extension _x, _y
     ts_origin.columns = [col + '_x' for col in ts_origin.columns]
     ts_train.columns  = [col + '_y' for col in ts_train.columns]
     
     var_origin = [var + '_x' for var in var_origin]
     var_train = [var + '_y' for var in var_train]
-    
+
     # Merge or join the dataframes based on time
     merged_data = pd.merge(ts_origin[var_origin], ts_train[var_train], how='inner', left_on='time', right_on='time')
 
@@ -60,12 +60,10 @@ def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
         model.fit(X_train, Y_train)
         Y_pred[:] = model.predict(ts_origin[var_origin].values).reshape(-1, 1)    
     elif model == 'LSTM':
-        from sklearn.preprocessing import MinMaxScaler
         from keras.models import Sequential
         from keras.layers import LSTM, Dense
         from keras.optimizers import Adam
-        from sklearn.preprocessing import MinMaxScaler
-        optimizer = Adam(lr=0.001)
+        optimizer = Adam(learning_rate=0.001)
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
         model = Sequential()
         model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 1)))

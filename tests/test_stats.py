@@ -1,5 +1,5 @@
 from metocean_api import ts
-from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats
+from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats, ml_stats
 import os
 
 # Define TimeSeries-object for NORA3
@@ -43,4 +43,13 @@ def test_return_levels_annual_max(ds=ds):
 def test_joint_2D_contour(ds=ds):
     extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[20,100], output_file='test.png')
     os.remove('test.png')
+
+def test_predict_ts_GBR(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
+
+def test_predict_ts_SVR(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
+
+def test_predict_ts_LSTM(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
 
