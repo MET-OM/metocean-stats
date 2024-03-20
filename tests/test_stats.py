@@ -1,5 +1,5 @@
 from metocean_api import ts
-from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats
+from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats, ml_stats
 import os
 
 # Define TimeSeries-object for NORA3
@@ -46,8 +46,6 @@ def test_mean_profile(ds=ds):
     
 def test_profile_shear(ds=ds):
     profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
-    
-    
 
 def test_diagnostic_return_level_plot_multi(ds=ds):
     extreme_stats.diagnostic_return_level_plot_multi(data=ds.data, 
@@ -57,13 +55,21 @@ def test_diagnostic_return_level_plot_multi(ds=ds):
                                                      yaxis='prob',
                                                      output_file=False)
 
+def test_predict_ts_GBR(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
+
+def test_predict_ts_SVR(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
+
+def test_predict_ts_LSTM(ds=ds):
+    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
+
 def test_return_level_threshold(ds=ds):
     extreme_stats.return_level_threshold(data=ds.data, var='hs', 
                                               thresholds=[1,1.5])
-
-
+    
 def test_joint_distribution_Hs_Tp(ds=ds):
     extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
     os.remove('test.png')
     
-    
+  
