@@ -271,7 +271,7 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
     return
 
 
-def Cmax(Tm,depth,Hs):
+def Cmax(Hs,Tm,depth):
     
     import matplotlib.pyplot as plt
     import numpy as np
