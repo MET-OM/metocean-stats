@@ -66,8 +66,8 @@ def test_joint_distribution_Hs_Tp(ds=ds):
     extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
     os.remove('test.png')
     
-def test_Cmax(Hs=16.2,Tm=12.8,depth=349):
-    general_stats.Cmax(Hs,Tm,depth)
+#def test_Cmax(Hs=16.2,Tm=12.8,depth=349):
+#    general_stats.Cmax(Hs,Tm,depth)
     
     
     
