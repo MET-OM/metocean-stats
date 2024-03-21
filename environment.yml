@@ -15,6 +15,7 @@ dependencies:
   - metocean-api
   - pyextremes
   - virocon
+  - scikit-learn
   - keras
   - tensorflow
 
