@@ -894,10 +894,12 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     
     
     
-def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):  
+def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distribution.png'):  
     
     # This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
-    # df : dataframe, must include hs and tp
+    # df : dataframe, 
+    # var1 : Hs: significant wave height,
+    # var2 : Tp: Peak period 
     # file_out: Hs-Tp joint distribution, optional
     
     # correct Tp from ocean model 
@@ -916,9 +918,10 @@ def joint_distribution_Hs_Tp(df,file_out='Hs.Tp.joint.distribution.png'):
         r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
         Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
     
-        return Tp 
-    
-    df['tp'] = Tp_correction(df.tp.values)
+        return Tp
+         
+    df['hs'] = df[var1].values
+    df['tp'] = Tp_correction(df[var2].values)
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     
