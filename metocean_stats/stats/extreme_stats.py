@@ -940,7 +940,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
     pdf_Hs1 = h*0
     pdf_Hs2 = h*0
     
-    if not np.isinf(mu) : 
+    if 0 < mu < 5 : 
     	pdf_Hs1 = 1/(np.sqrt(2*np.pi)*alpha*h)*np.exp(-(np.log(h)-sigma)**2/(2*alpha**2))
     else:
     	param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
