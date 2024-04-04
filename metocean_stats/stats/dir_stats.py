@@ -19,13 +19,13 @@ def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent):
 
 def var_rose(data, direction,intensity, output_file, method='overall'):
 
-    direction = data[direction]
-    intensity = data[intensity]
+    direction2 = data[direction]
+    intensity2 = data[intensity]
     size = 5
     if method == 'overall':
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot(111, projection="windrose")
-        ax.bar(direction, intensity, normed=True, opening=0.8, nsector=12)
+        ax.bar(direction2, intensity2, normed=True, opening=0.8, nsector=12)
         ax.set_legend()
         ax.figure.set_size_inches(size, size)
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
