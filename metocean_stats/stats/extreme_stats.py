@@ -1117,8 +1117,9 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
             if t[j]<=8 :
                 Sp=1/15
                 temp = Sp * g * t[j]**2 /(2*np.pi)
-                h1.append(temp)
-                t1.append(t[j])
+                if temp <= rve_X:
+                    h1.append(temp)
+                    t1.append(t[j])
             
                 j8=j # t=8
                 h1_t8=temp
