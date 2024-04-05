@@ -335,3 +335,47 @@ def Cmax(Hs,Tm,depth):
     Cmax = C_Pmax*1.135 # this is between 1.13 and 1.14 
     
     return Cmax
+    
+    
+    
+def pdf_all(data, bins=70): #pdf_all(data, bins=70)
+    
+    import matplotlib.pyplot as plt
+    from scipy.stats import expon
+    from scipy.stats import genextreme
+    from scipy.stats import gumbel_r 
+    from scipy.stats import lognorm 
+    from scipy.stats import weibull_min
+    
+    
+    x=np.linspace(min(data),max(data),100)
+    
+    param = weibull_min.fit(data) # shape, loc, scale
+    pdf_weibull = weibull_min.pdf(x, param[0], loc=param[1], scale=param[2])
+    
+    param = expon.fit(data) # loc, scale
+    pdf_expon = expon.pdf(x, loc=param[0], scale=param[1])
+    
+    param = genextreme.fit(data) # shape, loc, scale
+    pdf_gev = genextreme.pdf(x, param[0], loc=param[1], scale=param[2])
+    
+    param = gumbel_r.fit(data) # loc, scale
+    pdf_gumbel = gumbel_r.pdf(x, loc=param[0], scale=param[1])
+    
+    param = lognorm.fit(data) # shape, loc, scale
+    pdf_lognorm = lognorm.pdf(x, param[0], loc=param[1], scale=param[2])
+    
+    fig, ax = plt.subplots(1, 1)
+    #ax.plot(x, pdf_expon, label='pdf-expon')
+    ax.plot(x, pdf_weibull,label='pdf-Weibull')
+    ax.plot(x, pdf_gev, label='pdf-GEV')
+    ax.plot(x, pdf_gumbel, label='pdf-GUM')
+    ax.plot(x, pdf_lognorm, label='pdf-lognorm')
+    ax.hist(data, density=True, bins=bins, color='tab:blue', label='histogram', alpha=0.5)
+    #ax.hist(data, density=True, bins='auto', color='tab:blue', label='histogram', alpha=0.5)
+    ax.legend()
+    ax.grid()
+    ax.set_xlabel('Wave height')
+    ax.set_ylabel('Probability density')
+    
+    return 
