@@ -338,7 +338,7 @@ def Cmax(Hs,Tm,depth):
     
     
     
-def pdf_all(data, bins=70): #pdf_all(data, bins=70)
+def pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=70)
     
     import matplotlib.pyplot as plt
     from scipy.stats import expon
@@ -347,6 +347,7 @@ def pdf_all(data, bins=70): #pdf_all(data, bins=70)
     from scipy.stats import lognorm 
     from scipy.stats import weibull_min
     
+    data = data[var].values
     
     x=np.linspace(min(data),max(data),100)
     
@@ -377,5 +378,6 @@ def pdf_all(data, bins=70): #pdf_all(data, bins=70)
     ax.grid()
     ax.set_xlabel('Wave height')
     ax.set_ylabel('Probability density')
+    plt.savefig(output_file)
     
     return 
