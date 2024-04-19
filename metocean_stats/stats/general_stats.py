@@ -383,9 +383,9 @@ def pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=
     return 
 
 
-def scatter(df,var,location,regression_line,qqplot=True):
-    x=df[var+'_nora3'].values
-    y=df[var+'_nora10'].values
+def scatter(df,var1,var2,location,regression_line,qqplot=True):
+    x=df[var1].values
+    y=df[var2].values
     fig, ax = plt.subplots()
     ax.scatter(x,y,marker='.',s=10,c='g')
     dmin, dmax = np.min([x,y])*0.9, np.max([x,y])*1.05
@@ -418,10 +418,10 @@ def scatter(df,var,location,regression_line,qqplot=True):
                  +'\ncorr = '+str(round(corr,3))
                  +'\nstd = '+str(round(std,3)), xy=(dmin+1,0.6*(dmin+dmax)))
         
-    plt.xlabel("$" + 'Nora3'+ "$", fontsize=15)
-    plt.ylabel("$"+ 'Nora10'+ "$", fontsize=15)
+    plt.xlabel(var1, fontsize=15)
+    plt.ylabel(var2, fontsize=15)
 
-    plt.title("$"+var+(location +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
+    plt.title("$"+(location +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
     plt.grid()
     plt.close()
     
