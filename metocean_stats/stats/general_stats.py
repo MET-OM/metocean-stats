@@ -381,3 +381,48 @@ def pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=
     plt.savefig(output_file)
     
     return 
+
+
+def scatter(df,var,location,regression_line,qqplot=True):
+    x=df[var+'_nora3'].values
+    y=df[var+'_nora10'].values
+    fig, ax = plt.subplots()
+    ax.scatter(x,y,marker='.',s=10,c='g')
+    dmin, dmax = np.min([x,y])*0.9, np.max([x,y])*1.05
+    diag = np.linspace(dmin, dmax, 1000)
+    plt.plot(diag, diag, color='r', linestyle='--')
+    plt.gca().set_aspect('equal')
+    plt.xlim([0,dmax])
+    plt.ylim([0,dmax])
+    
+    if qqplot :    
+        percs = np.linspace(0,100,101)
+        qn_x = np.nanpercentile(x, percs)
+        qn_y = np.nanpercentile(y, percs)    
+        ax.scatter(qn_x,qn_y,marker='.',s=80,c='b')
+
+    if regression_line:  
+        m,b,r,p,se1=stats.linregress(x,y)
+        cm0="$"+('y=%2.2fx+%2.2f'%(m,b))+"$";   
+        plt.plot(x, m*x + b, 'k--', label=cm0)
+        plt.legend(loc='best')
+        
+    rmse = np.sqrt(((y - x) ** 2).mean())
+    bias = np.mean(y-x)
+    mae = np.mean(np.abs(y-x))
+    corr = np.corrcoef(y,x)[0][1]
+    std = np.std(x-y)/np.mean(x)
+    plt.annotate('rmse = '+str(round(rmse,3))
+                 +'\nbias = '+str(round(bias,3))
+                 +'\nmean = '+str(round(mae,3))
+                 +'\ncorr = '+str(round(corr,3))
+                 +'\nstd = '+str(round(std,3)), xy=(dmin+1,0.6*(dmin+dmax)))
+        
+    plt.xlabel("$" + 'Nora3'+ "$", fontsize=15)
+    plt.ylabel("$"+ 'Nora10'+ "$", fontsize=15)
+
+    plt.title("$"+var+(location +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
+    plt.grid()
+    plt.close()
+    
+    return fig
