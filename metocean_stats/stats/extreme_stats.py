@@ -891,10 +891,9 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
     return 
-    
-    
-    
-def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distribution.png'):  
+
+
+def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png'):  
     
     # This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
     # df : dataframe, 
@@ -919,6 +918,37 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
         Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
     
         return Tp
+        
+    def Weibull_method_of_moment(X):
+        X=X+0.0001; 
+        n=len(X);
+        m1 = np.mean(X);
+        cm1=np.mean((X-np.mean(X))**1);
+        m2 = np.var(X);
+        cm2=np.mean((X-np.mean(X))**2);
+        m3 = stats.skew(X);
+        cm3 = np.mean((X-np.mean(X))**3);
+    
+        from scipy.special import gamma
+        def m1fun(a,b,c):
+            return a+b*gamma(1+1/c)
+        def cm2fun(b,c):
+            return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
+        def cm3fun(b,c):
+            return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
+        def cfun(c):
+            return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
+    
+        from scipy import optimize
+        cHat = optimize.fminbound(cfun, -2, 5) # shape 
+        def bfun(b):
+            return abs(cm2fun(b,cHat)-cm2)
+        bHat = optimize.fminbound(bfun,-5,30) # scale 
+        def afun(a):
+            return abs(m1fun(a,bHat,cHat)-m1)
+        aHat = optimize.fminbound(afun,-5,30) # location
+    
+        return cHat, aHat, bHat # shape, location, scale 
          
     df['hs'] = df[var1].values
     df['tp'] = Tp_correction(df[var2].values)
@@ -947,7 +977,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
     	pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
     	pdf_Hs1 = pdf_lognorm
     
-    param = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
+    param = Weibull_method_of_moment(df.hs.values) #stats.weibull_min.fit(df.hs.values) # shape, loc, scale
     pdf_Hs2 = stats.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
     
     
@@ -1057,7 +1087,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
     def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
         # RVE of X years 
         period=X*365.2422*24/interval
-        shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
+        shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
         # Find index of Hs=value
@@ -1102,7 +1132,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
         ## steepness 
         X = 500 # get max 500 year 
         period=X*365.2422*24/interval
-        shape, loc, scale = stats.weibull_min.fit(df.hs.values) # shape, loc, scale
+        shape, loc, scale = Weibull_method_of_moment(df.hs.values) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
         h1=[]
@@ -1156,7 +1186,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
         # RVE of X years 
         X = 500 # get max 500 year 
         period=X*365.2422*24/interval
-        shape, loc, scale = stats.weibull_min.fit(data) # shape, loc, scale
+        shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         epsilon = abs(h - rve_X)
         param = find_peaks(1/epsilon) # to find the index of bottom
@@ -1208,6 +1238,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',file_out='Hs.Tp.joint.distri
     plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-95%',linewidth=2)
 
     plt.xlabel('Tp - Peak Period[s]')
+    plt.title(title)
     plt.ylabel('Hs - Significant Wave Height[m]')
     plt.grid()
     plt.legend() 
