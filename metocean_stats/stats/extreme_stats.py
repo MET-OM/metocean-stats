@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
+from .aux_funcs import Tp_correction
 
 
 def return_levels_pot(data, var, dist='Weibull_2P', 
@@ -893,31 +894,15 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     return 
 
 
-def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png'):  
+def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png',density_plot=False):  
     
-    # This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
-    # df : dataframe, 
-    # var1 : Hs: significant wave height,
-    # var2 : Tp: Peak period 
-    # file_out: Hs-Tp joint distribution, optional
-    
-    # correct Tp from ocean model 
-    def Tp_correction(Tp):  ### Tp_correction
-
-        # This function will correct the Tp from ocean model which are vertical straight lines in Hs-Tp distribution 
-        # Example of how to use 
-        # 
-        # df = pd.read_csv('NORA3_wind_wave_lon3.21_lat56.55_19930101_20021231.csv',comment='#',index_col=0, parse_dates=True)
-        # df['tp_corr'] = df.tp.values # new Tp = old Tp
-        # Tp_correction(df.tp_corr.values) # make change to the new Tp
-        #
-
-        new_Tp=1+np.log(Tp/3.244)/0.09525
-        index = np.where(Tp>=3.2) # indexes of Tp
-        r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
-        Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
-    
-        return Tp
+    """
+    This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
+    df : dataframe, 
+    var1 : Hs: significant wave height,
+    var2 : Tp: Peak period 
+    file_out: Hs-Tp joint distribution, optional
+    """
         
     def Weibull_method_of_moment(X):
         X=X+0.0001; 
@@ -1224,8 +1209,16 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
 
     plt.figure(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
-    plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)    
-    
+    fig, ax = plt.subplots()
+    if density_plot is False: 
+        plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+    else:
+        import seaborn as sns
+        sns.set_theme(style="ticks")
+        g = sns.jointplot(x=df.tp.values, y=df.hs.values, kind="hex", color="#5d5d60",joint_kws={'gridsize':40, 'bins':'log'})
+
+
+
     plt.plot(param1[0],param1[1],'k',label=str(param1[2])+'-year')
     plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
     plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
@@ -1234,12 +1227,12 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
     
     plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
-    plt.plot(percentile05[0],percentile05[1],'g--',label='Tp-5%',linewidth=2)
+    plt.plot(percentile05[0],percentile05[1],'g:',label='Tp-5%',linewidth=2)
     plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-95%',linewidth=2)
 
-    plt.xlabel('Tp - Peak Period[s]')
-    plt.title(title)
-    plt.ylabel('Hs - Significant Wave Height[m]')
+    plt.xlabel('Tp - Peak Period [s]')
+    plt.suptitle(title)
+    plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
     plt.legend() 
     plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
