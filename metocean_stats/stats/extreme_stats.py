@@ -894,7 +894,7 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     return 
 
 
-def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png',density_plot=False):  
+def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,10000]),save_rve=False, title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png',density_plot=False):  
     
     """
     This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
@@ -903,7 +903,8 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     var2 : Tp: Peak period 
     file_out: Hs-Tp joint distribution, optional
     """
-        
+    max_y = max(periods)
+    
     def Weibull_method_of_moment(X):
         X=X+0.0001; 
         n=len(X);
@@ -1070,9 +1071,14 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         
         
     def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
+        
         # RVE of X years 
-        period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
+        
+        if X == 1 : 
+            period=1.5873*365.2422*24/interval
+        else :
+            period=X*365.2422*24/interval
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
         # Find index of Hs=value
@@ -1113,9 +1119,9 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
 
 
         
-    def DVN_steepness(df,h,t):
+    def DVN_steepness(df,h,t,max_y=max(periods)):
         ## steepness 
-        X = 500 # get max 500 year 
+        X = max_y # get max 500 year 
         period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(df.hs.values) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
@@ -1166,10 +1172,10 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         
         
         
-    def find_percentile(data,pdf_Hs_Tp,h,t,p=50):
+    def find_percentile(data,pdf_Hs_Tp,h,t,p,max_y=max(periods)):
         ## find pecentile
         # RVE of X years 
-        X = 500 # get max 500 year 
+        X = max_y # get max 500 year 
         period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
@@ -1195,15 +1201,10 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     
         return t1,h1
         
-        
-    ## Plot data 
-    param1 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=1)
-    param50 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=50)
-    param100 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t)
-    param500 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=500)
+           
     t_steepness, h_steepness = DVN_steepness(df,h,t)
-    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t)
     percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5)
+    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50)
     percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95)
     
 
@@ -1218,12 +1219,14 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         g = sns.jointplot(x=df.tp.values, y=df.hs.values, kind="hex", color="#5d5d60",joint_kws={'gridsize':40, 'bins':'log'})
 
 
-
-    plt.plot(param1[0],param1[1],'k',label=str(param1[2])+'-year')
-    plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
-    plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
-    plt.plot(param500[0],param500[1],'r',label=str(param500[2])+'-year')
-    
+    for i in range(len(periods)):
+        param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=periods[i])
+        plt.plot(param[0],param[1],label=str(param[2])+'-year')
+        if save_rve :
+            np.save('Tp_'+str(param[2])+'.npy', param[0])
+            np.save('Hs_'+str(param[2])+'.npy', param[1])        
+        
+   
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
     
     plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
@@ -1237,7 +1240,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     plt.legend() 
     plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
     
-    return 
+    return
 
 
 
