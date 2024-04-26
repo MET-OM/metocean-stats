@@ -1114,8 +1114,13 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
         h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
         t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
         h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
-    
-        return t3,h3,X
+
+        df = pd.DataFrame()
+        df['hs']=h1
+        df['t1']=t1
+        df['t2']=t2
+      
+        return t3,h3,X,df
 
 
         
@@ -1223,8 +1228,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
         param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=periods[i])
         plt.plot(param[0],param[1],label=str(param[2])+'-year')
         if save_rve :
-            np.save('Tp_'+str(param[2])+'.npy', param[0])
-            np.save('Hs_'+str(param[2])+'.npy', param[1])        
+            param[3].to_csv(str(param[2])+'_year.csv')    
         
    
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
