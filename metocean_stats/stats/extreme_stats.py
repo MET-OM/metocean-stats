@@ -1228,7 +1228,7 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
         param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=periods[i])
         plt.plot(param[0],param[1],label=str(param[2])+'-year')
         if save_rve :
-            param[3].to_csv(str(param[2])+'_year.csv')    
+            param[3].to_csv(str(param[2])+'_year.csv', index=False)    
         
    
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
