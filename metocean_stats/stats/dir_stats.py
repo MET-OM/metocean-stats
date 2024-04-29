@@ -22,10 +22,10 @@ def var_rose(data, direction,intensity, output_file, method='overall'):
     direction2 = data[direction]
     intensity2 = data[intensity]
     size = 5
-    bins_range = np.array([0, np.percentile(intensity,40),
-                   np.percentile(intensity,60),
-                   np.percentile(intensity,80),
-                   np.percentile(intensity,99)])
+    bins_range = np.array([0, np.percentile(intensity2,40),
+                   np.percentile(intensity2,60),
+                   np.percentile(intensity2,80),
+                   np.percentile(intensity2,99)])
     
     if method == 'overall':
         fig = plt.figure(figsize = (8,8))
