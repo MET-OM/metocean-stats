@@ -165,7 +165,7 @@ def return_levels_idm(data, var, dist='Weibull_3P',
     return_periods = np.array(periods)*24*365.2422/time_step
     
     if dist == 'Weibull_3P':
-        shape, loc, scale = stats.weibull_min.fit(data['hs'])
+        shape, loc, scale = stats.weibull_min.fit(data[var])
         return_levels = stats.weibull_min.isf(1/return_periods, 
                                               shape, loc, scale)
     else:
@@ -443,7 +443,14 @@ def plot_multi_diagnostic_return_levels(data, var,
         df_emp_rl = get_empirical_return_levels(data=data, 
                                                 var=var, 
                                                 method='BM')
-
+    elif ('Weibull_3P') in dist_list:
+        df_emp_rl = get_empirical_return_levels(data=data, 
+                                                var=var, 
+                                                method='BM',
+                                                block_size="3D")
+        df_emp_rl.loc[:,'return_periods'] = df_emp_rl.loc[:,'return_periods']/(365.24/3)
+        df_emp_rl = df_emp_rl.loc[df_emp_rl.loc[:,'return_periods'] >= 1.0,:]
+                                                
     # Initialize plot and fill in empirical return levels
     fig, ax = plt.subplots()
 
@@ -477,6 +484,11 @@ def plot_multi_diagnostic_return_levels(data, var,
             df_model_rl_tmp = return_levels_annual_max(data, var,
                                                        dist=dist,
                                                        periods=periods)
+                                                       
+        elif dist in ['Weibull_3P']:
+            df_model_rl_tmp = return_levels_idm(data, var, 
+                                               dist=dist, 
+                                               periods=periods)
 
         # Troncate all series only to keep values corresponding to return
         # period greater than 1 year
