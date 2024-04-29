@@ -165,9 +165,10 @@ def return_levels_idm(data, var, dist='Weibull_3P',
     return_periods = np.array(periods)*24*365.2422/time_step
     
     if dist == 'Weibull_3P':
-        shape, loc, scale = stats.weibull_min.fit(data[var])
+        shape, loc, scale = param = Weibull_method_of_moment(data[var])
         return_levels = stats.weibull_min.isf(1/return_periods, 
                                               shape, loc, scale)
+        
     else:
         print ('please check method/distribution, must be one of: EXP, \
                 GP or Weibull_2P')
@@ -444,11 +445,15 @@ def plot_multi_diagnostic_return_levels(data, var,
                                                 var=var, 
                                                 method='BM')
     elif ('Weibull_3P') in dist_list:
+        
+        interval = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+        interval_day = 1/(24/interval)
+        
         df_emp_rl = get_empirical_return_levels(data=data, 
                                                 var=var, 
                                                 method='BM',
-                                                block_size="3D")
-        df_emp_rl.loc[:,'return_periods'] = df_emp_rl.loc[:,'return_periods']/(365.24/3)
+                                                block_size= str(interval_day) + "D")
+        df_emp_rl.loc[:,'return_periods'] = df_emp_rl.loc[:,'return_periods']/(365.24/interval_day)
         df_emp_rl = df_emp_rl.loc[df_emp_rl.loc[:,'return_periods'] >= 1.0,:]
                                                 
     # Initialize plot and fill in empirical return levels
@@ -1289,7 +1294,36 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     
     return 
 
-
-
+def Weibull_method_of_moment(X):
+    import scipy.stats as stats
+    X=X+0.0001;
+    n=len(X);
+    m1 = np.mean(X);
+    cm1=np.mean((X-np.mean(X))**1);
+    m2 = np.var(X);
+    cm2=np.mean((X-np.mean(X))**2);
+    m3 = stats.skew(X);
+    cm3 = np.mean((X-np.mean(X))**3);
+   
+    from scipy.special import gamma
+    def m1fun(a,b,c):
+        return a+b*gamma(1+1/c)
+    def cm2fun(b,c):
+        return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
+    def cm3fun(b,c):
+        return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
+    def cfun(c):
+        return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
+   
+    from scipy import optimize
+    cHat = optimize.fminbound(cfun, -2, 5) # shape
+    def bfun(b):
+        return abs(cm2fun(b,cHat)-cm2)
+    bHat = optimize.fminbound(bfun,-5,30) # scale
+    def afun(a):
+        return abs(m1fun(a,bHat,cHat)-m1)
+    aHat = optimize.fminbound(afun,-5,30) # location
+  
+    return cHat, aHat, bHat # shape, location, scale
 
 
