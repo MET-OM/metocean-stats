@@ -426,3 +426,121 @@ def scatter(df,var1,var2,location,regression_line,qqplot=True):
     plt.close()
     
     return fig
+
+
+def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float, output_file: str = None):
+    """
+    Calculate monthly non-exceedance table for a given variable.
+
+    Parameters:
+        data (pd.DataFrame): Input DataFrame containing the data.
+        var1 (str): Name of the column in the DataFrame representing the variable.
+        step_var1 (float): Step size for binning the variable.
+        output_file (str, optional): File path to save the output CSV file. Default is None.
+
+    Returns:
+        pd.DataFrame: Monthly non-exceedance table with percentage of time each data level occurs in each month.
+    """
+
+# Define  bins
+    bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
+    labels =  [f'<{num}' for num in bins]
+
+    # Categorize data into bins
+    data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
+    
+    # Group by month and var1 bin, then count occurrences
+    grouped = data.groupby([data.index.month, var1+'-level']).size().unstack(fill_value=0)
+
+
+    # Calculate percentage of time each wind speed bin occurs in each month
+    percentage_by_month = grouped.div(grouped.sum(axis=1), axis=0) * 100
+
+    # Calculate cumulative percentage for each bin across all months
+    cumulative_percentage = percentage_by_month.T.cumsum()
+
+    # Insert 'Annual', 'Mean', 'P99', 'Maximum' rows
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index.month)[var1].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index.month)[var1].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index.month)[var1].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index.month)[var1].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index.month)[var1].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month)[var1].max()
+    cumulative_percentage['Year'] = cumulative_percentage.mean(axis=1)[:-6]
+    cumulative_percentage['Year'][-6] = data[var1].mean()    
+    cumulative_percentage['Year'][-5] = data[var1].quantile(0.50)
+    cumulative_percentage['Year'][-4] = data[var1].quantile(0.75)
+    cumulative_percentage['Year'][-3] = data[var1].quantile(0.95)
+    cumulative_percentage['Year'][-2] = data[var1].quantile(0.99)
+    cumulative_percentage['Year'][-1] = data[var1].max()
+
+    # Round 2 decimals
+    cumulative_percentage = round(cumulative_percentage,2)
+
+    # Write to CSV file if output_file parameter is provided
+    if output_file:
+        cumulative_percentage.to_csv(output_file)
+
+    return cumulative_percentage
+
+
+
+def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str, output_file: str = None):
+    """
+    Calculate directional non-exceedance table for a given variable.
+
+    Parameters:
+        data (pd.DataFrame): Input DataFrame containing the data.
+        var1 (str): Name of the column in the DataFrame representing the variable.
+        step_var1 (float): Step size for binning the variable.
+        var_dir (str): Name of the column in the DataFrame representing the direction.
+        output_file (str, optional): File path to save the output CSV file. Default is None.
+
+    Returns:
+        pd.DataFrame: Directional non-exceedance table with percentage of time each data level occurs in each direction.
+    """
+
+# Define  bins
+    bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
+    labels =  [f'<{num}' for num in bins]
+    
+#    direction_bins = np.arange(345,730,30)%360
+    direction_bins = np.arange(0,390,30)
+    direction_labels = [f'{num}-{num+30}' for num in direction_bins[:-1]]
+    data['direction_sector'] = pd.cut(data[var_dir], bins=direction_bins, labels=direction_labels, right=True)
+    
+    # Categorize data into bins
+    data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
+    data = data.sort_values(by='direction_sector')
+    data = data.set_index('direction_sector')
+    data.index.name = 'direction_sector'
+
+    # Group by direction and var1 bin, then count occurrences
+    # Calculate percentage of time each var1 bin occurs in each month
+    percentage_by_dir = 100*data.groupby([data.index, var1+'-level'])[var1].count().unstack()/len(data[var1])
+    cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
+   
+    # Calculate cumulative percentage for each bin across all months
+    # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index)[var1].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index)[var1].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index)[var1].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index)[var1].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index)[var1].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index)[var1].max()
+    cumulative_percentage['Omni'] = cumulative_percentage.sum(axis=1)[:-6]
+    cumulative_percentage['Omni'][-6] = data[var1].mean()    
+    cumulative_percentage['Omni'][-5] = data[var1].quantile(0.50)
+    cumulative_percentage['Omni'][-4] = data[var1].quantile(0.75)
+    cumulative_percentage['Omni'][-3] = data[var1].quantile(0.95)
+    cumulative_percentage['Omni'][-2] = data[var1].quantile(0.99)
+    cumulative_percentage['Omni'][-1] = data[var1].max()
+
+    # Round 2 decimals
+    cumulative_percentage = round(cumulative_percentage,2)
+
+    # Write to CSV file if output_file parameter is provided
+    if output_file:
+        cumulative_percentage.to_csv(output_file)
+
+    return cumulative_percentage
