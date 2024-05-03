@@ -1247,6 +1247,108 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     return
 
 
-
-
-
+def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
+    from metocean_stats.stats import general_stats, extreme_stats, dir_stats, aux_funcs
+    import pandas as pd 
+    import numpy as np 
+    from scipy.stats import weibull_min
+    import scipy.stats as stats
+    import matplotlib.pyplot as plt
+    
+    def readNora10File(file):
+        df = pd.read_csv(file, delim_whitespace=True, header=3) # sep=' ', header=None,0,1,2,3
+        df.index= pd.to_datetime(df.YEAR*1000000+df.M*10000+df.D*100+df.H,format='%Y%m%d%H')
+        df['tp_corr_nora10'] = aux_funcs.Tp_correction(df.TP.values)
+        return df
+    
+    
+    def Weibull_method_of_moment(X):
+        X=X+0.0001; 
+        n=len(X);
+        m1 = np.mean(X);
+        cm1=np.mean((X-np.mean(X))**1);
+        m2 = np.var(X);
+        cm2=np.mean((X-np.mean(X))**2);
+        m3 = stats.skew(X);
+        cm3 = np.mean((X-np.mean(X))**3);
+    
+        from scipy.special import gamma
+        def m1fun(a,b,c):
+            return a+b*gamma(1+1/c)
+        def cm2fun(b,c):
+            return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
+        def cm3fun(b,c):
+            return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
+        def cfun(c):
+            return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
+    
+        from scipy import optimize
+        cHat = optimize.fminbound(cfun, -2, 5) # shape 
+        def bfun(b):
+            return abs(cm2fun(b,cHat)-cm2)
+        bHat = optimize.fminbound(bfun,-5,30) # scale 
+        def afun(a):
+            return abs(m1fun(a,bHat,cHat)-m1)
+        aHat = optimize.fminbound(afun,-5,30) # location
+    
+        return cHat, aHat, bHat # shape, location, scale 
+    
+    
+    
+    df = readNora10File(file)
+    
+    # Fit Weibull distribution to your data and estimate parameters
+    data = df.HS.values  # Your data
+    shape, loc, scale = Weibull_method_of_moment(data)
+    
+    # Define return periods
+    periods = np.arange(1.5873, 10000, 100) 
+    return_periods = periods
+    return_periods = return_periods*365.2422*24/3
+    # Calculate return values
+    return_values = weibull_min.ppf(1 - 1 / return_periods, shape, loc, scale)
+    
+    # Bootstrap to estimate confidence bounds
+    num_bootstrap_samples = 1000
+    bootstrap_return_values = []
+    for _ in range(num_bootstrap_samples):
+        # Resample data with replacement
+        bootstrap_sample = np.random.choice(data, size=1000, replace=True)
+        
+        # Fit Weibull distribution to resampled data
+        shape_b, loc_b, scale_b = Weibull_method_of_moment(bootstrap_sample)
+        # Calculate return values for resampled distribution
+        bootstrap_return_values.append(weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
+    
+    # Calculate confidence bounds
+    lower_bounds = np.percentile(bootstrap_return_values, 2.5, axis=0)
+    upper_bounds = np.percentile(bootstrap_return_values, 97.5, axis=0)
+    
+    
+    
+    modelled_data = pd.DataFrame()
+    modelled_data['return value'] = return_values
+    modelled_data['lower ci'] =     lower_bounds
+    modelled_data['upper ci'] =     upper_bounds
+    modelled_data['return period'] = periods
+    
+    
+    
+    # Generate some random data
+    x = modelled_data['return period'].values #np.linspace(0, 10, 100)
+    y = modelled_data['return value'].values ##np.sin(x)
+    
+    # Generate upper and lower bounds
+    upper_bound = modelled_data['upper ci'].values
+    lower_bound = modelled_data['lower ci'].values
+    
+    # Plot the data
+    plt.plot(x, y, label='Weibull')
+    plt.xscale('log')
+    plt.fill_between(x, lower_bound, upper_bound, color='gray', alpha=0.3, label='Bounds')
+    plt.xlabel('Years')
+    plt.ylabel('Waves')
+    plt.title('Plot with Bounds')
+    plt.legend()
+    
+    return 
