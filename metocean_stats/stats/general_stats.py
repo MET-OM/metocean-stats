@@ -450,7 +450,7 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
     
     # Group by month and var1 bin, then count occurrences
-    grouped = data.groupby([data.index.month, var1+'-level']).size().unstack(fill_value=0)
+    grouped = data.groupby([data.index.month, var1+'-level'], observed=True).size().unstack(fill_value=0)
 
 
     # Calculate percentage of time each wind speed bin occurs in each month
@@ -460,19 +460,19 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     cumulative_percentage = percentage_by_month.T.cumsum()
 
     # Insert 'Annual', 'Mean', 'P99', 'Maximum' rows
-    cumulative_percentage.loc['Mean'] = data.groupby(data.index.month)[var1].mean()
-    cumulative_percentage.loc['P50'] = data.groupby(data.index.month)[var1].quantile(0.50)
-    cumulative_percentage.loc['P75'] = data.groupby(data.index.month)[var1].quantile(0.75)
-    cumulative_percentage.loc['P95'] = data.groupby(data.index.month)[var1].quantile(0.95)
-    cumulative_percentage.loc['P99'] = data.groupby(data.index.month)[var1].quantile(0.99)
-    cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month)[var1].max()
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index.month, observed=True)[var1].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month, observed=True)[var1].max()
     cumulative_percentage['Year'] = cumulative_percentage.mean(axis=1)[:-6]
-    cumulative_percentage['Year'][-6] = data[var1].mean()    
-    cumulative_percentage['Year'][-5] = data[var1].quantile(0.50)
-    cumulative_percentage['Year'][-4] = data[var1].quantile(0.75)
-    cumulative_percentage['Year'][-3] = data[var1].quantile(0.95)
-    cumulative_percentage['Year'][-2] = data[var1].quantile(0.99)
-    cumulative_percentage['Year'][-1] = data[var1].max()
+    cumulative_percentage['Year'].iloc[-6] = data[var1].mean()    
+    cumulative_percentage['Year'].iloc[-5] = data[var1].quantile(0.50)
+    cumulative_percentage['Year'].iloc[-4] = data[var1].quantile(0.75)
+    cumulative_percentage['Year'].iloc[-3] = data[var1].quantile(0.95)
+    cumulative_percentage['Year'].iloc[-2] = data[var1].quantile(0.99)
+    cumulative_percentage['Year'].iloc[-1] = data[var1].max()
 
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
@@ -480,7 +480,7 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     # Write to CSV file if output_file parameter is provided
     if output_file:
         cumulative_percentage.to_csv(output_file)
-
+    
     return cumulative_percentage
 
 
@@ -517,24 +517,24 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
 
     # Group by direction and var1 bin, then count occurrences
     # Calculate percentage of time each var1 bin occurs in each month
-    percentage_by_dir = 100*data.groupby([data.index, var1+'-level'])[var1].count().unstack()/len(data[var1])
+    percentage_by_dir = 100*data.groupby([data.index, var1+'-level'], observed=True)[var1].count().unstack()/len(data[var1])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
    
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
-    cumulative_percentage.loc['Mean'] = data.groupby(data.index)[var1].mean()
-    cumulative_percentage.loc['P50'] = data.groupby(data.index)[var1].quantile(0.50)
-    cumulative_percentage.loc['P75'] = data.groupby(data.index)[var1].quantile(0.75)
-    cumulative_percentage.loc['P95'] = data.groupby(data.index)[var1].quantile(0.95)
-    cumulative_percentage.loc['P99'] = data.groupby(data.index)[var1].quantile(0.99)
-    cumulative_percentage.loc['Maximum'] = data.groupby(data.index)[var1].max()
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index, observed=True)[var1].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index, observed=True)[var1].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index, observed=True)[var1].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index, observed=True)[var1].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index, observed=True)[var1].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index, observed=True)[var1].max()
     cumulative_percentage['Omni'] = cumulative_percentage.sum(axis=1)[:-6]
-    cumulative_percentage['Omni'][-6] = data[var1].mean()    
-    cumulative_percentage['Omni'][-5] = data[var1].quantile(0.50)
-    cumulative_percentage['Omni'][-4] = data[var1].quantile(0.75)
-    cumulative_percentage['Omni'][-3] = data[var1].quantile(0.95)
-    cumulative_percentage['Omni'][-2] = data[var1].quantile(0.99)
-    cumulative_percentage['Omni'][-1] = data[var1].max()
+    cumulative_percentage['Omni'].iloc[-6] = data[var1].mean()    
+    cumulative_percentage['Omni'].iloc[-5] = data[var1].quantile(0.50)
+    cumulative_percentage['Omni'].iloc[-4] = data[var1].quantile(0.75)
+    cumulative_percentage['Omni'].iloc[-3] = data[var1].quantile(0.95)
+    cumulative_percentage['Omni'].iloc[-2] = data[var1].quantile(0.99)
+    cumulative_percentage['Omni'].iloc[-1] = data[var1].max()
 
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
@@ -544,3 +544,73 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
         cumulative_percentage.to_csv(output_file)
 
     return cumulative_percentage
+
+
+def plot_monthly_stats(data: pd.DataFrame, var1: str, step_var1: float, title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+    """
+    Plot monthly statistics of a variable from a DataFrame.
+
+    Parameters:
+        data (pd.DataFrame): The DataFrame containing the data.
+        var1 (str): The name of the variable to plot.
+        step_var1 (float): The step size for computing cumulative statistics.
+        title (str, optional): Title of the plot. Default is 'Variable [units] location'.
+        output_file (str, optional): File path to save the plot. Default is 'monthly_stats.png'.
+
+    Returns:
+        matplotlib.figure.Figure: The Figure object of the generated plot.
+
+    Notes:
+        This function computes monthly statistics (Maximum, P99, Mean) of a variable and plots them.
+        It uses the 'table_monthly_non_exceedance' function to compute cumulative statistics.
+
+    Example:
+        plot_monthly_stats(data, 'temperature', 0.1, title='Monthly Temperature Statistics', output_file='temp_stats.png')
+    """
+    fig, ax = plt.subplots()
+    cumulative_percentage = table_monthly_non_exceedance(data,var1,step_var1)
+    cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
+    cumulative_percentage.loc['P99'][:-1].plot(marker = 'o')    
+    cumulative_percentage.loc['Mean'][:-1].plot(marker = 'o')
+
+    plt.title(title,fontsize=16)
+    plt.xlabel('Month',fontsize=15)
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_file)
+    return fig
+
+def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str, title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
+    """
+    Plot directional statistics of a variable from a DataFrame.
+
+    Parameters:
+        data (pd.DataFrame): The DataFrame containing the data.
+        var1 (str): The name of the variable to plot.
+        step_var1 (float): The step size for computing cumulative statistics.
+        var_dir (str): The name of the directional variable.
+        title (str, optional): Title of the plot. Default is 'Variable [units] location'.
+        output_file (str, optional): File path to save the plot. Default is 'directional_stats.png'.
+
+    Returns:
+        matplotlib.figure.Figure: The Figure object of the generated plot.
+
+    Notes:
+        This function computes directional statistics (Maximum, P99, Mean) of a variable and plots them against a directional variable.
+        It uses the 'table_directional_non_exceedance' function to compute cumulative statistics.
+
+    Example:
+        plot_directional_stats(data, 'hs', 0.1, 'Pdir', title='Directional Wave Statistics', output_file='directional_hs_stats.png')
+    """    
+    fig, ax = plt.subplots()
+    cumulative_percentage = table_directional_non_exceedance(data,var1,step_var1,var_dir)
+    cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
+    cumulative_percentage.loc['P99'][:-1].plot(marker = 'o')    
+    cumulative_percentage.loc['Mean'][:-1].plot(marker = 'o')
+    
+    plt.title(title,fontsize=16)
+    plt.xlabel('Direction[$⁰$]',fontsize=15)
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_file)
+    return fig
