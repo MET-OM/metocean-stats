@@ -22,10 +22,15 @@ def var_rose(data, direction,intensity, output_file, method='overall'):
     direction2 = data[direction]
     intensity2 = data[intensity]
     size = 5
+    bins_range = np.array([0, np.percentile(intensity2,40),
+                   np.percentile(intensity2,60),
+                   np.percentile(intensity2,80),
+                   np.percentile(intensity2,99)])
+    
     if method == 'overall':
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot(111, projection="windrose")
-        ax.bar(direction2, intensity2, normed=True, opening=0.8, nsector=12)
+        ax.bar(direction2, intensity2, normed=True, bins=bins_range, opening=0.8, nsector=12)
         ax.set_legend()
         ax.figure.set_size_inches(size, size)
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
