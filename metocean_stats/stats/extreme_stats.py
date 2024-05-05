@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
+from .aux_funcs import Tp_correction
 
 
 def return_levels_pot(data, var, dist='Weibull_2P', 
@@ -941,32 +942,17 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     return 
 
 
-def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png'):  
+def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,10000]),save_rve=False, title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png',density_plot=False):  
     
-    # This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
-    # df : dataframe, 
-    # var1 : Hs: significant wave height,
-    # var2 : Tp: Peak period 
-    # file_out: Hs-Tp joint distribution, optional
+    """
+    This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
+    df : dataframe, 
+    var1 : Hs: significant wave height,
+    var2 : Tp: Peak period 
+    file_out: Hs-Tp joint distribution, optional
+    """
+    max_y = max(periods)
     
-    # correct Tp from ocean model 
-    def Tp_correction(Tp):  ### Tp_correction
-
-        # This function will correct the Tp from ocean model which are vertical straight lines in Hs-Tp distribution 
-        # Example of how to use 
-        # 
-        # df = pd.read_csv('NORA3_wind_wave_lon3.21_lat56.55_19930101_20021231.csv',comment='#',index_col=0, parse_dates=True)
-        # df['tp_corr'] = df.tp.values # new Tp = old Tp
-        # Tp_correction(df.tp_corr.values) # make change to the new Tp
-        #
-
-        new_Tp=1+np.log(Tp/3.244)/0.09525
-        index = np.where(Tp>=3.2) # indexes of Tp
-        r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
-        Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
-    
-        return Tp
-        
     def Weibull_method_of_moment(X):
         X=X+0.0001; 
         n=len(X);
@@ -1133,9 +1119,14 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         
         
     def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
+        
         # RVE of X years 
-        period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
+        
+        if X == 1 : 
+            period=1.5873*365.2422*24/interval
+        else :
+            period=X*365.2422*24/interval
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
         
         # Find index of Hs=value
@@ -1171,14 +1162,19 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
         t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
         h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
-    
-        return t3,h3,X
+
+        df = pd.DataFrame()
+        df['hs']=h1
+        df['t1']=t1
+        df['t2']=t2
+      
+        return t3,h3,X,df
 
 
         
-    def DVN_steepness(df,h,t):
+    def DVN_steepness(df,h,t,max_y=max(periods)):
         ## steepness 
-        X = 500 # get max 500 year 
+        X = max_y # get max 500 year 
         period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(df.hs.values) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
@@ -1229,10 +1225,10 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
         
         
         
-    def find_percentile(data,pdf_Hs_Tp,h,t,p=50):
+    def find_percentile(data,pdf_Hs_Tp,h,t,p,max_y=max(periods)):
         ## find pecentile
         # RVE of X years 
-        X = 500 # get max 500 year 
+        X = max_y # get max 500 year 
         period=X*365.2422*24/interval
         shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
         rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
@@ -1258,36 +1254,40 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',title='Hs-Tp joint distribut
     
         return t1,h1
         
-        
-    ## Plot data 
-    param1 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=1)
-    param50 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=50)
-    param100 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t)
-    param500 = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=500)
+           
     t_steepness, h_steepness = DVN_steepness(df,h,t)
-    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t)
     percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5)
+    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50)
     percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95)
     
 
     plt.figure(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
-    plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)    
-    
-    plt.plot(param1[0],param1[1],'k',label=str(param1[2])+'-year')
-    plt.plot(param50[0],param50[1],'y',label=str(param50[2])+'-year')
-    plt.plot(param100[0],param100[1],'b',label=str(param100[2])+'-year')
-    plt.plot(param500[0],param500[1],'r',label=str(param500[2])+'-year')
-    
+    fig, ax = plt.subplots()
+    if density_plot is False: 
+        plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+    else:
+        import seaborn as sns
+        sns.set_theme(style="ticks")
+        g = sns.jointplot(x=df.tp.values, y=df.hs.values, kind="hex", color="#5d5d60",joint_kws={'gridsize':40, 'bins':'log'})
+
+
+    for i in range(len(periods)):
+        param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=periods[i])
+        plt.plot(param[0],param[1],label=str(param[2])+'-year')
+        if save_rve :
+            param[3].to_csv(str(param[2])+'_year.csv', index=False)    
+        
+   
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
     
     plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
-    plt.plot(percentile05[0],percentile05[1],'g--',label='Tp-5%',linewidth=2)
+    plt.plot(percentile05[0],percentile05[1],'g:',label='Tp-5%',linewidth=2)
     plt.plot(percentile95[0],percentile95[1],'g--',label='Tp-95%',linewidth=2)
 
-    plt.xlabel('Tp - Peak Period[s]')
-    plt.title(title)
-    plt.ylabel('Hs - Significant Wave Height[m]')
+    plt.xlabel('Tp - Peak Period [s]')
+    plt.suptitle(title)
+    plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
     plt.legend() 
     plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
@@ -1327,3 +1327,108 @@ def Weibull_method_of_moment(X):
     return cHat, aHat, bHat # shape, location, scale
 
 
+def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
+    from metocean_stats.stats import general_stats, extreme_stats, dir_stats, aux_funcs
+    import pandas as pd 
+    import numpy as np 
+    from scipy.stats import weibull_min
+    import scipy.stats as stats
+    import matplotlib.pyplot as plt
+    
+    def readNora10File(file):
+        df = pd.read_csv(file, delim_whitespace=True, header=3) # sep=' ', header=None,0,1,2,3
+        df.index= pd.to_datetime(df.YEAR*1000000+df.M*10000+df.D*100+df.H,format='%Y%m%d%H')
+        df['tp_corr_nora10'] = aux_funcs.Tp_correction(df.TP.values)
+        return df
+    
+    
+    def Weibull_method_of_moment(X):
+        X=X+0.0001; 
+        n=len(X);
+        m1 = np.mean(X);
+        cm1=np.mean((X-np.mean(X))**1);
+        m2 = np.var(X);
+        cm2=np.mean((X-np.mean(X))**2);
+        m3 = stats.skew(X);
+        cm3 = np.mean((X-np.mean(X))**3);
+    
+        from scipy.special import gamma
+        def m1fun(a,b,c):
+            return a+b*gamma(1+1/c)
+        def cm2fun(b,c):
+            return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
+        def cm3fun(b,c):
+            return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
+        def cfun(c):
+            return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
+    
+        from scipy import optimize
+        cHat = optimize.fminbound(cfun, -2, 5) # shape 
+        def bfun(b):
+            return abs(cm2fun(b,cHat)-cm2)
+        bHat = optimize.fminbound(bfun,-5,30) # scale 
+        def afun(a):
+            return abs(m1fun(a,bHat,cHat)-m1)
+        aHat = optimize.fminbound(afun,-5,30) # location
+    
+        return cHat, aHat, bHat # shape, location, scale 
+    
+    
+    
+    df = readNora10File(file)
+    
+    # Fit Weibull distribution to your data and estimate parameters
+    data = df.HS.values  # Your data
+    shape, loc, scale = Weibull_method_of_moment(data)
+    
+    # Define return periods
+    periods = np.arange(1.5873, 10000, 100) 
+    return_periods = periods
+    return_periods = return_periods*365.2422*24/3
+    # Calculate return values
+    return_values = weibull_min.ppf(1 - 1 / return_periods, shape, loc, scale)
+    
+    # Bootstrap to estimate confidence bounds
+    num_bootstrap_samples = 1000
+    bootstrap_return_values = []
+    for _ in range(num_bootstrap_samples):
+        # Resample data with replacement
+        bootstrap_sample = np.random.choice(data, size=1000, replace=True)
+        
+        # Fit Weibull distribution to resampled data
+        shape_b, loc_b, scale_b = Weibull_method_of_moment(bootstrap_sample)
+        # Calculate return values for resampled distribution
+        bootstrap_return_values.append(weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
+    
+    # Calculate confidence bounds
+    lower_bounds = np.percentile(bootstrap_return_values, 2.5, axis=0)
+    upper_bounds = np.percentile(bootstrap_return_values, 97.5, axis=0)
+    
+    
+    
+    modelled_data = pd.DataFrame()
+    modelled_data['return value'] = return_values
+    modelled_data['lower ci'] =     lower_bounds
+    modelled_data['upper ci'] =     upper_bounds
+    modelled_data['return period'] = periods
+    
+    
+    
+    # Generate some random data
+    x = modelled_data['return period'].values #np.linspace(0, 10, 100)
+    y = modelled_data['return value'].values ##np.sin(x)
+    
+    # Generate upper and lower bounds
+    upper_bound = modelled_data['upper ci'].values
+    lower_bound = modelled_data['lower ci'].values
+    
+    # Plot the data
+    plt.plot(x, y, label='Weibull')
+    plt.xscale('log')
+    plt.fill_between(x, lower_bound, upper_bound, color='gray', alpha=0.3, label='Bounds')
+    plt.xlabel('Years')
+    plt.ylabel('Waves')
+    plt.title('Plot with Bounds')
+    plt.legend()
+    
+    return 
