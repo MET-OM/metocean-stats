@@ -952,37 +952,6 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     file_out: Hs-Tp joint distribution, optional
     """
     max_y = max(periods)
-    
-    def Weibull_method_of_moment(X):
-        X=X+0.0001; 
-        n=len(X);
-        m1 = np.mean(X);
-        cm1=np.mean((X-np.mean(X))**1);
-        m2 = np.var(X);
-        cm2=np.mean((X-np.mean(X))**2);
-        m3 = stats.skew(X);
-        cm3 = np.mean((X-np.mean(X))**3);
-    
-        from scipy.special import gamma
-        def m1fun(a,b,c):
-            return a+b*gamma(1+1/c)
-        def cm2fun(b,c):
-            return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
-        def cm3fun(b,c):
-            return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
-        def cfun(c):
-            return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
-    
-        from scipy import optimize
-        cHat = optimize.fminbound(cfun, -2, 5) # shape 
-        def bfun(b):
-            return abs(cm2fun(b,cHat)-cm2)
-        bHat = optimize.fminbound(bfun,-5,30) # scale 
-        def afun(a):
-            return abs(m1fun(a,bHat,cHat)-m1)
-        aHat = optimize.fminbound(afun,-5,30) # location
-    
-        return cHat, aHat, bHat # shape, location, scale 
          
     df['hs'] = df[var1].values
     df['tp'] = Tp_correction(df[var2].values)
@@ -1261,15 +1230,15 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95)
     
 
-    plt.figure(figsize=(8,6))
+    fig, ax = plt.subplots(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
-    fig, ax = plt.subplots()
     if density_plot is False: 
         plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
     else:
-        import seaborn as sns
-        sns.set_theme(style="ticks")
-        g = sns.jointplot(x=df.tp.values, y=df.hs.values, kind="hex", color="#5d5d60",joint_kws={'gridsize':40, 'bins':'log'})
+        from matplotlib.colors import LogNorm
+        #plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+        plt.hist2d(df['tp'].values, df['hs'].values,bins=50, cmap='hot',cmin=1)
+        plt.colorbar()
 
 
     for i in range(len(periods)):
@@ -1289,7 +1258,9 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     plt.suptitle(title)
     plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
-    plt.legend() 
+    plt.legend()
+    plt.xlim([0,param[3].t2.max().round()])
+    plt.ylim([0,param[3].hs.max().round()])
     plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
     
     return 
@@ -1340,40 +1311,6 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
         df.index= pd.to_datetime(df.YEAR*1000000+df.M*10000+df.D*100+df.H,format='%Y%m%d%H')
         df['tp_corr_nora10'] = aux_funcs.Tp_correction(df.TP.values)
         return df
-    
-    
-    def Weibull_method_of_moment(X):
-        X=X+0.0001; 
-        n=len(X);
-        m1 = np.mean(X);
-        cm1=np.mean((X-np.mean(X))**1);
-        m2 = np.var(X);
-        cm2=np.mean((X-np.mean(X))**2);
-        m3 = stats.skew(X);
-        cm3 = np.mean((X-np.mean(X))**3);
-    
-        from scipy.special import gamma
-        def m1fun(a,b,c):
-            return a+b*gamma(1+1/c)
-        def cm2fun(b,c):
-            return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
-        def cm3fun(b,c):
-            return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
-        def cfun(c):
-            return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
-    
-        from scipy import optimize
-        cHat = optimize.fminbound(cfun, -2, 5) # shape 
-        def bfun(b):
-            return abs(cm2fun(b,cHat)-cm2)
-        bHat = optimize.fminbound(bfun,-5,30) # scale 
-        def afun(a):
-            return abs(m1fun(a,bHat,cHat)-m1)
-        aHat = optimize.fminbound(afun,-5,30) # location
-    
-        return cHat, aHat, bHat # shape, location, scale 
-    
-    
     
     df = readNora10File(file)
     
@@ -1432,3 +1369,62 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     plt.legend()
     
     return 
+
+def monthly_extremes_weibull(dataframe, var='hs', periods=[1, 10, 100, 10000]):
+    from scipy.stats import weibull_min
+    # Your implementation of monthly_extremes_weibull function
+    # Calculate Weibull parameters for each month
+    weibull_params = []
+    for month in range(1, 13):
+        month_data = dataframe[dataframe.index.month == month][var]
+        shape, loc, scale = Weibull_method_of_moment(month_data)
+        weibull_params.append((shape, loc, scale))
+    # add annual
+    shape, loc, scale = Weibull_method_of_moment(dataframe[var])
+    weibull_params.append((shape, loc, scale))       
+    # time step between each data, in hours
+    time_step = ((dataframe.index[-1]-dataframe.index[0]).days + 1)*24/dataframe.shape[0]
+    # years is converted to K-th
+    periods1 = np.array(periods)*24*365.2422/time_step
+    #breakpoint()
+    # Calculate return periods for each month and period
+    return_periods = np.zeros((13, len(periods)))
+    for i, (shape, loc, scale) in enumerate(weibull_params):
+        for j, period in enumerate(periods1):
+            return_period = weibull_min.isf(1/period, shape, loc, scale)
+            return_periods[i, j] = round(return_period, 1)
+
+    df = create_weibull_table(weibull_params, return_periods,periods)
+    return weibull_params, return_periods
+
+
+def create_weibull_table(weibull_params, return_periods, periods, units='m',output_file='monthly_extremes_weibull.csv'):
+    # Define months
+    months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
+    
+    # Initialize lists to store table data
+    annual_prob = ['%'] + [8.33] * 12 + [100.00]
+    weibull_shape =   ['-'] + [round(shape, 3) for shape, _, _ in weibull_params]
+    weibull_scale =   [units] + [round(scale, 3) for _, _, scale in weibull_params]
+    weibull_location =   [units] + [round(loc, 2) for _, loc, _ in weibull_params]
+
+    # Create the table data dictionary
+    table_data = {
+        'Month': months,
+        'Annual prob.': annual_prob,
+        'Shape': weibull_shape,
+        'Scale': weibull_scale,
+        'Location': weibull_location,
+    }
+    return_periods = return_periods.T.tolist()
+    # Fill in return periods for each period
+    for i, period in enumerate(periods):
+        table_data[f'Return period: {period} [years]'] = [units] + return_periods[i]
+    # Create DataFrame
+    df = pd.DataFrame(table_data)
+    if output_file:
+        df.to_csv(output_file)
+    
+    return df
+
+
