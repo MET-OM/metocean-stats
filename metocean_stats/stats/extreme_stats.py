@@ -1388,22 +1388,21 @@ def monthly_extremes_weibull(dataframe, var='hs', periods=[1, 10, 100, 10000]):
     periods1 = np.array(periods)*24*365.2422/time_step
     #breakpoint()
     # Calculate return periods for each month and period
-    return_periods = np.zeros((13, len(periods)))
+    return_values = np.zeros((13, len(periods)))
     for i, (shape, loc, scale) in enumerate(weibull_params):
         for j, period in enumerate(periods1):
-            return_period = weibull_min.isf(1/period, shape, loc, scale)
-            return_periods[i, j] = round(return_period, 1)
+            return_value = weibull_min.isf(1/period, shape, loc, scale)
+            return_values[i, j] = round(return_value, 1)
 
-    df = create_weibull_table(weibull_params, return_periods,periods)
     return weibull_params, return_periods
 
 
-def create_weibull_table(weibull_params, return_periods, periods, units='m',output_file='monthly_extremes_weibull.csv'):
-    # Define months
+def table_monthly_weibull_return_periods(dataframe, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.csv'):
+    weibull_params, return_periods = monthly_extremes_weibull(dataframe=dataframe, var=var, periods=periods)
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
     
     # Initialize lists to store table data
-    annual_prob = ['%'] + [8.33] * 12 + [100.00]
+    annual_prob = ['%'] + [np.round(100/12,2)] * 12 + [100.00]
     weibull_shape =   ['-'] + [round(shape, 3) for shape, _, _ in weibull_params]
     weibull_scale =   [units] + [round(scale, 3) for _, _, scale in weibull_params]
     weibull_location =   [units] + [round(loc, 2) for _, loc, _ in weibull_params]
@@ -1427,4 +1426,66 @@ def create_weibull_table(weibull_params, return_periods, periods, units='m',outp
     
     return df
 
+def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], output_file: str = None):
+    from scipy.stats import weibull_min
+    # Your implementation of monthly_extremes_weibull function
+    # Calculate Weibull parameters for each month
+    sector_prob = []
+    weibull_params = []
+    direction_bins = np.arange(15, 360, 30)
+    direction_labels = [value for value in np.arange(30, 360, 30)]
 
+    data['direction_sector'] = pd.Series(np.nan, index=data.index)
+    for i in range(len(direction_bins)-1):
+        condition = (data[var_dir] > direction_bins[i]) & (data[var_dir] <= direction_bins[i + 1])
+        data['direction_sector'] = data['direction_sector'].where(~condition, direction_labels[i])
+
+    data['direction_sector'].fillna(0, inplace=True)      
+
+    for dir in range(0,360,30):
+        sector_data = data[data['direction_sector']==dir][var]
+        shape, loc, scale = Weibull_method_of_moment(sector_data)
+        weibull_params.append((shape, loc, scale))
+        sp = 100*len(sector_data)/len(data[var])
+        sector_prob.append(sp)
+    # add annual
+    shape, loc, scale = Weibull_method_of_moment(data[var])
+    weibull_params.append((shape, loc, scale))       
+    # time step between each data, in hours
+    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # years is converted to K-th
+    periods1 = np.array(periods)*24*365.2422/time_step
+    # Calculate return periods for each month and period
+    return_values = np.zeros((13, len(periods)))
+    for i, (shape, loc, scale) in enumerate(weibull_params):
+        for j, period in enumerate(periods1):
+            return_value = weibull_min.isf(1/period, shape, loc, scale)
+            return_values[i, j] = round(return_value, 1)
+    return weibull_params, return_values, sector_prob
+
+def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], units='m',output_file='directional_extremes_weibull.csv'):
+    weibull_params, return_periods, sector_prob = directional_extremes_weibull(data=data, var=var, var_dir=var_dir, periods=periods)
+    dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
+    # Initialize lists to store table data
+    sector_prob = ['%'] + [round(value, 2) for value in sector_prob] + [100.00]
+    weibull_shape = ['-'] + [round(shape, 3) for shape, _, _ in weibull_params]
+    weibull_scale = [units] + [round(scale, 3) for _, _, scale in weibull_params]
+    weibull_location = [units] + [round(loc, 2) for _, loc, _ in weibull_params]
+    # Create the table data dictionary
+    table_data = {
+        'Direction sector': dir,
+        'Sector prob.': sector_prob,
+        'Shape': weibull_shape,
+        'Scale': weibull_scale,
+        'Location': weibull_location,
+    }
+    return_periods = return_periods.T.tolist()
+    # Fill in return values for each period
+    for i, period in enumerate(periods):
+        table_data[f'Return period: {period} [years]'] = [units] + return_periods[i]
+    # Create DataFrame
+    df = pd.DataFrame(table_data)
+    if output_file:
+        df.to_csv(output_file)
+    
+    return df
