@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
-from .aux_funcs import Tp_correction
+from .aux_funcs import Tp_correction, add_direction_sector, Hs_Tp_curve, Gauss3, Gauss4, Weibull_method_of_moment, DVN_steepness, find_percentile
 
 
 def return_levels_pot(data, var, dist='Weibull_2P', 
@@ -901,7 +901,8 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
             
     duration = (df.index[-1]-df.index[0]).days + 1 
     length_data = data.shape[0]
-    interval = duration*24/length_data # in hours 
+    #interval = duration*24/length_data # in hours 
+    interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     period = period*365.2422*24/interval # years is converted to K-th
     
     # Fit a distribution to the data
@@ -942,7 +943,7 @@ def RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='W
     return 
 
 
-def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,10000]),save_rve=False, title='Hs-Tp joint distribution',file_out='Hs.Tp.joint.distribution.png',density_plot=False):  
+def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):  
     
     """
     This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
@@ -951,17 +952,18 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     var2 : Tp: Peak period 
     file_out: Hs-Tp joint distribution, optional
     """
+    df  = data
     max_y = max(periods)
-         
+    period = np.array(periods)
     df['hs'] = df[var1].values
     df['tp'] = Tp_correction(df[var2].values)
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     
     import scipy.stats as stats
-    from scipy.signal import find_peaks
     from matplotlib import pyplot as plt
     from scipy.optimize import curve_fit
+    from scipy.signal import find_peaks
    
     # calculate lognormal and weibull parameters and plot the PDFs 
     mu = np.mean(np.log(df.hs.values)) # mean of ln(Hs)
@@ -1049,20 +1051,14 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     mean_hs = np.asarray(mean_hs)
     mean_lnTp = np.asarray(mean_lnTp)
     variance_lnTp = np.asarray(variance_lnTp)
-    
-    # calcualte a1, a2, a3
-    def Gauss3(x, a1, a2):
-        y = a1 + a2*x**0.36
-        return y
+
+    # calcualte a1, a2, a3 
     parameters, covariance = curve_fit(Gauss3, mean_hs, mean_lnTp)
     a1 = parameters[0]
     a2 = parameters[1]
     a3 = 0.36
     
     # calcualte b1, b2, b3 
-    def Gauss4(x, b2, b3):
-        y = 0.005 + b2*np.exp(-x*b3)
-        return y
     start = 1
     x = mean_hs[start:]
     y = variance_lnTp[start:]
@@ -1085,151 +1081,33 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
         
         f_Hs_Tp[i,:] = 1/(np.sqrt(2*np.pi)*std*t)*np.exp(-(np.log(t)-mu)**2/(2*std2))
         pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
-        
-        
-    def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=100):
-        
-        # RVE of X years 
-        shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
-        
-        if X == 1 : 
-            period=1.5873*365.2422*24/interval
-        else :
-            period=X*365.2422*24/interval
-        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
-        
-        # Find index of Hs=value
-        epsilon = abs(h - rve_X)
-        param = find_peaks(1/epsilon) # to find the index of bottom
-        index = param[0][0]     # the  index of Hs=value
-        
-        # Find peak of pdf at Hs=RVE of X year 
-        pdf_Hs_Tp_X = pdf_Hs_Tp[index,:] # Find pdf at RVE of X year 
-        param = find_peaks(pdf_Hs_Tp_X) # find the peak
-        index = param[0][0]
-        f_Hs_Tp_100=pdf_Hs_Tp_X[index]
-    
-        
-        h1=[]
-        t1=[]
-        t2=[]
-        for i in range(len(h)):
-            f3_ = f_Hs_Tp_100/pdf_Hs[i]
-            f3 = f_Hs_Tp[i,:]
-            epsilon = abs(f3-f3_) # the difference 
-            para = find_peaks(1/epsilon) # to find the bottom
-            index = para[0]
-            if t[index].shape[0] == 2 :
-                h1.append(h[i])
-                t1.append(t[index][0])
-                t2.append(t[index][1])
-        
-        h1=np.asarray(h1)
-        t1=np.asarray(t1)
-        t2=np.asarray(t2)
-        t3 = np.concatenate((t1, t2[::-1])) # to get correct circle order 
-        h3 = np.concatenate((h1, h1[::-1])) # to get correct circle order 
-        t3 = np.concatenate((t3, t1[0:1])) # connect the last to the first point  
-        h3 = np.concatenate((h3, h1[0:1])) # connect the last to the first point  
 
-        df = pd.DataFrame()
-        df['hs']=h1
-        df['t1']=t1
-        df['t2']=t2
-      
-        return t3,h3,X,df
+    return a1, a2, a3, b1, b2, b3, pdf_Hs, h  
 
-
-        
-    def DVN_steepness(df,h,t,max_y=max(periods)):
-        ## steepness 
-        X = max_y # get max 500 year 
-        period=X*365.2422*24/interval
-        shape, loc, scale = Weibull_method_of_moment(df.hs.values) # shape, loc, scale
-        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
-        
-        h1=[]
-        t1=[]
-        h2=[]
-        t2=[]
-        h3=[]
-        t3=[]
-        g = 9.80665
-        j15 = 10000
-        for j in range(len(t)):
-            if t[j]<=8 :
-                Sp=1/15
-                temp = Sp * g * t[j]**2 /(2*np.pi)
-                if temp <= rve_X:
-                    h1.append(temp)
-                    t1.append(t[j])
-            
-                j8=j # t=8
-                h1_t8=temp
-                t8=t[j]
-            elif t[j]>=15 :
-                Sp=1/25 
-                temp = Sp * g * t[j]**2 /(2*np.pi)
-                if temp <= rve_X:
-                    h3.append(temp)
-                    t3.append(t[j])
-                if j < j15 :
-                    j15=j # t=15
-                    h3_t15=temp
-                    t15=t[j]
+def plot_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    df = data
+    # calculate pdf Hs, Tp 
+    t = np.linspace(start=0.01, stop=40, num=2000)
     
-        xp = [t8, t15]
-        fp = [h1_t8, h3_t15]
-        t2_=t[j8+1:j15]
-        h2_=np.interp(t2_, xp, fp)
-        for i in range(len(h2_)):
-            if h2_[i] <= rve_X:
-                h2.append(h2_[i])
-                t2.append(t2_[i])
+    f_Hs_Tp = np.zeros((len(h), len(t)))
+    pdf_Hs_Tp=f_Hs_Tp*0
     
-        h_steepness=np.asarray(h1+h2+h3)
-        t_steepness=np.asarray(t1+t2+t3)
+    for i in range(len(h)):
+        mu = a1 + a2*h[i]**a3
+        std2 = b1 + b2*np.exp(-b3*h[i])
+        std = np.sqrt(std2)
         
-        return t_steepness, h_steepness
-        
-        
-        
-    def find_percentile(data,pdf_Hs_Tp,h,t,p,max_y=max(periods)):
-        ## find pecentile
-        # RVE of X years 
-        X = max_y # get max 500 year 
-        period=X*365.2422*24/interval
-        shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
-        rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
-        epsilon = abs(h - rve_X)
-        param = find_peaks(1/epsilon) # to find the index of bottom
-        index_X = param[0][0]     # the  index of Hs=value
-        
-        
-        h1=[]
-        t1=[]
-        # Find peak of pdf at Hs=RVE of X year 
-        for i in range(index_X):
-            pdf_Hs_Tp_X = pdf_Hs_Tp[i,:] # Find pdf at RVE of X year 
-            sum_pdf = sum(pdf_Hs_Tp_X)
-            for j in range(len(pdf_Hs_Tp_X)):
-                if (sum(pdf_Hs_Tp_X[:j])/sum_pdf <= p/100) and (sum(pdf_Hs_Tp_X[:j+1])/sum_pdf >= p/100) : 
-                    #print (i, h[i],j,t[j])
-                    t1.append(t[j])
-                    h1.append(h[i])
-                    break 
-        h1=np.asarray(h1)
-        t1=np.asarray(t1)
+        f_Hs_Tp[i,:] = 1/(np.sqrt(2*np.pi)*std*t)*np.exp(-(np.log(t)-mu)**2/(2*std2))
+        pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
+              
     
-        return t1,h1
-        
-           
-    t_steepness, h_steepness = DVN_steepness(df,h,t)
-    percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5)
-    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50)
-    percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95)
+    interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
+    t_steepness, h_steepness = DVN_steepness(df,h,t,periods,interval)
+    percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5,periods,interval)
+    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50,periods,interval)
+    percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95,periods,interval)
     
-
     fig, ax = plt.subplots(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
     if density_plot is False: 
@@ -1242,10 +1120,10 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
 
 
     for i in range(len(periods)):
-        param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,X=periods[i])
+        param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,interval,X=periods[i])
         plt.plot(param[0],param[1],label=str(param[2])+'-year')
-        if save_rve :
-            param[3].to_csv(str(param[2])+'_year.csv', index=False)    
+        #if save_rve :
+        #    param[3].to_csv(str(param[2])+'_year.csv', index=False)    
         
    
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
@@ -1261,42 +1139,57 @@ def joint_distribution_Hs_Tp(df,var1='hs',var2='tp',periods=np.array([1,10,100,1
     plt.legend()
     plt.xlim([0,param[3].t2.max().round()])
     plt.ylim([0,param[3].hs.max().round()])
-    plt.savefig(file_out,dpi=100,facecolor='white',bbox_inches='tight')
+    plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
-    return 
+    return fig
 
-def Weibull_method_of_moment(X):
-    import scipy.stats as stats
-    X=X+0.0001;
-    n=len(X);
-    m1 = np.mean(X);
-    cm1=np.mean((X-np.mean(X))**1);
-    m2 = np.var(X);
-    cm2=np.mean((X-np.mean(X))**2);
-    m3 = stats.skew(X);
-    cm3 = np.mean((X-np.mean(X))**3);
-   
-    from scipy.special import gamma
-    def m1fun(a,b,c):
-        return a+b*gamma(1+1/c)
-    def cm2fun(b,c):
-        return b**2*(gamma(1+2/c)-gamma(1+1/c)**2)
-    def cm3fun(b,c):
-        return b**3*(gamma(1+3/c)-3*gamma(1+1/c)*gamma(1+2/c)+2*gamma(1+1/c)**3)
-    def cfun(c):
-        return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
-   
-    from scipy import optimize
-    cHat = optimize.fminbound(cfun, -2, 5) # shape
-    def bfun(b):
-        return abs(cm2fun(b,cHat)-cm2)
-    bHat = optimize.fminbound(bfun,-5,30) # scale
-    def afun(a):
-        return abs(m1fun(a,bHat,cHat)-m1)
-    aHat = optimize.fminbound(afun,-5,30) # location
-  
-    return cHat, aHat, bHat # shape, location, scale
+def table_monthly_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
+    # Calculate LoNoWe parameters for each month
+    params = []
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
+    for month in range(1,len(months)):
+        month_data = data[data.index.month == month]
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=month_data,var1=var1,var2=var2,periods=periods)
+        params.append((a1, a2, a3, b1, b2, b3))
+    # add annual
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    params.append((a1, a2, a3, b1, b2, b3))   
+    headers = ['Month', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
+        # Create DataFrame
+    df = pd.DataFrame(params, columns=headers[1:], index=months)
+    df.index.name='Month'
+    df = df.round(3)
+
+    if output_file:
+        df.to_csv(output_file)    
+
+    return df
+
+def table_directional_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
+    # Calculate LoNoWe parameters for each month
+    params = []
+    dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
+
+    add_direction_sector(data=data,var_dir=var_dir)
+    for dir in range(0,360,30):
+        sector_data = data[data['direction_sector']==dir]
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods)
+        params.append((a1, a2, a3, b1, b2, b3))
+    # add annual
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    params.append((a1, a2, a3, b1, b2, b3))       
+    headers = ['Direction', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
+    # Create DataFrame
+
+    df = pd.DataFrame(params, columns=headers[1:], index=dir_label)
+    df.index.name='Direction'
+    df = df.round(3)
+
+    if output_file:
+        df.to_csv(output_file)    
+
+    return df  
 
 def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     from metocean_stats.stats import general_stats, extreme_stats, dir_stats, aux_funcs
@@ -1370,20 +1263,20 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     return 
 
-def monthly_extremes_weibull(dataframe, var='hs', periods=[1, 10, 100, 10000]):
+def monthly_extremes_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
     from scipy.stats import weibull_min
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
     weibull_params = []
     for month in range(1, 13):
-        month_data = dataframe[dataframe.index.month == month][var]
+        month_data = data[data.index.month == month][var]
         shape, loc, scale = Weibull_method_of_moment(month_data)
         weibull_params.append((shape, loc, scale))
     # add annual
-    shape, loc, scale = Weibull_method_of_moment(dataframe[var])
+    shape, loc, scale = Weibull_method_of_moment(data[var])
     weibull_params.append((shape, loc, scale))       
     # time step between each data, in hours
-    time_step = ((dataframe.index[-1]-dataframe.index[0]).days + 1)*24/dataframe.shape[0]
+    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
     # years is converted to K-th
     periods1 = np.array(periods)*24*365.2422/time_step
     #breakpoint()
@@ -1394,11 +1287,25 @@ def monthly_extremes_weibull(dataframe, var='hs', periods=[1, 10, 100, 10000]):
             return_value = weibull_min.isf(1/period, shape, loc, scale)
             return_values[i, j] = round(return_value, 1)
 
-    return weibull_params, return_periods
+    return weibull_params, return_values
 
 
-def table_monthly_weibull_return_periods(dataframe, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.csv'):
-    weibull_params, return_periods = monthly_extremes_weibull(dataframe=dataframe, var=var, periods=periods)
+def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000],title: str='Variable [units] location', units='m',output_file='monthly_extremes_weibull.png'):
+    df = table_monthly_weibull_return_periods(data=data,var=var, periods=periods, units=units, output_file=None)
+    fig, ax = plt.subplots()
+    #breakpoint()
+    for i in range(len(periods)):
+        plt.plot(df['Month'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
+
+    plt.title(title,fontsize=16)
+    plt.xlabel('Month',fontsize=15)
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_file)
+    return fig
+
+def table_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.csv'):
+    weibull_params, return_periods = monthly_extremes_weibull(data=data, var=var, periods=periods)
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
     
     # Initialize lists to store table data
@@ -1432,15 +1339,8 @@ def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, per
     # Calculate Weibull parameters for each month
     sector_prob = []
     weibull_params = []
-    direction_bins = np.arange(15, 360, 30)
-    direction_labels = [value for value in np.arange(30, 360, 30)]
 
-    data['direction_sector'] = pd.Series(np.nan, index=data.index)
-    for i in range(len(direction_bins)-1):
-        condition = (data[var_dir] > direction_bins[i]) & (data[var_dir] <= direction_bins[i + 1])
-        data['direction_sector'] = data['direction_sector'].where(~condition, direction_labels[i])
-
-    data['direction_sector'].fillna(0, inplace=True)      
+    add_direction_sector(data=data,var_dir=var_dir)
 
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir][var]
@@ -1489,3 +1389,44 @@ def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_d
         df.to_csv(output_file)
     
     return df
+
+def plot_directional_weibull_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],title: str='Variable [units] location', units='m', output_file='monthly_extremes_weibull.png'):
+    df = table_directional_weibull_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, units=units, output_file=None)
+    fig, ax = plt.subplots()
+    for i in range(len(periods)):
+        plt.plot(df['Direction sector'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
+    
+    plt.title(title,fontsize=16)
+    plt.xlabel('Direction',fontsize=15)
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_file)
+    return fig
+
+
+def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
+    from scipy.stats import weibull_min
+    # Your implementation of monthly_extremes_weibull function
+    # Calculate Weibull parameters for each month
+    weibull_params = []
+    for month in range(1, 13):
+        month_data = data[data.index.month == month][var]
+        shape, loc, scale = Weibull_method_of_moment(month_data)
+        weibull_params.append((shape, loc, scale))
+    # add annual
+    shape, loc, scale = Weibull_method_of_moment(data[var])
+    weibull_params.append((shape, loc, scale))       
+    # time step between each data, in hours
+    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # years is converted to K-th
+    periods1 = np.array(periods)*24*365.2422/time_step
+    #breakpoint()
+    # Calculate return periods for each month and period
+    return_values = np.zeros((13, len(periods)))
+    for i, (shape, loc, scale) in enumerate(weibull_params):
+        for j, period in enumerate(periods1):
+            return_value = weibull_min.isf(1/period, shape, loc, scale)
+            return_values[i, j] = round(return_value, 1)
+
+    return weibull_params, return_values
+    
