@@ -955,10 +955,9 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):
     df  = data
     max_y = max(periods)
     period = np.array(periods)
-    df['hs'] = df[var1].values
-    df['tp'] = Tp_correction(df[var2].values)
-    
-    interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
+    pd.options.mode.chained_assignment = None  # default='warn'
+    df.loc[:,'hs'] = df[var1].values
+    df.loc[:,'tp'] = Tp_correction(df[var2].values)
     
     import scipy.stats as stats
     from matplotlib import pyplot as plt
@@ -1081,11 +1080,31 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):
         
         f_Hs_Tp[i,:] = 1/(np.sqrt(2*np.pi)*std*t)*np.exp(-(np.log(t)-mu)**2/(2*std2))
         pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
+    
+    interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
 
-    return a1, a2, a3, b1, b2, b3, pdf_Hs, h  
+    t3 = []
+    h3 = []
+    X = []
+    hs_tpl_tph = pd.DataFrame()
+
+    # Assuming Hs_Tp_curve() returns four values, otherwise adjust accordingly
+    for i in range(len(periods)):
+        t3_val, h3_val, X_val, hs_tpl_tph_val = Hs_Tp_curve(df.hs.values, pdf_Hs, pdf_Hs_Tp, f_Hs_Tp, h, t, interval, X=periods[i])
+        t3.append(t3_val)
+        h3.append(h3_val)
+        X.append(X_val)
+        hs_tpl_tph_val.columns = [f'{col}_{periods[i]}' for col in hs_tpl_tph_val.columns]
+        hs_tpl_tph = pd.concat([hs_tpl_tph, hs_tpl_tph_val], axis=1)
+    
+    #if save_rve:
+    #    hs_tpl_tph[3].to_csv(str(param[2])+'_year.csv', index=False)  
+
+
+    return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
 def plot_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
     df = data
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
@@ -1120,10 +1139,7 @@ def plot_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,100
 
 
     for i in range(len(periods)):
-        param = Hs_Tp_curve(df.hs.values,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,interval,X=periods[i])
-        plt.plot(param[0],param[1],label=str(param[2])+'-year')
-        #if save_rve :
-        #    param[3].to_csv(str(param[2])+'_year.csv', index=False)    
+        plt.plot(t3[i],h3[i],label=str(X[i])+'-year')  
         
    
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
@@ -1137,23 +1153,23 @@ def plot_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,100
     plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
     plt.legend()
-    plt.xlim([0,param[3].t2.max().round()])
-    plt.ylim([0,param[3].hs.max().round()])
+    plt.xlim([0,hs_tpl_tph['t2_'+str(np.max(periods))].max().round()])
+    plt.ylim([0,hs_tpl_tph['hs_'+str(np.max(periods))].max().round()])
     plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
     return fig
 
-def table_monthly_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
+def table_monthly_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
     # Calculate LoNoWe parameters for each month
     params = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
     for month in range(1,len(months)):
         month_data = data[data.index.month == month]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=month_data,var1=var1,var2=var2,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var1=var1,var2=var2,periods=periods)
         params.append((a1, a2, a3, b1, b2, b3))
     # add annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
     params.append((a1, a2, a3, b1, b2, b3))   
     headers = ['Month', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
         # Create DataFrame
@@ -1166,7 +1182,7 @@ def table_monthly_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,1
 
     return df
 
-def table_directional_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
+def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
     # Calculate LoNoWe parameters for each month
     params = []
     dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
@@ -1174,10 +1190,10 @@ def table_directional_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',var_dir=
     add_direction_sector(data=data,var_dir=var_dir)
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods)
         params.append((a1, a2, a3, b1, b2, b3))
     # add annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
     params.append((a1, a2, a3, b1, b2, b3))       
     headers = ['Direction', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
     # Create DataFrame
