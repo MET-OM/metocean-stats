@@ -256,3 +256,23 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     t1=np.asarray(t1)
 
     return t1,h1
+
+
+def intergrated_current(speed,direction,ocean_time,layers):
+    """
+    This function convert speed and direction to intergrated current
+    speed(time,depth)
+    direction(time,depth)
+    ocean_time: time
+    layers: depths 
+    """
+    referenceDate = datetime(1948, 1, 1)
+    time = [referenceDate + timedelta(seconds=x) for x in ocean_time] 
+    df = pd.DataFrame()
+    df.index = time
+    inter_speed = np.trapz(speed, x=layers, axis=1)
+    inter_direct = np.trapz(direction, x=layers, axis=1)
+    df['intergrated_speed'] = inter_speed/(layers[-1]-layers[0])
+    df['intergrated_direction'] = inter_direct/(layers[-1]-layers[0])
+    
+    return df 
