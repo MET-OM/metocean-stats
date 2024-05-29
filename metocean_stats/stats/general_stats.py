@@ -483,8 +483,6 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     
     return cumulative_percentage
 
-
-
 def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str, output_file: str = None):
     """
     Calculate directional non-exceedance table for a given variable.
@@ -504,22 +502,20 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
     labels =  [f'<{num}' for num in bins]
     
-#    direction_bins = np.arange(345,730,30)%360
-    direction_bins = np.arange(0,390,30)
-    direction_labels = [f'{num}-{num+30}' for num in direction_bins[:-1]]
-    data['direction_sector'] = pd.cut(data[var_dir], bins=direction_bins, labels=direction_labels, right=True)
-    
+    add_direction_sector(data=data,var_dir=var_dir)
+
     # Categorize data into bins
     data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
+
     data = data.sort_values(by='direction_sector')
     data = data.set_index('direction_sector')
     data.index.name = 'direction_sector'
-
     # Group by direction and var1 bin, then count occurrences
     # Calculate percentage of time each var1 bin occurs in each month
     percentage_by_dir = 100*data.groupby([data.index, var1+'-level'], observed=True)[var1].count().unstack()/len(data[var1])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
-   
+    cumulative_percentage = cumulative_percentage.fillna(method='ffill')
+
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
     cumulative_percentage.loc['Mean'] = data.groupby(data.index, observed=True)[var1].mean()
@@ -536,14 +532,35 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     cumulative_percentage['Omni'].iloc[-2] = data[var1].quantile(0.99)
     cumulative_percentage['Omni'].iloc[-1] = data[var1].max()
 
+
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
+
+    rename_mapping = {
+        0.0: '0°',
+        30.0: '30°',
+        60.0: '60°',
+        90.0: '90°',
+        120.0: '120°',
+        150.0: '150°',
+        180.0: '180°',
+        210.0: '210°',
+        240.0: '240°',
+        270.0: '270°',
+        300.0: '300°',
+        330.0: '330°'
+    }
+
+    # Rename the columns
+    cumulative_percentage.rename(columns=rename_mapping, inplace=True)
+
 
     # Write to CSV file if output_file parameter is provided
     if output_file:
         cumulative_percentage.to_csv(output_file)
 
     return cumulative_percentage
+
 
 
 def plot_monthly_stats(data: pd.DataFrame, var1: str, step_var1: float, title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
