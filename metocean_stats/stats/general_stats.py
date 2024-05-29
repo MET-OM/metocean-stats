@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
 
-from .aux_funcs import convert_latexTab_to_csv
+from .aux_funcs import convert_latexTab_to_csv, add_direction_sector
 
 def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
     """
