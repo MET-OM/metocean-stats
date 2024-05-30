@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
 
-from .aux_funcs import convert_latexTab_to_csv
+from .aux_funcs import convert_latexTab_to_csv, add_direction_sector, consecutive_indices
 
 def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
     """
@@ -477,6 +477,23 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
 
+    rename_mapping = {
+    1: 'JAN',
+    2: 'FEB',
+    3: 'MAR',
+    4: 'MAY',
+    5: 'APR',
+    6: 'JUN',
+    7: 'JUL',
+    8: 'AUG',
+    9: 'SEP',
+    10: 'OCT',
+    11: 'NOV',
+    12: 'DEC'
+}
+    # Rename the columns
+    cumulative_percentage.rename(columns=rename_mapping, inplace=True)
+
     # Write to CSV file if output_file parameter is provided
     if output_file:
         cumulative_percentage.to_csv(output_file)
@@ -504,22 +521,20 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
     labels =  [f'<{num}' for num in bins]
     
-#    direction_bins = np.arange(345,730,30)%360
-    direction_bins = np.arange(0,390,30)
-    direction_labels = [f'{num}-{num+30}' for num in direction_bins[:-1]]
-    data['direction_sector'] = pd.cut(data[var_dir], bins=direction_bins, labels=direction_labels, right=True)
-    
+    add_direction_sector(data=data,var_dir=var_dir)
+
     # Categorize data into bins
     data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
+
     data = data.sort_values(by='direction_sector')
     data = data.set_index('direction_sector')
     data.index.name = 'direction_sector'
-
     # Group by direction and var1 bin, then count occurrences
     # Calculate percentage of time each var1 bin occurs in each month
     percentage_by_dir = 100*data.groupby([data.index, var1+'-level'], observed=True)[var1].count().unstack()/len(data[var1])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
-   
+    cumulative_percentage = cumulative_percentage.fillna(method='ffill')
+
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
     cumulative_percentage.loc['Mean'] = data.groupby(data.index, observed=True)[var1].mean()
@@ -536,8 +551,28 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     cumulative_percentage['Omni'].iloc[-2] = data[var1].quantile(0.99)
     cumulative_percentage['Omni'].iloc[-1] = data[var1].max()
 
+
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
+
+    rename_mapping = {
+        0.0: '0°',
+        30.0: '30°',
+        60.0: '60°',
+        90.0: '90°',
+        120.0: '120°',
+        150.0: '150°',
+        180.0: '180°',
+        210.0: '210°',
+        240.0: '240°',
+        270.0: '270°',
+        300.0: '300°',
+        330.0: '330°'
+    }
+
+    # Rename the columns
+    cumulative_percentage.rename(columns=rename_mapping, inplace=True)
+
 
     # Write to CSV file if output_file parameter is provided
     if output_file:
@@ -614,3 +649,239 @@ def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_
     plt.grid()
     plt.savefig(output_file)
     return fig
+
+
+
+def calculate_weather_window0(data: pd.DataFrame, var: str,threshold=5, window_size=12):
+    """
+    Calculate the mean and percentiles of consecutive periods where a variable
+    stays below a certain threshold within a given window size.
+
+    Parameters:
+        data (pd.DataFrame): The DataFrame containing the time series data.
+        var (str): The name of the variable in the DataFrame.
+        threshold (float, optional): The threshold value for the variable.
+            Defaults to 5.
+        window_size (int, optional): The size of the window in hours.
+            Defaults to 12.
+
+    Returns:
+        tuple: A tuple containing the mean and percentiles of consecutive periods
+            where the variable stays below the threshold.
+    """
+    df = (data[var]<threshold).astype(int)
+    dt = (data.index[1]-data.index[0]).total_seconds()/3600 # in hours # 1 hour for NORA3
+    consecutive_periods = df.rolling(window=str(window_size+dt)+'H').sum()
+    # Mark consecutive periods of window_size (hours) with 1
+    consecutive_periods = consecutive_periods > 0 #(dt+window_size)/dt
+    consecutive_periods = consecutive_periods.astype(int)*df  
+    # add all periods with zero waiting time (consecutive_periods==1)
+    counter_list_no_waiting = [window_size]*int((np.sum(consecutive_periods)*dt)//window_size)
+    plt.plot(data[var][:],'r')
+    plt.axhline( y=threshold, color='k', linestyle='--')
+    plt.plot(data[var].where(consecutive_periods==0)[:],'ro')
+    plt.plot(data[var].where(consecutive_periods==1)[:],'go')
+    plt.grid()
+    plt.show()
+    breakpoint()
+    # add all periods with waiting time (consecutive_periods==0)
+    mask = 0*consecutive_periods
+    counter = 0
+    counter_list_with_waiting =   []
+    for i in range(len(consecutive_periods)-1):
+        if consecutive_periods.iloc[i]==0 and consecutive_periods.iloc[i+1]==0:
+            counter = counter + dt
+            mask.iloc[i] = counter
+        elif consecutive_periods.iloc[i]==0 and consecutive_periods.iloc[i+1]==1:
+            counter = counter + dt 
+            counter_list_with_waiting.append(counter+window_size)
+            mask.iloc[i] = counter
+            counter = 0
+        if consecutive_periods.iloc[i]==0 and consecutive_periods.index[i].year != consecutive_periods.index[i+1].year:
+            counter = counter + dt 
+            mask.iloc[i] = counter
+            counter_list_with_waiting.append(counter+window_size)
+            counter = 0     
+    #plt.plot(data[var].where(mask==0)[:],'b-')   
+    #plt.show()
+    
+    counter_list =  counter_list_with_waiting #+ counter_list_no_waiting 
+    #counter_list = [x for x in counter_list if x >= window_size]
+    counter_list_days = (np.array(counter_list))/24 
+    mean = np.mean(counter_list_days)
+    p10 = np.percentile(counter_list_days, 10)
+    p50 = np.percentile(counter_list_days, 50)
+    #p75 = np.percentile(counter_list_days, 75)
+    p90 = np.percentile(counter_list_days, 90)
+    return mean, p10, p50,p90
+
+
+def calculate_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
+    results = []
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    for month in range(1, 13):
+#        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var].resample('60min').interpolate(),month=month ,threshold=threshold,op_duration=window_size,timestep=1)
+        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=3)
+
+#        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var][data.index.month == month],threshold=threshold,op_duration=window_size,timestep=3)
+#        avg_duration, p10, p50, p90 = calculate_weather_window(data[data.index.month == month],var=var, threshold=threshold, window_size=window_size)
+#        avg_duration, p10, p50, p90 = calculate_weather_window(data,var=var, threshold=threshold, window_size=window_size)
+
+        results.append((p10,p50, avg_duration, p90))
+    results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
+    if output_file:
+        # Save results to CSV
+        results_df.to_csv('monthly_weather_window_results.csv')
+    
+    return results_df
+
+def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, title: str='Var < ... m for ... hours',add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+    results_df = calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size)
+    # Plot the results
+    fig, ax = plt.subplots(figsize=(12, 6))
+    results_df.T.plot(marker='o')
+    lines = results_df.T.plot(marker='o')
+    plt.title(title)
+    plt.xlabel('Month')
+    plt.ylabel('Duration [days]')
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    
+    if add_table:
+        # Get legend colors and labels
+        legend_colors = [line.get_color() for line in lines.get_lines()]
+        # Add the table of results_df under the plot
+        plt.xticks([])
+        plt.xlabel('')
+        plt.legend('',frameon=False)
+        cell_text = []
+        for row in range(len(results_df)):
+            cell_text.append(results_df.iloc[row].values)
+        table = plt.table(cellText=cell_text, colLabels=results_df.columns, rowLabels=results_df.index, loc='bottom')
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 1.5)
+        # Make the blue color value
+        cell_dict = table.get_celld()
+        for i in range(1,len(legend_colors)+1):
+            cell_dict[(i, -1)].set_facecolor(legend_colors[i-1])
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return fig
+
+
+
+def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12):
+    """
+    Calculate the mean and percentiles of consecutive periods where a variable
+    stays below a certain threshold within a given window size.
+
+    Parameters:
+        data (pd.DataFrame): The DataFrame containing the time series data.
+        var (str): The name of the variable in the DataFrame.
+        threshold (float, optional): The threshold value for the variable.
+            Defaults to 5.
+        window_size (int, optional): The size of the window in hours.
+            Defaults to 12.
+
+    Returns:
+        tuple: A tuple containing the mean and percentiles of consecutive periods
+            where the variable stays below the threshold.
+    """
+    #data=data['1958-02-04' :'1958-02-23']
+    df = (data[var]<threshold).astype(int)
+    dt = (data.index[1]-data.index[0]).total_seconds()/3600 # in hours # 1 hour for NORA3
+    #consecutive_periods = df.rolling(window=str(window_size+dt)+'H').sum()
+    # Mark consecutive periods of window_size (hours) with 1
+    #consecutive_periods[consecutive_periods < window_size] = 0
+    #consecutive_periods = consecutive_periods > 0 
+    #consecutive_periods = consecutive_periods.astype(int)*df  
+    # Find consecutive sequences of ones
+    consecutive_periods = (df == 1).astype(int).groupby((df != 1).cumsum()).cumsum()
+
+    # Find indices of zeros between sequences of five or more consecutive ones
+    #indices_zeros = df[df == 0].groupby(consecutive_periods).filter(lambda x: (x == 0).sum() >= window_size/dt).index
+    
+    
+    plt.plot(data[var][:],'r')
+    plt.axhline( y=threshold, color='k', linestyle='--')
+    plt.plot(consecutive_periods,'go')
+    #plt.plot(data[var].where(consecutive_periods==0)[:],'ro')
+    #plt.plot(data[var].where(consecutive_periods==1)[:],'go')
+    plt.grid()
+    plt.show()    
+    #breakpoint()
+    # add all periods with zero waiting time (consecutive_periods==1)
+    counter_list_no_waiting = [window_size]*int((np.sum(consecutive_periods)*dt)//window_size)
+    # add all periods with waiting time (consecutive_periods==0)
+    counter = 0
+    counter_list_with_waiting =   [[] for _ in range(12)]
+    for i in range(len(consecutive_periods)-1):
+        if consecutive_periods.iloc[i]==0 and consecutive_periods.iloc[i+1]==0:
+            counter = counter + dt
+        elif consecutive_periods.iloc[i]==0 and consecutive_periods.iloc[i+1]==1:
+            counter = counter + dt
+            counter_list_with_waiting[consecutive_periods.index[i].month-1].append(counter)
+            counter = 0
+    counter_list =  counter_list_with_waiting #+ counter_list_no_waiting 
+    
+    mean = np.zeros(12)
+    p10 = np.zeros(12)
+    p50 = np.zeros(12)
+    p90 = np.zeros(12)
+
+    for j in range(len(counter_list)): # 12 months
+        counter_list_days = np.array(counter_list[j])/24 
+        mean[j] = np.mean(counter_list_days)
+        p10[j] = np.percentile(counter_list_days, 10)
+        p50[j] = np.percentile(counter_list_days, 50)
+        #p75 = np.percentile(counter_list_days, 75)
+        p90[j] = np.percentile(counter_list_days, 90)
+    #breakpoint()
+    return mean, p10, p50,p90
+
+def weather_window_length(time_series,month,threshold,op_duration,timestep):
+    print(month)
+    # time_series: input timeseries (numpy array)
+    # threshold over which operation is possible (same unit as timeseries)
+    # op_duration: duration of operation in hours
+    # timestep: time resolution of time_series in hours
+    # returns an array with all weather windows duration in hours
+    month_ts = time_series.index.month
+    ts_mask=np.where(time_series<threshold,1,0)
+    od=int(op_duration/timestep)
+    ts=np.zeros((len(ts_mask)-od+1))
+    mon=np.zeros((len(ts_mask)-od+1))
+    for i in range(len(ts_mask)-od+1):
+        ts[i]=np.sum(ts_mask[i:i+od])
+    s0=np.where(ts==od)[0].tolist()
+    mon_s0=month_ts[0:s0[-1]+1]
+    wt=[]
+    for s in range(len(s0)):
+        if s0[s]==0:
+            wt.append(0)
+        elif s==0:
+            diff=s0[s]
+            a=0
+            wt.append(diff)
+            while (diff!=0):
+                diff=s0[s]-a-1
+                wt.append(diff*timestep)
+                a=a+1
+        else:
+            diff=s
+            a=0
+            while (diff!=0):
+                diff=s0[s]-s0[s-1]-a-1
+                wt.append(diff*timestep)
+                a=a+1
+    wt1=(np.array(wt)+op_duration)/24
+    # Note that we this subroutine, we stop the calculation of the waiting time
+    # at the first timestep of the last operating period found in the timeseries
+    mean = np.mean(wt1[mon_s0==month])
+    p10 = np.percentile(wt1[mon_s0==month],10)
+    p50 = np.percentile(wt1[mon_s0==month],50)
+    p90 = np.percentile(wt1[mon_s0==month],90)
+    return mean, p10, p50, p90
