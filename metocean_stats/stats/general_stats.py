@@ -631,3 +631,57 @@ def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_
     plt.grid()
     plt.savefig(output_file)
     return fig
+
+
+def var_rose(df,direc='direction',inten='intensity',bins_range=None,yaxis = np.arange(5, 35, step=5),title=None,output_file=None):
+
+    # this plot (wind, waves, ocean currents) rose and save to a file
+    # Figure 5 in metocean report 
+    # Rembember the direction must be in standard format 
+    # format type is array, numpy array works, pandas also works 
+    #max_ = max(intensity)
+    #bins_range = np.arange(0,max_*1.05,round(max_*0.25,1)) # this sets the legend scale
+    
+    intensity=df[inten].values
+    direction=df[direc].values
+    bins_range2 = bins_range
+    
+    if bins_range is None :
+    	p80 = np.percentile(intensity,80)
+    	if p80 < 1 : # meaning current 
+    		decimal = 2
+    	elif 1 <= p80 < 10 : # meaning current 
+    		decimal = 1
+    	else : # meaning wind  
+    		decimal = 0 
+    	
+    	bins_range = np.array([0, round(np.percentile(intensity,50),decimal),
+                       round(np.percentile(intensity,80),decimal),
+                       round(np.percentile(intensity,95),decimal),
+                       round(np.percentile(intensity,99),decimal)])
+    
+    fig = plt.figure(figsize = (8,8))
+    
+    ax = fig.add_subplot(111, projection="windrose")
+    ax.bar(direction, intensity, normed=True, bins=bins_range, opening=0.8, nsector=12)
+    ax.set_legend()
+    size = 5
+    if title != None : 
+    	ax.set_title(title)
+    ax.figure.set_size_inches(size, size)
+    ax.legend(loc='lower left', title="Current speed (m/s)") #, decimal_places=1,units='(m/s)'
+    
+    #yaxis = np.arange(5, 35, step=5)
+    label = [str(num)+'%' for num in yaxis]
+    ax.set_yticks(yaxis)
+    ax.set_yticklabels(label)
+
+    if bins_range2 is None :
+    	ax.legend(decimal_places=decimal)
+    
+    if output_file != None : 
+        plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
+
+
+    
+    return 
