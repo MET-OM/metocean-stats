@@ -4,6 +4,6 @@ This is the Stats-module that contains functions for stastistics of metocean dat
 Copyright 2023, Konstantinos Christakos, MET Norway
 """
 
-from .general_stats import *
-from .dir_stats import *
-from .extreme_stats import *
+from .general import *
+from .dir import *
+from .extreme import *

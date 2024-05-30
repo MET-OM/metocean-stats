@@ -1,28 +1,35 @@
 from metocean_api import ts
-from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats
+from metocean_stats import plots, tables, stats
+#from metocean_stats.stats.aux_funcs import readNora10File
 
 # Define TimeSeries-object
-ds = ts.TimeSeries(lon=1.32, lat=53.324,start_time='2000-01-01', end_time='2010-12-31' , product='NORA3_wind_wave')
+ds = ts.TimeSeries(lon=5, lat=57.7,start_time='1980-01-01', end_time='2019-12-31' , product='NORA3_wind_wave')
 
 # Import data from thredds.met.no and save it as csv
 #ds.import_data(save_csv=True)
 # Load data from local file
-ds.load_data('/home/birgitterf/dev/github/metocean-stats/tests/data/'+ds.datafile)
+ds.load_data('/home/konstantinosc/Downloads/'+ds.datafile)
+#ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt')
 
-# Generate Statistics
-general_stats.scatter_diagram(data=ds.data, var1='hs', step_var1=1, var2='tp', step_var2=1, output_file='scatter_hs_tp_diagram.png')
-general_stats.table_var_sorted_by_hs(data=ds.data, var='tp',var_hs='hs', output_file='tp_sorted_by_hs.csv')
-general_stats.table_monthly_percentile(data=ds.data, var='hs', output_file='hs_monthly_perc.csv')
-general_stats.table_monthly_min_mean_max(data=ds.data, var='hs',output_file='hs_montly_min_mean_max.csv')#
 
-# Directional Statistics
-dir_stats.var_rose(ds.data, 'thq','hs','windrose.png',method='overall')
-dir_stats.directional_min_mean_max(ds.data,'thq','hs','hs_dir_min_mean_max.csv')
+# New Functions
+plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
 
-# Extreme Statistics
-rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', periods=[20,50,100,1000], output_file='return_levels_POT.png')
-rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,50,100,1000],method='GEV',output_file='return_levels_GEV.png')
+tables.table_monthly_non_exceedance(ds,var1='HS',step_var1=0.5,output_file='table_monthly_non_exceedance.csv')
+plots.plot_monthly_stats(ds,var1='HS',step_var1=0.5, title = '$H_s$[m] - Havstj', output_file='monthly_stats.png')
+tables.table_directional_non_exceedance(ds,var1='HS',step_var1=0.5,var_dir='DIRM',output_file='table_directional_non_exceedance.csv')
+plots.plot_directional_stats(ds,var1='HS',step_var1=0.5, var_dir='DIRM', title = '$H_s$[m] - Havstj', output_file='directional_stats.png')
+plots.plot_joint_distribution_Hs_Tp(ds,var1='HS',var2='TP',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=True)
+tables.table_monthly_joint_distribution_Hs_Tp_param(ds,var1='HS',var2='TP',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv')
+tables.table_directional_joint_distribution_Hs_Tp_param(ds,var1='HS',var2='TP',var_dir='DIRM',periods=[1,10,100,10000],output_file='dir_Hs_Tp_joint_param.csv')
+#plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=48, title='$H_s$ < 4 m for 48 hours',output_file= 'NORA10_monthly_weather_window4_48_plot.png')
 
-# Profile Statistics
-mean_prof = profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750],perc=[5,95], output_file='wind_profile.png')
-alfa = profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750],z=[20,50], perc=[5,95], output_file='wind_profile_shear.png')
+tables.table_monthly_weibull_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.csv')
+tables.table_directional_weibull_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',var_dir = 'DIRM',output_file='directional_extremes_weibull.csv')
+
+plots.plot_monthly_weibull_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.png')
+plots.plot_directional_weibull_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000], units='m',output_file='dir_extremes_weibull.png')
+
+
+tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds,var1='HS',var2='TP',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_return_values.csv')
+tables.table_directional_joint_distribution_Hs_Tp_return_values(ds,var1='HS',var2='TP',var_dir='DIRM',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_return_values.csv')
