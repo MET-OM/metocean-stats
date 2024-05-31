@@ -211,9 +211,11 @@ def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10
             table[j,k:k+3] = hs_tpl_tph.loc[closest_index][k:k+3].values.round(1)
         k = k+3
 
+    # Create a DataFrame for better readability
+    columns = [f'HS_{period} [m]', f'TpL_{period} [s]', f'TpH_{period} [s]' for period in periods]
 
     # Create DataFrame
-    df = pd.DataFrame(table)
+    df = pd.DataFrame(table,  columns=columns)
     if output_file:
         df.to_csv(output_file,index=False)
 
