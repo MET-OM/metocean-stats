@@ -561,14 +561,14 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     return 
 
-def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000],title: str='Variable [units] location', units='m',output_file='monthly_extremes_weibull.png'):
+def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.png'):
     df = table_monthly_weibull_return_periods(data=data,var=var, periods=periods, units=units, output_file=None)
     fig, ax = plt.subplots()
     #breakpoint()
     for i in range(len(periods)):
         plt.plot(df['Month'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
 
-    plt.title(title,fontsize=16)
+    plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Month',fontsize=15)
     plt.legend()
     plt.grid()
@@ -576,55 +576,74 @@ def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 100
     return fig
 
 
-def plot_directional_weibull_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],title: str='Variable [units] location', units='m', output_file='monthly_extremes_weibull.png'):
+def plot_directional_weibull_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000], units='m', output_file='monthly_extremes_weibull.png'):
     df = table_directional_weibull_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, units=units, output_file=None)
     fig, ax = plt.subplots()
     for i in range(len(periods)):
         plt.plot(df['Direction sector'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
     
-    plt.title(title,fontsize=16)
+    plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Direction',fontsize=15)
     plt.legend()
     plt.grid()
     plt.savefig(output_file)
     return fig
 
-def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot_prob_non_exceedance_fitted_3p_weibull.png'):
-    hs, y, cdf, prob_non_exceedance_obs = prob_non_exceedance_fitted_3p_weibull(data=data, var=var)
-    
-    
-    fig, ax = plt.subplots()
-    plt.plot(hs,prob_non_exceedance_obs/100,'ro',label='data')
-    plt.plot(np.sort(y),np.sort(cdf),label='fitted')
-    plt.legend()
-    # Define your custom ticks
-    #x_ticks = np.concatenate((np.logspace(np.log10(0.5), np.log10(5), num=10),np.logspace(np.log10(5), np.log10(10), num=10),np.logspace(np.log10(10), np.log10(15), num=20)))    # Set the x and y ticks
-    #y_ticks = np.concatenate((np.logspace(np.log10(0.05), np.log10(0.9), num=10),np.logspace(np.log10(0.9), np.log10(1), num=5)))    # Set the x and y ticks
-    #print(y_ticks)
-    #y_ticks = np.concatenate((np.linspace(0.05, 0.9, num=20),np.linspace(0.99, 0.999999, num=5)))    # Set the x and y ticks
-    #plt.xticks(x_ticks, ['{:.1f}'.format(i) for i in x_ticks])  # Format x tick labels to show 1 decimal place
-    #plt.yticks(y_ticks, ['{:.6f}'.format(i) for i in y_ticks])  # Format y tick labels to show 6 decimal places
 
-    # Set the x and y scales to logarithmic
-    #plt.xlim([10,15])
-    plt.ylim([0.05,1])
-    plt.xlim([0.5,np.max(hs)+2])
-    #x_ticks = np.arange(1,16,1)
-    #plt.xticks(np.log(x_ticks), [f'{(x)}' for x in x_ticks])
-    # Set y-ticks and y-tick labels to match the plot style
-    #y_ticks = np.array([0.05, 0.1, 0.3, 0.5, 0.8, 0.9, 0.99, 0.999, 0.9999, 0.99999, 0.999999])
-    #plt.yticks(np.log(y_ticks), [f'{(y)}' for y in y_ticks])
-    plt.xlabel(var,fontsize=16)
-    plt.ylabel('Probability of non-exceedance',fontsize=16)
-    #plt.grid()
-    #plt.xscale("log")
-    #plt.yscale("log")
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)  
-    #plt.show()
-    plt.savefig(output_file)  
-    #breakpoint()
+
+
+def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot_prob_non_exceedance_fitted_3p_weibull.png'):
+    hs, y, cdf, prob_non_exceedance_obs, shape, location, scale = prob_non_exceedance_fitted_3p_weibull(data=data, var=var)
+    fig, ax = plt.subplots()
+
+    a = np.array([0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 0.999, 0.9999, 0.99999, 0.999999])
+    b1 = np.array([0, 1, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6.5, 7, 7.5, 8, 8.5])
+    a1 = prob_non_exceedance_obs / 100
+    yinterp = np.interp(a1, a, b1)
+    b = np.arange(0, len(yinterp), 1)
+    a2 = cdf
+    yinterp2 = np.interp(a2, a, b1)
+    b2 = np.arange(0, len(yinterp2), 1)
+    ax.plot(np.log(np.sort(y)), np.log(np.sort(yinterp2)), label='fitted')
+    ax.plot(np.log(hs), np.log(yinterp), 'r*', label='data')
+    
+    ax.set_yticks(np.log(b1))
+    ax.set_yticklabels([str(i) for i in a.tolist()])
+    ax.set_ylim(-0.5, 2.2)
+    
+    # Set grid lines for each integer
+    x_grid_ticks = np.arange(1, int(data[var].max()) + 2)
+    ax.set_xticks(np.log(x_grid_ticks), minor=True)
+    
+    # Set major ticks and labels at intervals of 5
+    x_major_ticks = np.arange(5, int(data[var].max()) + 5, 5)
+    ax.set_xticks(np.log(x_major_ticks))
+    ax.set_xticklabels([f'{x}' for x in x_major_ticks])
+    
+    # Center the value 5 in the middle of the x-axis
+    x_min, x_max = np.log(data[var].min()), np.log(data[var].max())
+    mid_point = (x_min + x_max) / 2
+    offset = np.log(5) - mid_point
+    ax.set_xlim(x_min + offset, x_max)
+
+    ax.set_xlabel(var, fontsize=12)
+    ax.set_ylabel('Probability of non-exceedance', fontsize=12)
+    ax.legend()
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax.grid(True, which='minor', linestyle='--', linewidth=0.5)  # Add minor grid lines
+    # Add solid black grid lines for major ticks and dashed lines for minor ticks
+    for tick in x_major_ticks:
+        ax.axvline(np.log(tick), color='black', linestyle='-')    
+    
+    # Move y-axis ticks to the right, but keep the label on the left
+    ax.yaxis.tick_right()
+    ax.tick_params(axis='y', labelleft=False, labelright=True)
+    plt.tight_layout()
+    
+    plt.savefig(output_file)
 
     return
+
 
 
 

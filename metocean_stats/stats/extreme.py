@@ -912,7 +912,7 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     from scipy.stats import percentileofscore, weibull_min
     step = 0.01
     #hs = np.arange(0.5,data[var].max()+step,step)
-    y_obs = np.arange(1,14.5,0.5)
+    y_obs = np.arange(1,int(data[var].max())+0.5,0.5)
     prob_non_exceedance_obs = percentileofscore(data[var], y_obs)
     print(prob_non_exceedance_obs)
     shape, location, scale =  Weibull_method_of_moment(data[var])
@@ -921,9 +921,19 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     num_samples = 1000000  # Number of samples to generate
     y_fitted = weibull_dist.rvs(size=num_samples)
     cdf = weibull_dist.cdf(y_fitted)
+    #pdf=weib_3(np.arange(0.001,15.001,0.001),shape,location,scale)
     
-    return y_obs, y_fitted, cdf, prob_non_exceedance_obs
+    
+    return y_obs, y_fitted, cdf, prob_non_exceedance_obs, shape, location, scale
     
 
+
+
+def weib_3(arr,sh,lo,sc):
+    a=sh/sc
+    b=((arr-lo)/sc)**(sh-1)
+    c=0.0-((arr-lo)/sc)**(sh)
+    d=np.exp(c)
+    return d
 
 

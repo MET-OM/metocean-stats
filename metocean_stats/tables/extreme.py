@@ -151,8 +151,6 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp
     if output_file:
         df.to_csv(output_file,index=False)
 
-
-
     return df
     
 def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_reurn_values.csv'):
@@ -195,4 +193,29 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2
     df = pd.DataFrame(table_data)
     if output_file:
         df.to_csv(output_file,index=False)
+    return df
+
+
+def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='Hs_Tpl_Tph_joint_reurn_values.csv'):
+    # Calculate LoNoWe parameters for each month
+    table = np.zeros((10,3*len(periods)))
+
+    #append annual
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    k=0
+    for i in range(len(periods)):
+        max_hs = hs_tpl_tph['hs_'+str(periods[i])].max().round(1)
+        for j in range(10):
+            closest_index = (hs_tpl_tph['hs_'+str(periods[i])] - (max_hs-j)).abs().idxmin()
+            #print(j,k,k+3)
+            table[j,k:k+3] = hs_tpl_tph.loc[closest_index][k:k+3].values.round(1)
+        k = k+4
+    breakpoint()
+
+
+    # Create DataFrame
+    df = pd.DataFrame(table)
+    if output_file:
+        df.to_csv(output_file,index=False)
+
     return df

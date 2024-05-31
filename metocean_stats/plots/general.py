@@ -219,13 +219,13 @@ def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_
     plt.savefig(output_file)
     return fig
 
-def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, title: str='Var < ... m for ... hours',add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     results_df = calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
     results_df.T.plot(marker='o')
     lines = results_df.T.plot(marker='o')
-    plt.title(title)
+    plt.title(str(var)+' < '+str(threshold)+' for ' + str(window_size)+' hours')
     plt.xlabel('Month')
     plt.ylabel('Duration [days]')
     plt.legend()
@@ -254,47 +254,3 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
     plt.savefig(output_file)
 
     return fig
-
-def weather_window_length(time_series,month,threshold,op_duration,timestep):
-    print(month)
-    # time_series: input timeseries (numpy array)
-    # threshold over which operation is possible (same unit as timeseries)
-    # op_duration: duration of operation in hours
-    # timestep: time resolution of time_series in hours
-    # returns an array with all weather windows duration in hours
-    month_ts = time_series.index.month
-    ts_mask=np.where(time_series<threshold,1,0)
-    od=int(op_duration/timestep)
-    ts=np.zeros((len(ts_mask)-od+1))
-    mon=np.zeros((len(ts_mask)-od+1))
-    for i in range(len(ts_mask)-od+1):
-        ts[i]=np.sum(ts_mask[i:i+od])
-    s0=np.where(ts==od)[0].tolist()
-    mon_s0=month_ts[0:s0[-1]+1]
-    wt=[]
-    for s in range(len(s0)):
-        if s0[s]==0:
-            wt.append(0)
-        elif s==0:
-            diff=s0[s]
-            a=0
-            wt.append(diff)
-            while (diff!=0):
-                diff=s0[s]-a-1
-                wt.append(diff*timestep)
-                a=a+1
-        else:
-            diff=s
-            a=0
-            while (diff!=0):
-                diff=s0[s]-s0[s-1]-a-1
-                wt.append(diff*timestep)
-                a=a+1
-    wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
-    # at the first timestep of the last operating period found in the timeseries
-    mean = np.mean(wt1[mon_s0==month])
-    p10 = np.percentile(wt1[mon_s0==month],10)
-    p50 = np.percentile(wt1[mon_s0==month],50)
-    p90 = np.percentile(wt1[mon_s0==month],90)
-    return mean, p10, p50, p90
