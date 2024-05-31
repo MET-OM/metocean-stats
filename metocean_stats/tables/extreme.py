@@ -209,8 +209,7 @@ def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10
             closest_index = (hs_tpl_tph['hs_'+str(periods[i])] - (max_hs-j)).abs().idxmin()
             #print(j,k,k+3)
             table[j,k:k+3] = hs_tpl_tph.loc[closest_index][k:k+3].values.round(1)
-        k = k+4
-    breakpoint()
+        k = k+3
 
 
     # Create DataFrame
