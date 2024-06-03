@@ -929,6 +929,9 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
 
 
 
+
+
+
 def weib_3(arr,sh,lo,sc):
     a=sh/sc
     b=((arr-lo)/sc)**(sh-1)
@@ -936,4 +939,48 @@ def weib_3(arr,sh,lo,sc):
     d=np.exp(c)
     return d
 
+
+def perc_tp_for_hs_bins_data(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1):
+    df=data
+    # Create bins
+    min_hs = 0.5
+    max_hs = df['HS'].max()+0.5*df['HS'].max()
+    bins = np.arange(min_hs - 0.5, max_hs + 0.5 + bin_width, bin_width)
+    bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
+    bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
+
+    # Bin the HS values
+    df['HS_bin'] = pd.cut(df['HS'], bins=bins, labels=bin_labels, right=False)
+    
+    # Calculate P5, Mean, and P95 for each bin
+    result = []
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=[1])
+    for i, bin_label in enumerate(bin_labels):
+        bin_df = df[df['HS_bin'] == bin_label]
+        if not bin_df.empty:
+            P5 = bin_df['TP'].quantile(0.05)
+            Mean = bin_df['TP'].mean()
+            P95 = bin_df['TP'].quantile(0.95)
+            P5_model,Mean_model,P95_model = model_tp_given_hs(hs=bin_centers[i], a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
+            result.append([bin_label, bin_centers[i], P5, Mean, P95,P5_model,Mean_model,P95_model])
+ #       else:
+ #           result.append([bin_label, bin_centers[i], np.nan, np.nan, np.nan,np.nan, np.nan, np.nan])
+
+    # Create a new dataframe with the results
+    result_df = pd.DataFrame(result, columns=['HS_bin', 'HS_bin_center', 'P5', 'Mean', 'P95', 'P5_model','Mean_model','P95_model'])
+    #result_df = result_df.dropna()
+    print(result_df)
+
+    return result_df
+
+def model_tp_given_hs(hs: float, a1, a2, a3, b1, b2, b3):
+    mi = a1 +a2 * hs**a3
+    variance = b1 + b2*np.exp(-b3*hs)
+    tp_mean = np.exp(mi + 0.5*variance)
+    std_tp = tp_mean * np.sqrt(np.exp(variance)-1) 
+    P5_model = tp_mean - 1.645*std_tp
+    P95_model = tp_mean + 1.645*std_tp
+    Mean_model = tp_mean
+
+    return P5_model,Mean_model,P95_model
 

@@ -647,3 +647,24 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
 
 
 
+def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_file='tp_for_given_hs.png'):
+    df = perc_tp_for_hs_bins_data(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1)
+    
+    # Plot the 2D histogram
+    plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
+    
+    # Scatter plots
+    plt.scatter(df['HS_bin_center'], df['P5'], marker='x', color='grey', label='P5')
+    plt.scatter(df['HS_bin_center'], df['Mean'], marker='x', color='blue', label='Mean')
+    plt.scatter(df['HS_bin_center'], df['P95'], marker='x', color='magenta', label='P95')
+    plt.plot(df['HS_bin_center'], df['P5_model'], color='grey', label='P5 fitted')
+    plt.plot(df['HS_bin_center'], df['Mean_model'], color='blue', label='Mean fitted')
+    plt.plot(df['HS_bin_center'], df['P95_model'], color='magenta', label='P95 fitted')
+    plt.xlabel('$H_s$ [m]',fontsize=12)
+    plt.ylabel('$T_p$ [s]',fontsize=12)
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return
