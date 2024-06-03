@@ -212,7 +212,7 @@ def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10
         k = k+3
 
     # Create a DataFrame for better readability
-    columns = [item for period in periods for item in (f'HS_{period} [m]', f'TpL_{period} [s]', f'TpH_{period} [s]')]
+    columns = [item for period in periods for item in (f'HS [{period} years]', f'TpL [{period} years]', f'TpH [{period} years]')]
 
     # Create DataFrame
     df = pd.DataFrame(table,  columns=columns)
