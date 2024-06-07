@@ -645,22 +645,20 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     return
 
 
-
-
 def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_file='tp_for_given_hs.png'):
     df = table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
     # Plot the 2D histogram
     plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
     # Scatter plots
-    plt.scatter(df[var_hs], df['P5'], marker='x', color='grey', label='P5')
-    plt.scatter(df[var_hs], df['Mean'], marker='x', color='blue', label='Mean')
-    plt.scatter(df[var_hs], df['P95'], marker='x', color='magenta', label='P95')
-    plt.plot(df[var_hs], df['P5-model'], color='grey', label='P5 fitted')
-    plt.plot(df[var_hs], df['Mean-model'], color='blue', label='Mean fitted')
-    plt.plot(df[var_hs], df['P95-model'], color='magenta', label='P95 fitted')
+    plt.scatter(df['Hs[m]'], df['Tp(P5-obs) [s]'], marker='x', color='grey', label='P5')
+    plt.scatter(df['Hs[m]'], df['Tp(Mean-obs) [s]'], marker='x', color='blue', label='Mean')
+    plt.scatter(df['Hs[m]'], df['Tp(P95-obs) [s]'], marker='x', color='magenta', label='P95')
+    plt.plot(df['Hs[m]'], df['Tp(P5-model) [s]'], color='grey', label='P5 fitted')
+    plt.plot(df['Hs[m]'], df['Tp(Mean-model) [s]'], color='blue', label='Mean fitted')
+    plt.plot(df['Hs[m]'], df['Tp(P95-model) [s]'], color='magenta', label='P95 fitted')
     plt.xlabel('$H_s$ [m]',fontsize=16)
     plt.ylabel('$T_p$ [s]',fontsize=16)
-    plt.xlim(0,df[var_hs].max())
+    plt.xlim(0,df['Hs[m]'].max())
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()

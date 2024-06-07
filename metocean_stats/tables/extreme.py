@@ -222,13 +222,13 @@ def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10
     return df
 
 
-def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, periods=[10000], output_file='table_perc_tp_for_hs.csv'):
+def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, max_hs=20, output_file='table_perc_tp_for_hs.csv'):
     df=data
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=[1000])
     # Create bins
     min_hs = 0.5
-    max_hs = np.ceil(hs_tpl_tph['hs_'+str(np.array(periods).max())].max())
-    bins = np.arange(min_hs, max_hs + 2*bin_width, bin_width)
+    max_hs = max_hs
+    bins = np.arange(min_hs, max_hs + bin_width, bin_width)
     bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
     bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
 
@@ -239,18 +239,43 @@ def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width
     result = []
     for i, bin_label in enumerate(bin_labels):
         bin_df = df[df[var_hs+'_bin'] == bin_label]
-        #if not bin_df.empty:
-        P5 = bin_df[var_tp].quantile(0.05)
-        Mean = bin_df[var_tp].mean()
-        P95 = bin_df[var_tp].quantile(0.95)
+        if len(bin_df.index)>10:
+            P5 = bin_df[var_tp].quantile(0.05)
+            Mean = bin_df[var_tp].mean()
+            P95 = bin_df[var_tp].quantile(0.95)
+        else:
+            P5 = np.nan
+            Mean = np.nan
+            P95 = np.nan
+
         P5_model,Mean_model,P95_model = model_tp_given_hs(hs=bin_centers[i], a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
         result.append([bin_label, bin_centers[i], P5, Mean, P95,P5_model,Mean_model,P95_model])
 
 
     # Create a new dataframe with the results
-    result_df = pd.DataFrame(result, columns=[var_hs+'_bin', var_hs, 'P5', 'Mean', 'P95', 'P5-model','Mean-model','P95-model'])
+    result_df = pd.DataFrame(result, columns=[var_hs+'_bin', 'Hs[m]','Tp(P5-obs) [s]','Tp(Mean-obs) [s]','Tp(P95-obs) [s]', 'Tp(P5-model) [s]','Tp(Mean-model) [s]','Tp(P95-model) [s]'])
+    if output_file:
+        result_df[['Hs[m]', 'Tp(P5-model) [s]','Tp(Mean-model) [s]','Tp(P95-model) [s]']].round(2).to_csv(output_file,index=False)
+
+    return result_df
+
+
+def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, periods=[1,10,1000,10000], output_file='table_perc_tp_for_hs.csv'):
+    df=data
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=periods)
+    # Create bins
+    rv_hs = np.zeros(len(periods))
+    result = []
+    for i in range(len(periods)):
+        rv_hs = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
+        P5_model,Mean_model,P95_model = model_tp_given_hs(hs=rv_hs, a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
+        result.append([periods[i],rv_hs,P5_model,Mean_model,P95_model])
+
+
+    # Create a new dataframe with the results
+    result_df = pd.DataFrame(result, columns=['Return period [years]', 'Hs[m]','Tp(P5-model) [s]','Tp(Mean-model) [s]','Tp(P95-model) [s]'])
     #result_df = result_df.dropna()
     if output_file:
-        result_df[[var_hs,'P5-model','Mean-model','P95-model']].round(2).to_csv(output_file,index=False)
+        result_df.round(2).to_csv(output_file,index=False)
 
     return result_df
