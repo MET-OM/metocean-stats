@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
-from ..stats.aux_funcs import Tp_correction, add_direction_sector, Hs_Tp_curve, Gauss3, Gauss4, Weibull_method_of_moment, DVN_steepness, find_percentile
+from ..stats.aux_funcs import *
 from ..stats.extreme import *
 
 
@@ -279,3 +279,13 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
         result_df.round(2).to_csv(output_file,index=False)
 
     return result_df
+
+def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth=50,spectrum='JONSWAP',output_file='wave_induced_current_depth200.csv'):
+    df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1, max_hs=max_hs, output_file=None)
+    df['Us(P5) [m/s]'], df['Tu(P5-model) [s]'] = calculate_Us_Tu(df['Hs[m]'],df['Tp(P5-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
+    df['Us(Mean) [m/s]'], df['Tu(Mean-model) [s]'] = calculate_Us_Tu(df['Hs[m]'],df['Tp(Mean-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
+    df['Us(P95) [m/s]'], df['Tu(P95-model) [s]'] = calculate_Us_Tu(df['Hs[m]'],df['Tp(P95-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
+    if output_file:
+        df[['Hs[m]','Tp(P5-model) [s]', 'Us(P5) [m/s]','Tu(P5-model) [s]','Tp(Mean-model) [s]', 'Us(Mean) [m/s]','Tu(Mean-model) [s]','Tp(P95-model) [s]', 'Us(P95) [m/s]','Tu(P95-model) [s]']].round(2).to_csv(output_file,index=False)
+    
+    return df

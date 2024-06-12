@@ -304,7 +304,6 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
 
 
 
-
 def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
     results = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

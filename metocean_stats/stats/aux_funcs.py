@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import time
 import os
+from ..stats.spec_funcs import *
+
 
 
 def convert_latexTab_to_csv(inputFileName, outputFileName):
@@ -256,3 +258,26 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     t1=np.asarray(t1)
 
     return t1,h1
+
+
+def estimate_Tz(T_p):
+    return T_p / 1.28
+
+def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
+    df = 0.01
+    f=np.arange(0,1,df)
+    S_u = np.zeros((len(H_s),len(f)))
+    for i in range(len(H_s)):
+        if spectrum=='JONSWAP':
+            E = jonswap(f=f,hs=H_s[i],tp=T_p[i])
+        elif spectrum=='TORSEHAUGEN':
+            E = torsethaugen(f=f,hs=H_s[i],tp=T_p[i]) 
+
+        S_u[i,:] = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
+    
+    M0 = np.trapz(S_u*df,axis=1)
+    M2 = np.trapz((f**2)*S_u*df,axis=1)
+    Us = 2*np.sqrt(M0)
+    Tu = np.sqrt(M0/M2)
+    return Us, Tu
+
