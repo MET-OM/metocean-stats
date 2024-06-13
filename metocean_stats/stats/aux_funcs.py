@@ -281,3 +281,24 @@ def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
     Tu = np.sqrt(M0/M2)
     return Us, Tu
 
+import numpy as np
+from scipy.optimize import curve_fit
+
+# Define the function H(U)
+def Hs_as_function_of_U(U, a, b, c, d):
+    return a + b * U**(c + d * U)
+
+# Function to fit the parameters a, b, c, and d
+def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
+    if initial_guesses is None:
+        # If no initial guesses are provided, use some default values
+        initial_guesses = [1, 0.32, 1.6, 0.003]
+    
+    # Use curve_fit to fit the function to the data
+    params, covariance = curve_fit(Hs_as_function_of_U, U, H_values, p0=initial_guesses, maxfev=maxfev)
+    
+    # Extract the parameters
+    a, b, c, d = params
+    return a, b, c, d
+
+

@@ -649,7 +649,6 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     df = table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
     # Plot the 2D histogram
     plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
-    # Scatter plots
     plt.scatter(df['Hs[m]'], df['Tp(P5-obs) [s]'], marker='x', color='grey', label='P5')
     plt.scatter(df['Hs[m]'], df['Tp(Mean-obs) [s]'], marker='x', color='blue', label='Mean')
     plt.scatter(df['Hs[m]'], df['Tp(P95-obs) [s]'], marker='x', color='magenta', label='P95')
@@ -659,6 +658,27 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     plt.xlabel('$H_s$ [m]',fontsize=16)
     plt.ylabel('$T_p$ [s]',fontsize=16)
     plt.xlim(0,df['Hs[m]'].max())
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return
+
+def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
+    df = table_tp_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
+    # Plot the 2D histogram
+    plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
+    plt.scatter(df['U[m/s]'], df['Hs(P5-obs) [m]'], marker='x', color='grey', label='P5')
+    plt.scatter(df['U[m/s]'], df['Hs(Mean-obs) [m]'], marker='x', color='blue', label='Mean')
+    plt.scatter(df['U[m/s]'], df['Hs(P95-obs) [m]'], marker='x', color='magenta', label='P95')
+    plt.plot(df['U[m/s]'],df['Hs(P5-model) [m]'],  color='grey', label='P5 fitted')
+    plt.plot(df['U[m/s]'],df['Hs(Mean-model) [m]'],  color='blue', label='Mean fitted')
+    plt.plot(df['U[m/s]'],df['Hs(P95-model) [m]'],  color='magenta', label='P95 fitted')
+    plt.ylabel('$H_s$ [m]',fontsize=16)
+    plt.xlabel('$U$ [m/s]',fontsize=16)
+    plt.xlim(0,df['U[m/s]'].max())
+    plt.ylim(0,df['Hs(P95-model) [m]'].max())
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()

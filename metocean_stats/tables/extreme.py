@@ -280,6 +280,47 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
 
     return result_df
 
+
+def table_tp_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_tp_for_wind.csv'):
+    df=data
+    # Create bins
+    min_wind = 0
+    bins = np.arange(min_wind, max_wind + bin_width, bin_width)
+    bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
+    bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
+    # Bin the wind values
+    df[var_wind+'_bin'] = pd.cut(df[var_wind], bins=bins, labels=bin_labels, right=False)
+    
+    # Calculate P5, Mean, and P95 for each bin
+    result = []
+    for i, bin_label in enumerate(bin_labels):
+        bin_df = df[df[var_wind+'_bin'] == bin_label]
+        if len(bin_df.index)>10:
+            P5 = bin_df[var_hs].quantile(0.05)
+            Mean = bin_df[var_hs].mean()
+            sigma = bin_df[var_hs].std()
+            P95 = bin_df[var_hs].quantile(0.95)
+        else:
+            P5 = np.nan
+            Mean = np.nan
+            sigma  = np.nan
+            P95 = np.nan
+
+        result.append([bin_label, bin_centers[i], P5, Mean, sigma, P95])
+
+    result_df = pd.DataFrame(result, columns=[var_hs+'_bin', 'U[m/s]','Hs(P5-obs) [m]','Hs(Mean-obs) [m]','Hs(std-obs) [m]', 'Hs(P95-obs) [m]'])
+    a_mean, b_mean, c_mean, d_mean = fit_hs_wind_model(result_df.dropna()['U[m/s]'].values,result_df.dropna()['Hs(Mean-obs) [m]'].values) 
+    a_sigma, b_sigma, c_sigma, d_sigma = fit_hs_wind_model(result_df.dropna()['U[m/s]'].values,result_df.dropna()['Hs(std-obs) [m]'].values) 
+    result_df['Hs(Mean-model) [m]'] = Hs_as_function_of_U(result_df['U[m/s]'], a_mean, b_mean, c_mean, d_mean)
+    result_df['Hs(std-model) [m]'] = Hs_as_function_of_U(result_df['U[m/s]'], a_sigma, b_sigma, c_sigma, d_sigma)
+    result_df['Hs(P5-model) [m]'] =  result_df['Hs(Mean-model) [m]'] - 1.65*result_df['Hs(std-model) [m]']
+    result_df['Hs(P95-model) [m]'] =  result_df['Hs(Mean-model) [m]'] + 1.65*result_df['Hs(std-model) [m]']
+
+    # Create a new dataframe with the results
+    if output_file:
+        result_df[['U[m/s]', 'Hs(P5-model) [m]','Hs(Mean-model) [m]','Hs(P95-model) [m]']].round(2).to_csv(output_file,index=False)
+    return result_df
+
 def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth=50,spectrum='JONSWAP',output_file='wave_induced_current_depth200.csv'):
     df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1, max_hs=max_hs, output_file=None)
     df['Us(P5) [m/s]'], df['Tu(P5-model) [s]'] = calculate_Us_Tu(df['Hs[m]'],df['Tp(P5-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
