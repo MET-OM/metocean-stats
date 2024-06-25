@@ -339,15 +339,15 @@ def table_profile_return_values(data=df,var=['W10','W50','W80','W100','W150'], h
         if period == 1 : 
         	period = 1.5873
         	
-        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var].values)
+        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
     
         duration = (data.index[-1]-data.index[0]).days + 1 
         length_data = data.shape[0]
         interval = duration*24/length_data # in hours 
         period = period*365.2422*24/interval # years is converted to K-th
-        RVE = stats.weibull_min.isf(1/period, shape, loc, scale)
+        return_value = stats.weibull_min.isf(1/period, shape, loc, scale)
         
-        return RVE
+        return return_value
     
     import pandas as pd
     
