@@ -330,3 +330,32 @@ def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth
         df[['Hs[m]','Tp(P5-model) [s]', 'Us(P5) [m/s]','Tu(P5-model) [s]','Tp(Mean-model) [s]', 'Us(Mean) [m/s]','Tu(Mean-model) [s]','Tp(P95-model) [s]', 'Us(P95) [m/s]','Tu(P95-model) [s]']].round(2).to_csv(output_file,index=False)
     
     return df
+
+
+def table_profile_return_values(data=df,var=['W10','W50','W80','W100','W150'], heights=[10, 50, 80, 100, 150], period=[1, 10, 100, 10000], file_out='RVE_wind_profile.csv'):
+    def RVE_Weibull(data,var,period=100):
+        import scipy.stats as stats
+        
+        if period == 1 : 
+        	period = 1.5873
+        	
+        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var].values)
+    
+        duration = (data.index[-1]-data.index[0]).days + 1 
+        length_data = data.shape[0]
+        interval = duration*24/length_data # in hours 
+        period = period*365.2422*24/interval # years is converted to K-th
+        RVE = stats.weibull_min.isf(1/period, shape, loc, scale)
+        
+        return RVE
+    
+    import pandas as pd
+    
+    df_wind_profile = pd.DataFrame()
+    df_wind_profile['Height above MSL']=heights
+    for p in period:
+        df_wind_profile[str(p)+'-year Return'] = [RVE_Weibull(data,var1,period=p) for var1 in var]
+        
+    df_wind_profile.to_csv(file_out, index=False)  
+    
+    return df_wind_profile
