@@ -301,4 +301,18 @@ def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
     a, b, c, d = params
     return a, b, c, d
 
+def RVE_Weibull(data,var,period=100):
+    import scipy.stats as stats
+    
+    if period == 1 : 
+    	period = 1.5873
+    	
+    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
 
+    duration = (data.index[-1]-data.index[0]).days + 1 
+    length_data = data.shape[0]
+    interval = duration*24/length_data # in hours 
+    period = period*365.2422*24/interval # years is converted to K-th
+    return_value = stats.weibull_min.isf(1/period, shape, loc, scale)
+    
+    return return_value
