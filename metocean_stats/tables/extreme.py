@@ -333,22 +333,7 @@ def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth
 
 
 def table_profile_return_values(data=df,var=['W10','W50','W80','W100','W150'], heights=[10, 50, 80, 100, 150], period=[1, 10, 100, 10000], file_out='RVE_wind_profile.csv'):
-    def RVE_Weibull(data,var,period=100):
-        import scipy.stats as stats
-        
-        if period == 1 : 
-        	period = 1.5873
-        	
-        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
-    
-        duration = (data.index[-1]-data.index[0]).days + 1 
-        length_data = data.shape[0]
-        interval = duration*24/length_data # in hours 
-        period = period*365.2422*24/interval # years is converted to K-th
-        return_value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        
-        return return_value
-    
+   
     import pandas as pd
     
     df_wind_profile = pd.DataFrame()
