@@ -339,7 +339,7 @@ def table_profile_return_values(data=df,var=['W10','W50','W80','W100','W150'], h
     df_wind_profile = pd.DataFrame()
     df_wind_profile['Height above MSL']=heights
     for p in period:
-        df_wind_profile[str(p)+'-year Return'] = [RVE_Weibull(data,var1,period=p) for var1 in var]
+        df_wind_profile[str(p)+'-year Return'] = [aux_funcs.RVE_Weibull(data,var1,period=p) for var1 in var]
         
     df_wind_profile.to_csv(file_out, index=False)  
     
