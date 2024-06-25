@@ -307,7 +307,7 @@ def RVE_Weibull(data,var,period=100):
     if period == 1 : 
     	period = 1.5873
     	
-    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
+    shape, loc, scale = Weibull_method_of_moment(data[var])
 
     duration = (data.index[-1]-data.index[0]).days + 1 
     length_data = data.shape[0]
