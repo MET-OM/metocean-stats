@@ -310,3 +310,17 @@ def air_temperature_correction_nora10(df,var='T2m'):
     df.loc[df[var] > T15, var]=df.loc[df[var] > T15, var] + p*(df.loc[df[var] > T15, var]-T15) 
 
     return df 
+
+
+def wind_gust(df,var='W10',var0='W10',z=10):
+    # this assume the 3-hour interval = 1-h mean wind speed 
+    # the calculation folow Norce Report for LUNA page 122/130 
+    Uo=df[var0]
+    Uref=10 # m/s
+    zr = 10
+    Iu = 0.06*(1+0.43*Uo/Uref)*(z/zr)**(-0.22)
+    Uzt = df[var]*(1-0.41*Iu*np.log(10/60))
+    Uzt90 = df[var]*(1-0.59*Iu*np.log(10/60))
+    df['Wind_gust'] = Uzt
+    df['Wind_gust_P90'] = Uzt90
+    return df 
