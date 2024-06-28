@@ -85,8 +85,8 @@ def table_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10
     
     return df
 
-def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], units='m',output_file='directional_extremes_weibull.csv'):
-    weibull_params, return_periods, sector_prob = directional_extremes_weibull(data=data, var=var, var_dir=var_dir, periods=periods)
+def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], units='m',adjustment='NORSOK',output_file='directional_extremes_weibull.csv'):
+    weibull_params, return_periods, sector_prob = directional_extremes_weibull(data=data, var=var, var_dir=var_dir, periods=periods, adjustment=adjustment)
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
     # Initialize lists to store table data
     sector_prob = ['%'] + [round(value, 2) for value in sector_prob] + [100.00]
@@ -109,7 +109,7 @@ def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_d
     df = pd.DataFrame(table_data)
     if output_file:
         df.to_csv(output_file)
-    
+
     return df
 
 

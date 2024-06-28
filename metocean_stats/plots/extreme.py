@@ -675,6 +675,7 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     plt.plot(df['U[m/s]'],df['Hs(P5-model) [m]'],  color='grey', label='P5 fitted')
     plt.plot(df['U[m/s]'],df['Hs(Mean-model) [m]'],  color='blue', label='Mean fitted')
     plt.plot(df['U[m/s]'],df['Hs(P95-model) [m]'],  color='magenta', label='P95 fitted')
+
     plt.ylabel('$H_s$ [m]',fontsize=16)
     plt.xlabel('$U$ [m/s]',fontsize=16)
     plt.xlim(0,df['U[m/s]'].max())

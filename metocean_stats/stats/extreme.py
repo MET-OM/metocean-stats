@@ -852,7 +852,7 @@ def monthly_extremes_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
 
     return weibull_params, return_values
 
-def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], output_file: str = None):
+def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], adjustment='NORSOK', output_file: str = None):
     from scipy.stats import weibull_min
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
@@ -872,14 +872,37 @@ def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, per
     weibull_params.append((shape, loc, scale))       
     # time step between each data, in hours
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
-    # years is converted to K-th
-    periods1 = np.array(periods)*24*365.2422/time_step
-    # Calculate return periods for each month and period
     return_values = np.zeros((13, len(periods)))
+    # years is converted to K-th
+
+    periods_adj = np.array([x * 6 for x in periods])*24*365.2422/time_step
+    periods_noadj = np.array(periods)*24*365.2422/time_step
+    
+    if adjustment == 'NORSOK':
+        pass
+        print('test...')
+    else:
+        periods_adj = periods_noadj
+
+    # Calculate return periods for each month and period
     for i, (shape, loc, scale) in enumerate(weibull_params):
-        for j, period in enumerate(periods1):
-            return_value = weibull_min.isf(1/period, shape, loc, scale)
-            return_values[i, j] = round(return_value, 1)
+        if i == 12:
+            for j, period in enumerate(periods_noadj):
+                return_value = weibull_min.isf(1/period, shape, loc, scale)
+                return_values[i, j] = round(return_value, 1)
+        else:
+            for j, period in enumerate(periods_adj):
+                return_value = weibull_min.isf(1/period, shape, loc, scale)
+                return_values[i, j] = round(return_value, 1)
+
+    # Define the threshold values (annual values) for each column
+    thresholds = return_values[-1]
+
+    # Replace values in each column that exceed the thresholds
+    for col in range(return_values.shape[1]):
+        return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
+
+
     return weibull_params, return_values, sector_prob
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
