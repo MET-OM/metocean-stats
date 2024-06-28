@@ -254,3 +254,22 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
     plt.savefig(output_file)
 
     return fig
+
+
+def plot_monthly_max_mean_min(df,var='T2m',out_file='plot_monthly_max_min_min.png'):
+    out = sort_by_month(df)
+    df2 = pd.DataFrame()
+    months = calendar.month_name[1:] # eliminate the first insane one 
+    df2['month']=[x[:3] for x in months] # get the three first letters 
+    df2['Min']=[np.min(out[m][var]) for m in out]
+    df2['Mean']=[np.mean(out[m][var]) for m in out]
+    df2['Max']=[np.max(out[m][var]) for m in out]
+    
+    plt.plot(df2['month'],df2['Min'])
+    plt.plot(df2['month'],df2['Mean'])
+    plt.plot(df2['month'],df2['Max'])
+    plt.ylabel('Temperature [℃]') 
+    plt.grid()
+    plt.savefig(out_file,dpi=100,facecolor='white',bbox_inches='tight')
+    
+    return df2 
