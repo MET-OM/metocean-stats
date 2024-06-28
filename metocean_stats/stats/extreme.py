@@ -880,7 +880,6 @@ def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, per
     
     if adjustment == 'NORSOK':
         pass
-        print('test...')
     else:
         periods_adj = periods_noadj
 

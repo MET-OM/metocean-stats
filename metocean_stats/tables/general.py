@@ -244,7 +244,7 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     """
 
 # Define  bins
-    bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
+    bins = np.arange(int(data[var1].min()), data[var1].max() + step_var1, step_var1).tolist()
     labels =  [f'<{num}' for num in bins]
 
     # Categorize data into bins
