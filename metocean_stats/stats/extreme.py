@@ -666,7 +666,7 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
     return 
 
 
-def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):  
+def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], adjustment=None):  
     
     """
     This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
@@ -675,6 +675,10 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):
     var2 : Tp: Peak period 
     file_out: Hs-Tp joint distribution, optional
     """
+    if adjustment == 'NORSOK':
+        periods_adj = np.array([x * 6 for x in periods])
+    else:
+        periods_adj = periods
     df  = data
     max_y = max(periods)
     period = np.array(periods)
@@ -813,7 +817,7 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000]):
 
     # Assuming Hs_Tp_curve() returns four values, otherwise adjust accordingly
     for i in range(len(periods)):
-        t3_val, h3_val, X_val, hs_tpl_tph_val = Hs_Tp_curve(df.hs.values, pdf_Hs, pdf_Hs_Tp, f_Hs_Tp, h, t, interval, X=periods[i])
+        t3_val, h3_val, X_val, hs_tpl_tph_val = Hs_Tp_curve(df.hs.values, pdf_Hs, pdf_Hs_Tp, f_Hs_Tp, h, t, interval, X=periods_adj[i])
         t3.append(t3_val)
         h3.append(h3_val)
         X.append(X_val)
