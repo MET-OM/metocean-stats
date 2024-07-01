@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
 
-from ..stats.aux_funcs import convert_latexTab_to_csv, add_direction_sector, consecutive_indices
+from ..stats.aux_funcs import *
+from ..stats.general import *
+
 
 def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
     """
@@ -29,8 +31,8 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     sumcols = np.sum(tbl, axis=0)
     sumrows = np.sum(tbl, axis=1)
 
-    sumrows = np.around(sumrows, decimals=1)
-    sumcols = np.around(sumcols, decimals=1)
+    sumrows = np.around(sumrows, decimals=2)
+    sumcols = np.around(sumcols, decimals=2)
 
     bins_var1 = sd.index
     bins_var2 = sd.columns
@@ -38,26 +40,31 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     lower_bin_2 = bins_var2[0] - step_var2
 
     rows = []
-    rows.append(f'{lower_bin_1:04.1f}-{bins_var1[0]:04.1f} | {sumrows[0]:04.1f}%')
+    rows.append(f'{lower_bin_1:04.1f}-{bins_var1[0]:04.1f} | {sumrows[0]:04.2f}%')
     for i in range(len(bins_var1)-1):
-        rows.append(f'{bins_var1[i]:04.1f}-{bins_var1[i+1]:04.1f} | {sumrows[i+1]:04.1f}%')
+        rows.append(f'{bins_var1[i]:04.1f}-{bins_var1[i+1]:04.1f} | {sumrows[i+1]:04.2f}%')
 
     cols = []
-    cols.append(f'{int(lower_bin_2)}-{int(bins_var2[0])} | {sumcols[0]:04.1f}%')
+    cols.append(f'{int(lower_bin_2)}-{int(bins_var2[0])} | {sumcols[0]:04.2f}%')
     for i in range(len(bins_var2)-1):
-        cols.append(f'{int(bins_var2[i])}-{int(bins_var2[i+1])} | {sumcols[i+1]:04.1f}%')
+        cols.append(f'{int(bins_var2[i])}-{int(bins_var2[i+1])} | {sumcols[i+1]:04.2f}%')
 
+    #breakpoint()
+    #cols.insert(0,var1+' / '+var2 )
     rows = rows[::-1]
     tbl = tbl[::-1,:]
-    dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
-    hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
-    plt.ylabel(var1)
-    plt.xlabel(var2)
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
+    dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
+    if output_file.split('.')[-1]=='csv':
+        dfout.to_csv(output_file,index_label=var1+'/'+var2)
+    else:
+        hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
+        plt.ylabel(var1)
+        plt.xlabel(var2)
+        plt.tight_layout()
+        plt.savefig(output_file)
+        plt.close()
 
-    return hi
+    return 
 
 def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
     """
