@@ -342,9 +342,6 @@ def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth
 
 
 def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heights=[10, 50, 80, 100, 150], period=[1, 10, 100, 10000], file_out='RVE_wind_profile.csv'):
-   
-    import pandas as pd
-    
     df_wind_profile = pd.DataFrame()
     df_wind_profile['Height above MSL']=heights
     for p in period:
