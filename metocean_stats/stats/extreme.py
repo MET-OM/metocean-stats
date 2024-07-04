@@ -588,14 +588,14 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
     # data : dataframe, should be daily or hourly
     # period: a value, or an array return periods =np.array([1,10,100,10000],dtype=float)
     # distribution: 'EXP', 'GEV', 'GUM', 'LoNo', 'Weibull2P' or 'Weibull3P'
-    # method: 'default', 'AM' or 'POT'
+    # method: 'default' (all data), 'AM' or 'POT'
     # threshold='default'(min anual maxima), or a value 
 
     import scipy.stats as stats
     from pyextremes import get_extremes
+    shape, loc, scale = [], [], []
     periods = np.array(periods)
     it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
-    
     df = dataframe[var]
     
     period = periods
@@ -656,14 +656,13 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
     else:
         print ('Please check the distribution')    
         
-    if method == 'default' :  
-    	output_file= distribution + '.png'
-    else:
-        output_file= distribution + '(' + method + ')' + '.png'
-        
-    plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
+    #if method == 'default' :  
+    # 	output_file= distribution + '.png'
+    #else:
+    #    output_file= distribution + '(' + method + ')' + '.png'   
+    #plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
-    return 
+    return shape, loc, scale, value
 
 
 def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], adjustment=None):  
@@ -856,24 +855,66 @@ def monthly_extremes_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
 
     return weibull_params, return_values
 
-def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], adjustment='NORSOK', output_file: str = None):
-    from scipy.stats import weibull_min
+def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull'):
+    from scipy.stats import weibull_min, gumbel_r
+    # Calculate parameters for each month based on different method
+    params = []
+    for month in range(1, 13):
+        month_data = data[data.index.month == month]
+        if distribution == 'Weibull':
+            shape, loc, scale = Weibull_method_of_moment(month_data[var])
+        elif distribution == 'GUM':
+            shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+        params.append((shape, loc, scale))
+    # add annual
+    if distribution == 'Weibull':
+        shape, loc, scale = Weibull_method_of_moment(data[var])
+    elif distribution == 'GUM':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+
+    params.append((shape, loc, scale))       
+    # time step between each data, in hours
+    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # years is converted to K-th
+    periods1 = np.array(periods)*24*365.2422/time_step
+    #breakpoint()
+    # Calculate return periods for each month and period
+    return_values = np.zeros((13, len(periods)))
+    for i, (shape, loc, scale) in enumerate(params):
+        for j, period in enumerate(periods1):
+            if distribution == 'Weibull':  
+                return_value = weibull_min.isf(1/period, shape, loc, scale)
+            elif distribution == 'GUM':     
+                return_value = gumbel_r.isf(1/period, loc, scale)            
+            return_values[i, j] = round(return_value, 1)
+
+    return params, return_values
+
+def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull', adjustment='NORSOK'):
+    from scipy.stats import weibull_min, gumbel_r
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
     sector_prob = []
-    weibull_params = []
+    params = []
 
     add_direction_sector(data=data,var_dir=var_dir)
 
     for dir in range(0,360,30):
-        sector_data = data[data['direction_sector']==dir][var]
-        shape, loc, scale = Weibull_method_of_moment(sector_data)
-        weibull_params.append((shape, loc, scale))
+        sector_data = data[data['direction_sector']==dir]
+        if distribution == 'Weibull':
+            shape, loc, scale = Weibull_method_of_moment(sector_data[var])
+        elif distribution == 'GUM':
+            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
+        params.append((shape, loc, scale))            
         sp = 100*len(sector_data)/len(data[var])
         sector_prob.append(sp)
     # add annual
-    shape, loc, scale = Weibull_method_of_moment(data[var])
-    weibull_params.append((shape, loc, scale))       
+    if distribution == 'Weibul':
+        shape, loc, scale = Weibull_method_of_moment(data[var])
+    elif distribution == 'GUM':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
+
+    params.append((shape, loc, scale))       
     # time step between each data, in hours
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
     return_values = np.zeros((13, len(periods)))
@@ -888,14 +929,20 @@ def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, per
         periods_adj = periods_noadj
 
     # Calculate return periods for each month and period
-    for i, (shape, loc, scale) in enumerate(weibull_params):
+    for i, (shape, loc, scale) in enumerate(params):
         if i == 12:
             for j, period in enumerate(periods_noadj):
-                return_value = weibull_min.isf(1/period, shape, loc, scale)
+                if distribution == 'Weibull':
+                    return_value = weibull_min.isf(1/period, shape, loc, scale)
+                elif distribution == 'GUM':
+                    return_value = gumbel_r.isf(1/period, loc, scale)
                 return_values[i, j] = round(return_value, 1)
         else:
             for j, period in enumerate(periods_adj):
-                return_value = weibull_min.isf(1/period, shape, loc, scale)
+                if distribution == 'Weibull':
+                    return_value = weibull_min.isf(1/period, shape, loc, scale)
+                elif distribution == 'GUM':
+                    return_value = gumbel_r.isf(1/period, loc, scale)
                 return_values[i, j] = round(return_value, 1)
 
     # Define the threshold values (annual values) for each column
@@ -906,7 +953,7 @@ def directional_extremes_weibull(data: pd.DataFrame, var: str, var_dir: str, per
         return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
 
 
-    return weibull_params, return_values, sector_prob
+    return params, return_values, sector_prob
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
     from scipy.stats import weibull_min

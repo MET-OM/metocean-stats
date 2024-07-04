@@ -56,23 +56,23 @@ def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',va
     return df  
 
 
-def table_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.csv'):
-    weibull_params, return_periods = monthly_extremes_weibull(data=data, var=var, periods=periods)
+def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',output_file='monthly_extremes_weibull.csv'):
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
-    
+    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution)    
+
     # Initialize lists to store table data
     annual_prob = ['%'] + [np.round(100/12,2)] * 12 + [100.00]
-    weibull_shape =   ['-'] + [round(shape, 3) for shape, _, _ in weibull_params]
-    weibull_scale =   [units] + [round(scale, 3) for _, _, scale in weibull_params]
-    weibull_location =   [units] + [round(loc, 2) for _, loc, _ in weibull_params]
+    shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
+    scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
+    location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
 
     # Create the table data dictionary
     table_data = {
         'Month': months,
         'Annual prob.': annual_prob,
-        'Shape': weibull_shape,
-        'Scale': weibull_scale,
-        'Location': weibull_location,
+        'Shape': shape,
+        'Scale': scale,
+        'Location': location,
     }
     return_periods = return_periods.T.tolist()
     # Fill in return periods for each period
@@ -85,21 +85,23 @@ def table_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10
     
     return df
 
-def table_directional_weibull_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], units='m',adjustment='NORSOK',output_file='directional_extremes_weibull.csv'):
-    weibull_params, return_periods, sector_prob = directional_extremes_weibull(data=data, var=var, var_dir=var_dir, periods=periods, adjustment=adjustment)
+def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m',adjustment='NORSOK',output_file='directional_extremes_weibull.csv'):
+    params, return_periods, sector_prob = directional_extremes(data=data, var=var, var_dir=var_dir, periods=periods,distribution=distribution, adjustment=adjustment)    
+
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
     # Initialize lists to store table data
     sector_prob = ['%'] + [round(value, 2) for value in sector_prob] + [100.00]
-    weibull_shape = ['-'] + [round(shape, 3) for shape, _, _ in weibull_params]
-    weibull_scale = [units] + [round(scale, 3) for _, _, scale in weibull_params]
-    weibull_location = [units] + [round(loc, 2) for _, loc, _ in weibull_params]
+    shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
+    scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
+    location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
+
     # Create the table data dictionary
     table_data = {
         'Direction sector': dir,
         'Sector prob.': sector_prob,
-        'Shape': weibull_shape,
-        'Scale': weibull_scale,
-        'Location': weibull_location,
+        'Shape': shape,
+        'Scale': scale,
+        'Location': location,
     }
     return_periods = return_periods.T.tolist()
     # Fill in return values for each period
@@ -171,14 +173,14 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2
         sector_data = data[data['direction_sector']==dir]
         a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods,adjustment=adjustment)
         for i in range(len(periods)):
-            rv_hs[k-1,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
-            rv_tp[k-1,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
+            rv_hs[k-1,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+            rv_tp[k-1,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     #append annual
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods,adjustment=None)
     for i in range(len(periods)):
-        rv_hs[12,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
-        rv_tp[12,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
+        rv_hs[12,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+        rv_tp[12,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     # Define the threshold values (annual values) for each column
     thresholds_hs = rv_hs[12,:]
@@ -345,7 +347,7 @@ def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heig
     df_wind_profile = pd.DataFrame()
     df_wind_profile['Height above MSL']=heights
     for p in period:
-        df_wind_profile[str(p)+'-year Return'] = [aux_funcs.RVE_Weibull(data,var1,period=p) for var1 in var]
+        df_wind_profile[str(p)+'-year Return'] = [RVE_Weibull(data,var1,period=p) for var1 in var]
         
     df_wind_profile.to_csv(file_out, index=False)  
     

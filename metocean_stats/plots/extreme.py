@@ -561,10 +561,9 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     return 
 
-def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 10000], units='m',output_file='monthly_extremes_weibull.png'):
-    df = table_monthly_weibull_return_periods(data=data,var=var, periods=periods, units=units, output_file=None)
+def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',output_file='monthly_extremes_weibull.png'):
+    df = table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution, units=units, output_file=None)
     fig, ax = plt.subplots()
-    #breakpoint()
     for i in range(len(periods)):
         plt.plot(df['Month'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
 
@@ -576,8 +575,8 @@ def plot_monthly_weibull_return_periods(data, var='hs', periods=[1, 10, 100, 100
     return fig
 
 
-def plot_directional_weibull_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000], units='m', output_file='monthly_extremes_weibull.png'):
-    df = table_directional_weibull_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, units=units, output_file=None)
+def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK', output_file='monthly_extremes_weibull.png'):
+    df = table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment, output_file=None)
     fig, ax = plt.subplots()
     for i in range(len(periods)):
         plt.plot(df['Direction sector'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
@@ -586,6 +585,37 @@ def plot_directional_weibull_return_periods(data, var='hs',var_dir='Pdir', perio
     plt.xlabel('Direction',fontsize=15)
     plt.legend()
     plt.grid()
+    plt.savefig(output_file)
+    return fig
+
+
+def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m', adjustment='NORSOK', output_file='monthly_extremes_weibull.png'):
+    df = table_directional_return_periods(data=data, var=var, var_dir=var_dir, periods=periods, distribution=distribution, units=units, adjustment=adjustment, output_file=None)
+    
+    # Remove degree symbols and convert to numeric
+    directions_str = df['Direction sector'][1:-1].str.rstrip('°')
+    directions = pd.to_numeric(directions_str, errors='coerce')
+    directions_rad = np.deg2rad(directions.dropna())  # Convert valid directions to radians
+    
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})    
+    
+    for i in range(len(periods)):
+        values = df.iloc[1:-1, i+5].astype(float)
+        marker_sizes = values ** 1.8  # Scale factor, adjust as needed
+        ax.scatter(directions_rad, values, marker='o', s=marker_sizes, label=df.keys()[i+5].split(':')[1])
+    
+    ax.set_theta_direction(-1)  # Set the direction of the theta axis
+    ax.set_theta_offset(np.pi / 2.0)  # Set the location of 0 degrees to the top
+
+    # Add the cardinal directions
+    ax.set_xticks(np.deg2rad([0, 90, 180, 270]))
+    ax.set_xticklabels(['N', 'E', 'S', 'W'])
+
+    plt.title('Return values for ' + str(var) + ' [' + units + ']', fontsize=16)
+    plt.legend(loc='upper left',  bbox_to_anchor=(1.1, 0.6))
+    plt.grid(True)
+    plt.tight_layout()
+    
     plt.savefig(output_file)
     return fig
 
