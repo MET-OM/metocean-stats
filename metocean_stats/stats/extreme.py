@@ -828,33 +828,6 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], 
 
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
-
-def monthly_extremes_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
-    from scipy.stats import weibull_min
-    # Your implementation of monthly_extremes_weibull function
-    # Calculate Weibull parameters for each month
-    weibull_params = []
-    for month in range(1, 13):
-        month_data = data[data.index.month == month][var]
-        shape, loc, scale = Weibull_method_of_moment(month_data)
-        weibull_params.append((shape, loc, scale))
-    # add annual
-    shape, loc, scale = Weibull_method_of_moment(data[var])
-    weibull_params.append((shape, loc, scale))       
-    # time step between each data, in hours
-    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
-    # years is converted to K-th
-    periods1 = np.array(periods)*24*365.2422/time_step
-    #breakpoint()
-    # Calculate return periods for each month and period
-    return_values = np.zeros((13, len(periods)))
-    for i, (shape, loc, scale) in enumerate(weibull_params):
-        for j, period in enumerate(periods1):
-            return_value = weibull_min.isf(1/period, shape, loc, scale)
-            return_values[i, j] = round(return_value, 1)
-
-    return weibull_params, return_values
-
 def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull'):
     from scipy.stats import weibull_min, gumbel_r
     # Calculate parameters for each month based on different method

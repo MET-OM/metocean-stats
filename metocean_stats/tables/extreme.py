@@ -20,7 +20,7 @@ def table_monthly_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',period
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
     params.append((a1, a2, a3, b1, b2, b3))   
     headers = ['Month', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
-        # Create DataFrame
+    # Create DataFrame
     df = pd.DataFrame(params, columns=headers[1:], index=months)
     df.index.name='Month'
     df = df.round(3)
@@ -156,7 +156,7 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp
     return df
     
 def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
-    weibull_params, return_periods, sector_prob = directional_extremes_weibull(data=data, var=var1, var_dir=var_dir, periods=periods, adjustment=adjustment)
+    weibull_params, return_periods, sector_prob = directional_extremes(data=data, var=var1, var_dir=var_dir, periods=periods,distribution='Weibull', adjustment=adjustment)
 
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']    
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
