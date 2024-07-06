@@ -55,18 +55,17 @@ def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',va
 
     return df  
 
-
-def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',output_file='monthly_extremes_weibull.csv'):
+def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull',negative=False, units='m',output_file='monthly_extremes_weibull.csv'):
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
-    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution)    
+    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution, negative=negative)    
 
     # Initialize lists to store table data
     annual_prob = ['%'] + [np.round(100/12,2)] * 12 + [100.00]
     shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
     scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
     location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
-
-    # Create the table data dictionary
+    shape = ['-' if element == [] else element for element in shape]   
+    
     table_data = {
         'Month': months,
         'Annual prob.': annual_prob,
@@ -77,7 +76,7 @@ def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dis
     return_periods = return_periods.T.tolist()
     # Fill in return periods for each period
     for i, period in enumerate(periods):
-        table_data[f'Return period: {period} [years]'] = [units] + return_periods[i]
+        table_data[f'Return period: {period} [years]'] = [units] + [round(x, 2) for x in return_periods[i]]
     # Create DataFrame
     df = pd.DataFrame(table_data)
     if output_file:
@@ -94,6 +93,7 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
     shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
     scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
     location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
+    shape = ['-' if element == [] else element for element in shape]  
 
     # Create the table data dictionary
     table_data = {
@@ -113,8 +113,6 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
         df.to_csv(output_file)
 
     return df
-
-
 
 def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_reurn_values.csv'):
     # Calculate LoNoWe parameters for each month

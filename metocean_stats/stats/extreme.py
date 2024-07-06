@@ -206,59 +206,6 @@ def get_threshold_os(data, var):
     return min_ym
 
 
-def plot_return_levels(data, var, rl, output_file):
-    """
-    Plots data, extremes from these data and associated return levels.  
-    
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable 
-    rl (pandas DataFrame): Return level estimates, output of one of the
-                           return_levels function
-    output_file (str): Path to save the plot to.
-    
-    Function written by dung-manh-nguyen and KonstantinChri.
-    """
-    from pyextremes import get_extremes
-    
-    method = rl.attrs['method']
-
-    color = plt.cm.rainbow(np.linspace(0, 1, len(rl)))
-    fig, ax = plt.subplots(figsize=(12,6))
-    data[var].plot(color='lightgrey')
-    for i in range(len(rl.index)):
-        ax.hlines(y=rl.return_levels.iloc[i], 
-                  xmin=data[var].index[0], 
-                  xmax=data[var].index[-1],
-                  color=color[i], linestyle='dashed', linewidth=2,
-                  label=str(rl.return_levels.iloc[i].round(2))+\
-                            ' ('+str(int(rl.index[i]))+'y)')
-
-    if method == 'pot':
-        r = rl.attrs['r']
-        threshold = rl.attrs['threshold']
-        extremes = get_extremes(data[var], method="POT", 
-                                threshold=threshold, r=r)
-        it_selected_max = extremes.index.values
-
-    elif method == 'AM':
-        it_selected_max = data.groupby(data.index.year)[var].idxmax().values
-
-    elif method == 'idm':
-        it_selected_max = data[var].index.values
-
-    plt.scatter(data[var][it_selected_max].index, 
-                data[var].loc[it_selected_max], 
-                s=10, marker='o', color='black', zorder=2)
-
-    plt.grid(linestyle='dotted')
-    plt.ylabel(var, fontsize=18)
-    plt.xlabel('time', fontsize=18)
-    plt.legend(loc='center left')
-    plt.title(output_file.split('.')[0], fontsize=18)
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
 
 def probplot(data, sparams):    
     import scipy.stats as stats
@@ -641,6 +588,10 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
         loc, scale = stats.gumbel_r.fit(data) # fit data
         value = stats.gumbel_r.isf(1/period, loc, scale)
         #value = stats.gumbel_r.ppf(1 - 1 / period, loc, scale)
+    elif distribution == 'GUM_L' : # Gumbel Left-skewed (for minimum order statistic) Distribution
+        loc, scale = stats.gumbel_l.fit(data) # fit data
+        value = stats.gumbel_l.ppf(1/period, loc, scale)
+        #value = stats.gumbel_l.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'LoNo' :
         shape, loc, scale = stats.lognorm.fit(data)
         value = stats.lognorm.isf(1/period, shape, loc, scale)
@@ -828,38 +779,40 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], 
 
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
-def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull'):
-    from scipy.stats import weibull_min, gumbel_r
+def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull', negative=False):
+    from scipy.stats import weibull_min
     # Calculate parameters for each month based on different method
     params = []
+    return_values = [] #np.zeros((13, len(periods)))
+    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # years is converted to K-th
+    periods1 = np.array(periods)*24*365.2422/time_step
     for month in range(1, 13):
         month_data = data[data.index.month == month]
         if distribution == 'Weibull':
             shape, loc, scale = Weibull_method_of_moment(month_data[var])
-        elif distribution == 'GUM':
-            shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+            value = weibull_min.isf(1/periods1, shape, loc, scale)
+        else:
+            if negative == True:
+                shape, loc, scale, value = RVE_ALL(month_data.resample('M').min().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+            else:
+                shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
         params.append((shape, loc, scale))
+        return_values.append(value)
+
     # add annual
     if distribution == 'Weibull':
         shape, loc, scale = Weibull_method_of_moment(data[var])
-    elif distribution == 'GUM':
-        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+        value = weibull_min.isf(1/periods1, shape, loc, scale)
+    else:
+        if negative == True:
+            shape, loc, scale, value = RVE_ALL(data.resample('Y').min(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+        else:
+            shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
 
     params.append((shape, loc, scale))       
-    # time step between each data, in hours
-    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
-    # years is converted to K-th
-    periods1 = np.array(periods)*24*365.2422/time_step
-    #breakpoint()
-    # Calculate return periods for each month and period
-    return_values = np.zeros((13, len(periods)))
-    for i, (shape, loc, scale) in enumerate(params):
-        for j, period in enumerate(periods1):
-            if distribution == 'Weibull':  
-                return_value = weibull_min.isf(1/period, shape, loc, scale)
-            elif distribution == 'GUM':     
-                return_value = gumbel_r.isf(1/period, loc, scale)            
-            return_values[i, j] = round(return_value, 1)
+    return_values.append(value)
+    return_values = np.array(return_values)
 
     return params, return_values
 
@@ -876,15 +829,15 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
         sector_data = data[data['direction_sector']==dir]
         if distribution == 'Weibull':
             shape, loc, scale = Weibull_method_of_moment(sector_data[var])
-        elif distribution == 'GUM':
+        else:
             shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
         params.append((shape, loc, scale))            
         sp = 100*len(sector_data)/len(data[var])
         sector_prob.append(sp)
     # add annual
-    if distribution == 'Weibul':
+    if distribution == 'Weibull':
         shape, loc, scale = Weibull_method_of_moment(data[var])
-    elif distribution == 'GUM':
+    else:
         shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
 
     params.append((shape, loc, scale))       
