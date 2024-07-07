@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
 from ..stats.general import *
+from ..tables.general import *
+
 
 def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
     """
@@ -150,7 +152,7 @@ def plot_scatter(df,var1,var2,location,regression_line,qqplot=True):
     return fig
 
 
-def plot_monthly_stats(data: pd.DataFrame, var1: str, step_var1: float, title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+def plot_monthly_stats(data: pd.DataFrame, var1: str, show: str, title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
@@ -172,11 +174,9 @@ def plot_monthly_stats(data: pd.DataFrame, var1: str, step_var1: float, title: s
         plot_monthly_stats(data, 'temperature', 0.1, title='Monthly Temperature Statistics', output_file='temp_stats.png')
     """
     fig, ax = plt.subplots()
-    cumulative_percentage = table_monthly_non_exceedance(data,var1,step_var1)
-    cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
-    cumulative_percentage.loc['P99'][:-1].plot(marker = 'o')    
-    cumulative_percentage.loc['Mean'][:-1].plot(marker = 'o')
-
+    cumulative_percentage = table_monthly_non_exceedance(data,var1,step_var1=0.5)
+    for i in show:
+        cumulative_percentage.loc[i][:-1].plot(marker = 'o')
     plt.title(title,fontsize=16)
     plt.xlabel('Month',fontsize=15)
     plt.legend()

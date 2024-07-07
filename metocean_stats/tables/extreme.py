@@ -55,9 +55,9 @@ def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',va
 
     return df  
 
-def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull',negative=False, units='m',output_file='monthly_extremes_weibull.csv'):
+def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull',method='default', units='m',output_file='monthly_extremes_weibull.csv'):
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
-    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution, negative=negative)    
+    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution, method=method)    
 
     # Initialize lists to store table data
     annual_prob = ['%'] + [np.round(100/12,2)] * 12 + [100.00]

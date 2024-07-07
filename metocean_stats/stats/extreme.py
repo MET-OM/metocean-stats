@@ -779,7 +779,7 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], 
 
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
-def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull', negative=False):
+def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull', method='default'):
     from scipy.stats import weibull_min
     # Calculate parameters for each month based on different method
     params = []
@@ -793,9 +793,11 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
             shape, loc, scale = Weibull_method_of_moment(month_data[var])
             value = weibull_min.isf(1/periods1, shape, loc, scale)
         else:
-            if negative == True:
-                shape, loc, scale, value = RVE_ALL(month_data.resample('M').min().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-            else:
+            if method == 'minimum': # used for negative temperature
+                shape, loc, scale, value = RVE_ALL(month_data.resample('ME').min().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+            elif method == 'maximum':
+                shape, loc, scale, value = RVE_ALL(month_data.resample('ME').max().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+            elif method == 'default':
                 shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
         params.append((shape, loc, scale))
         return_values.append(value)
@@ -805,10 +807,13 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
         shape, loc, scale = Weibull_method_of_moment(data[var])
         value = weibull_min.isf(1/periods1, shape, loc, scale)
     else:
-        if negative == True:
-            shape, loc, scale, value = RVE_ALL(data.resample('Y').min(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-        else:
+        if method == 'minimum':
+            shape, loc, scale, value = RVE_ALL(data.resample('YE').min(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+        elif method == 'maximum':
+            shape, loc, scale, value = RVE_ALL(data.resample('YE').max(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+        elif method == 'default':
             shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+                 
 
     params.append((shape, loc, scale))       
     return_values.append(value)
