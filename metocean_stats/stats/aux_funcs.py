@@ -388,7 +388,7 @@ def Cmax(Hs,Tm,depth):
     
     Tm02 = Tm
     #t=5
-    #C_MPmax = AlphaC*Hs*(np.log(Tm02/t))**(1/BetaC) # This is wrong, anyway it is not important 
+    #C_MPmax = AlphaC*Hs*(np.log(Tm02/t))**(1/BetaC) # Need to be checked 
     
     factor = 1.135 # this is between 1.13 and 1.14 
     t=10800 # 3 hours 

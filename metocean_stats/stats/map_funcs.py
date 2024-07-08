@@ -48,6 +48,7 @@ def plot_point_on_map(lon, lat, label):
 
     plt.tight_layout()
     plt.savefig('map_'+str(lon)+'_'+str(lat)+'.png')
+    plt.close()
 
     return fig
 
