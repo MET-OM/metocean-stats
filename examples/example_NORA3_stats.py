@@ -16,7 +16,7 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 ds = air_temperature_correction_nora10(ds,var='T2m')
 
 # Map:
-plot_point_on_map( [3.36,3.5], [60.36,62.50])
+plot_point_on_map( lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA10','NORKYST800'])
 # Waves:
 #plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
 #tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
