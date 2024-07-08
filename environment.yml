@@ -18,4 +18,5 @@ dependencies:
   - scikit-learn
   - keras
   - tensorflow
+  - cartopy
 
