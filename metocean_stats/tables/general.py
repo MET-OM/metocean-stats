@@ -268,20 +268,29 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
     cumulative_percentage = percentage_by_month.T.cumsum()
 
     # Insert 'Annual', 'Mean', 'P99', 'Maximum' rows
+    cumulative_percentage.loc['Minimum'] = data.groupby(data.index.month, observed=True)[var1].min()
     cumulative_percentage.loc['Mean'] = data.groupby(data.index.month, observed=True)[var1].mean()
     cumulative_percentage.loc['P50'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.50)
     cumulative_percentage.loc['P75'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.75)
     cumulative_percentage.loc['P95'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.95)
     cumulative_percentage.loc['P99'] = data.groupby(data.index.month, observed=True)[var1].quantile(0.99)
-    cumulative_percentage.loc['Minimum'] = data.groupby(data.index.month, observed=True)[var1].min()
     cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month, observed=True)[var1].max()
     cumulative_percentage['Year'] = cumulative_percentage.mean(axis=1)[:-6]
-    cumulative_percentage['Year'].iloc[-6] = data[var1].mean()    
-    cumulative_percentage['Year'].iloc[-5] = data[var1].quantile(0.50)
-    cumulative_percentage['Year'].iloc[-4] = data[var1].quantile(0.75)
-    cumulative_percentage['Year'].iloc[-3] = data[var1].quantile(0.95)
-    cumulative_percentage['Year'].iloc[-2] = data[var1].quantile(0.99)
-    cumulative_percentage['Year'].iloc[-1] = data[var1].max()
+    #cumulative_percentage['Year'].iloc[-7] = data[var1].min()    
+    #cumulative_percentage['Year'].iloc[-6] = data[var1].mean()    
+    #cumulative_percentage['Year'].iloc[-5] = data[var1].quantile(0.50)
+    #cumulative_percentage['Year'].iloc[-4] = data[var1].quantile(0.75)
+    #cumulative_percentage['Year'].iloc[-3] = data[var1].quantile(0.95)
+    #cumulative_percentage['Year'].iloc[-2] = data[var1].quantile(0.99)
+    #cumulative_percentage['Year'].iloc[-1] = data[var1].max()
+
+    cumulative_percentage.loc[cumulative_percentage.index[-7], 'Year'] = data[var1].min()
+    cumulative_percentage.loc[cumulative_percentage.index[-6], 'Year'] = data[var1].mean()
+    cumulative_percentage.loc[cumulative_percentage.index[-5], 'Year'] = data[var1].quantile(0.50)
+    cumulative_percentage.loc[cumulative_percentage.index[-4], 'Year'] = data[var1].quantile(0.75)
+    cumulative_percentage.loc[cumulative_percentage.index[-3], 'Year'] = data[var1].quantile(0.95)
+    cumulative_percentage.loc[cumulative_percentage.index[-2], 'Year'] = data[var1].quantile(0.99)
+    cumulative_percentage.loc[cumulative_percentage.index[-1], 'Year'] = data[var1].max()
 
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)

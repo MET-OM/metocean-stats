@@ -1,6 +1,8 @@
 #from metocean_api import ts
 from metocean_stats import plots, tables
 from metocean_stats.stats.aux_funcs import *
+from metocean_stats.stats.map_funcs import *
+
 
 # Define TimeSeries-object
 #ds = ts.TimeSeries(lon=3.73, lat=64.6,start_time='1990-01-01', end_time='1990-01-31' , product='NORA3_wave_sub')
@@ -13,12 +15,17 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 ds = air_temperature_correction_nora10(ds,var='T2m')
 
+# Map:
+plot_point_on_map( [3.36,3.5], [60.36,62.50])
 # Waves:
 #plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
 #tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
-#tables.table_var_sorted_by_hs(ds, var='TP', var_hs='HS', output_file='var_sorted_by_Hs.csv')
-#tables.table_monthly_non_exceedance(ds,var1='T2m',step_var1=0.5,output_file='table_monthly_non_exceedance.csv')
-#plots.plot_monthly_stats(ds,var1='T2m',show=['Maximum','P99','Mean'], title = 'Temp.', output_file='T2m_monthly_stats.png')
+#tables.table_var_sorted_by_hs(ds, var='TP', var_hs='HS', output_file='Tp_sorted_by_Hs.csv')
+#tables.table_monthly_non_exceedance(ds,var1='HS',step_var1=0.5,output_file='Hs_table_monthly_non_exceedance.csv')
+#tables.table_monthly_non_exceedance(ds,var1='T2m',step_var1=0.5,output_file='T2m_table_monthly_non_exceedance.csv')
+#plots.plot_monthly_stats(ds,var1='HS',show=['Maximum','P99','Mean'], title = 'Hs[m]', output_file='Hs_monthly_stats.png')
+#plots.plot_monthly_stats(ds,var1='T2m',show=['Minimum','Mean','Maximum'], title = 'T2m', output_file='T2m_monthly_stats.png')
+
 #tables.table_directional_non_exceedance(ds,var1='HS',step_var1=0.5,var_dir='DIRM',output_file='table_directional_non_exceedance.csv')
 #plots.plot_directional_stats(ds,var1='HS',step_var1=0.5, var_dir='DIRM', title = '$H_s$[m]', output_file='directional_stats.png')
 #plots.plot_joint_distribution_Hs_Tp(ds,var1='HS',var2='TP',periods=[1,10,100,1000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=True)
@@ -44,8 +51,14 @@ ds = air_temperature_correction_nora10(ds,var='T2m')
 
 
 # Air Temperature:
-plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L',method='minimum', units='°C',output_file='T2m_monthly_extremes_neg.png')
-tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L', method='minimum' ,units='°C',output_file='T2m_monthly_extremes_neg.csv')
-plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum', units='°C',output_file='T2m_monthly_extremes_pos.png')
-tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum' ,units='°C',output_file='T2m_monthly_extremes_pos.csv')
+#plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L',method='minimum', units='°C',output_file='T2m_monthly_extremes_neg.png')
+#tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L', method='minimum' ,units='°C',output_file='T2m_monthly_extremes_neg.csv')
+#plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum', units='°C',output_file='T2m_monthly_extremes_pos.png')
+#tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum' ,units='°C',output_file='T2m_monthly_extremes_pos.csv')
 
+
+# Currents
+
+
+
+# Watet levels
