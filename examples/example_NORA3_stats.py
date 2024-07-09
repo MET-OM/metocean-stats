@@ -17,6 +17,8 @@ ds = air_temperature_correction_nora10(ds,var='T2m')
 
 # Map:
 plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA10','NORKYST800'],bathymetry='NORA3')
+plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', num_colors= 21)
+#plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc',lon='x', lat='y', var='wind_speed', title='50-yr return values Hs (NORA3)', num_colors= 21)
 
 # Waves:
 #plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')

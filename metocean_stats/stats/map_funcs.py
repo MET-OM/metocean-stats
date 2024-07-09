@@ -97,7 +97,7 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
     plt.close()
     return fig
 
-def plot_hexbin_map(file,lon, lat, var, title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73], num_colors= 21):
+def plot_extreme_map(file,lon, lat, var, title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73], num_colors= 21):
 	ds = xr.open_dataset(file)
     # Extract the data variables
 	hs = ds[var].values
@@ -145,11 +145,11 @@ def plot_hexbin_map(file,lon, lat, var, title='50-yr return values Hs (NORA3)', 
 	hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=150, cmap=cmap, vmin=0, vmax=21, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
 
 	# Add the land feature on top of the hexbin plot
-	ax.add_feature(cfeature.LAND, color='lightgrey', zorder=2)
+	ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
 
 	# Add gridlines for latitude and longitude
-	country=cfeature.NaturalEarthFeature(category='cultural',name='admin_0_countries', scale='10m', facecolor='none')
-	ax.add_feature(country, edgecolor='k', alpha=1)
+	coast=cfeature.NaturalEarthFeature(category='physical', name='coastline', scale='10m', edgecolor='lightgrey', facecolor='darkkhaki')
+	ax.add_feature(coast)
 
 	ax.set_extent(set_extent, crs=ccrs.PlateCarree())
 	gl=ax.gridlines(crs=ccrs.PlateCarree(),draw_labels=True,x_inline=False,y_inline=False,linewidth=0.5,color='black',alpha=1,linestyle='--')
@@ -169,7 +169,5 @@ def plot_hexbin_map(file,lon, lat, var, title='50-yr return values Hs (NORA3)', 
 		pass
 	else:
 		plt.title(title, fontsize=16)
-	plt.savefig('test.png',dpi=300)
-
-
-plot_hexbin_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', num_colors= 21)
+	plt.savefig(title+'.png',dpi=300)
+     
