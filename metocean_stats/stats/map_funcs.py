@@ -4,7 +4,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 
-def plot_points_on_map(lon, lat, label, source_for_depth='NORA3'):
+def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
     lon_list = lon
     lat_list = lat
     label_list = label
@@ -18,7 +18,7 @@ def plot_points_on_map(lon, lat, label, source_for_depth='NORA3'):
         label_list = [label_list]
 
     # Extract the data variables
-    if source_for_depth == 'NORA3':
+    if bathymetry == 'NORA3':
         var = 'model_depth'
         file = 'https://thredds.met.no/thredds/dodsC/windsurfer/mywavewam3km_files/2022/12/20221231_MyWam3km_hindcast.nc'
         ds = xr.open_dataset(file)
@@ -65,7 +65,7 @@ def plot_points_on_map(lon, lat, label, source_for_depth='NORA3'):
     ax.add_feature(coast)
 
     # Plot depth
-    if source_for_depth == 'NORA3':
+    if bathymetry == 'NORA3':
         # Mask depth data to the zoomed extent
         mask_extent = (
             (standard_lon >= lon_min) & (standard_lon <= lon_max) &
