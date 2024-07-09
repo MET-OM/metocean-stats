@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 
 def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
@@ -95,3 +96,80 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
     plt.savefig('map_'+str(lon)+'_'+str(lat)+'.png')
     plt.close()
     return fig
+
+def plot_hexbin_map(file,lon, lat, var, title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73], num_colors= 21):
+	ds = xr.open_dataset(file)
+    # Extract the data variables
+	hs = ds[var].values
+	rlat = ds[lat].values
+	rlon = ds[lon].values
+
+	# Get the rotated pole parameters from the dataset attributes
+	rotated_pole = ccrs.RotatedPole(
+	    pole_latitude=ds.projection_ob_tran.grid_north_pole_latitude,
+	    pole_longitude=ds.projection_ob_tran.grid_north_pole_longitude
+	)
+
+	# Create meshgrid for lat/lon
+	lon, lat = np.meshgrid(rlon, rlat)
+
+	# Transform rotated coordinates to standard lat/lon coordinates
+	proj = ccrs.PlateCarree()
+	transformed_coords = proj.transform_points(rotated_pole, lon, lat)
+	standard_lon = transformed_coords[..., 0]
+	standard_lat = transformed_coords[..., 1]
+
+	# Flatten the arrays
+	hs_flat = hs.flatten()
+	lat_flat = standard_lat.flatten()
+	lon_flat = standard_lon.flatten()
+
+	# Create a mask for NaN values
+	mask = ~np.isnan(hs_flat)
+	hs_flat = hs_flat[mask]
+	lat_flat = lat_flat[mask]
+	lon_flat = lon_flat[mask]
+
+	# Create a colormap with discrete colors
+	num_colors = num_colors   # Number of discrete colors
+	cmap = plt.cm.get_cmap('coolwarm', num_colors)
+	cmap = ListedColormap(cmap(np.linspace(0, 1, num_colors)))
+
+	# Create the plot
+	fig = plt.figure(figsize=(9, 10))
+	ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=15))
+	ax.coastlines(resolution='10m', zorder=3)
+	ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
+
+	# Plot the significant wave height using hexbin with a higher gridsize and discrete colors
+	hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=150, cmap=cmap, vmin=0, vmax=21, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+
+	# Add the land feature on top of the hexbin plot
+	ax.add_feature(cfeature.LAND, color='lightgrey', zorder=2)
+
+	# Add gridlines for latitude and longitude
+	country=cfeature.NaturalEarthFeature(category='cultural',name='admin_0_countries', scale='10m', facecolor='none')
+	ax.add_feature(country, edgecolor='k', alpha=1)
+
+	ax.set_extent(set_extent, crs=ccrs.PlateCarree())
+	gl=ax.gridlines(crs=ccrs.PlateCarree(),draw_labels=True,x_inline=False,y_inline=False,linewidth=0.5,color='black',alpha=1,linestyle='--')
+	gl.xlabel_style = {'size': 12}
+	gl.ylabel_style = {'size': 12}
+	gl.right_labels=False
+	gl.left_labels=True
+	gl.top_labels=False
+	gl.bottom_labels=True
+	gl.rotate_labels=False
+
+	# Add colorbar with discrete colors
+	cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05, ticks=np.arange(0, 21, 2))
+	cb.set_label(ds[var].standard_name, fontsize=14)
+	plt.tight_layout()
+	if title is None:
+		pass
+	else:
+		plt.title(title, fontsize=16)
+	plt.savefig('test.png',dpi=300)
+
+
+plot_hexbin_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', num_colors= 21)
