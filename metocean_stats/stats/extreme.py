@@ -950,3 +950,59 @@ def model_tp_given_hs(hs: float, a1, a2, a3, b1, b2, b3):
 
     return P5_model,Mean_model,P95_model
 
+def estimate_crest_height(Hs,Tm,depth=1000, sea_state='long-crested'):
+    
+    # this function to estimate wave crest height
+    # Hs : wave height 
+    # Tm01 : mean wave period
+    # depth : depth 
+    #  sea_state='long-crested' or 'short-crested'
+    
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from scipy.signal import find_peaks
+    
+    # calculate k1
+    g = 9.80665 # m/s2, gravity 
+    Tm01 = Tm # second, period 
+    d = depth # m, depth
+    lamda1 = 1 # wave length from 8.5 to 212 
+    lamda2 = 500 # wave length from 8.5 to 212 
+    k1_temp=np.linspace(2*np.pi/lamda2,2*np.pi/lamda1,10000)
+    F = (2*np.pi)**2/(g*Tm01**2*np.tanh(k1_temp*d)) - k1_temp
+    
+    epsilon = abs(F)
+    try:
+        param = find_peaks(1/epsilon)
+        index = param[0][0]
+    except:
+        param = np.where(epsilon == epsilon.min())
+        index = param[0][0]
+        
+    k1 = k1_temp[index]
+    #lamda = 2*np.pi/k1
+
+    Urs = Hs/(k1**2*d**3)
+    S1 = 2*np.pi/g*Hs/Tm01**2
+    
+    if sea_state == 'long-crested' :
+        AlphaC = 0.3536 + 0.2892*S1 + 0.1060*Urs
+        BetaC = 2 - 2.1597*S1 + 0.0968*Urs
+    elif sea_state == 'short-crested' :
+        AlphaC = 0.3536 + 0.2568*S1 + 0.08*Urs
+        AlphaC = 2 - 1.7912*S1 - 0.5302*Urs + 0.2824*Urs
+    else:
+        print ('please check sea state')
+        
+    
+    Tm02 = Tm
+    #t=5
+    #C_MPmax = AlphaC*Hs*(np.log(Tm02/t))**(1/BetaC) # Need to be checked 
+    
+    factor = 1.135 # this is between 1.13 and 1.14 
+    t=10800 # 3 hours 
+    p = 0.85
+    C_Pmax = AlphaC*Hs*(-np.log(1-p**(Tm02/t)))**(1/BetaC)
+    Cmax = C_Pmax*factor 
+    
+    return Cmax

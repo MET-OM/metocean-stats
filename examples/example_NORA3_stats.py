@@ -1,5 +1,5 @@
 #from metocean_api import ts
-from metocean_stats import plots, tables
+from metocean_stats import plots, tables, stats
 from metocean_stats.stats.aux_funcs import *
 from metocean_stats.stats.map_funcs import *
 
@@ -13,12 +13,15 @@ from metocean_stats.stats.map_funcs import *
 #ds.load_data('/home/konstantinosc/'+ds.datafile)
 ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
-ds = air_temperature_correction_nora10(ds,var='T2m')
 
 # Map:
-plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA10','NORKYST800'],bathymetry='NORA3')
-plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', num_colors= 21)
+#plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA10','NORKYST800'],bathymetry='NORA3')
+#plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73], num_colors= 21)
 #plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc',lon='x', lat='y', var='wind_speed', title='50-yr return values Hs (NORA3)', num_colors= 21)
+
+
+# Wind:
+
 
 # Waves:
 #plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
@@ -52,16 +55,19 @@ plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/w
 #tables.table_tp_for_given_wind(ds, 'HS','W10', bin_width=2, max_wind=42, output_file='table_perc_tp_for_wind.csv')
 #plots.plot_hs_for_given_wind(ds, 'HS', 'W10',output_file='hs_for_given_wind.png')
 
+tables.table_wave_crest_return_periods(ds,var_hs='HS', var_tp='TP', var_tm = 'TM', depth=200, periods=[1, 10, 100,10000])
+
 
 # Air Temperature:
+#ds = air_temperature_correction_nora10(ds,var='T2m') # Temperature correction
 #plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L',method='minimum', units='°C',output_file='T2m_monthly_extremes_neg.png')
 #tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L', method='minimum' ,units='°C',output_file='T2m_monthly_extremes_neg.csv')
 #plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum', units='°C',output_file='T2m_monthly_extremes_pos.png')
 #tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum' ,units='°C',output_file='T2m_monthly_extremes_pos.csv')
 
 
-# Currents
+# Currents:
 
 
 
-# Watet levels
+# Water levels:

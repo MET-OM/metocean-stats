@@ -350,3 +350,16 @@ def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heig
     df_wind_profile.to_csv(file_out, index=False)  
     
     return df_wind_profile
+
+
+
+def table_wave_crest_return_periods(ds,var_hs='HS', var_tp = 'TP', var_tm = 'TM',depth=200, periods=[1, 10, 100,10000]):
+    df = table_tp_for_rv_hs(ds, var_hs, var_tp,periods=periods,output_file=None)
+
+    df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] 
+    df['T_Hmax(Mean-model) [s]'] =  0.9 * df['Tp(Mean-model) [s]'] 
+    df['T_Hmax(P95-model) [s]'] =  0.9 * df['Tp(P95-model) [s]'] 
+    df.drop(['Tp(P5-model) [s]','Tp(Mean-model) [s]', 'Tp(P95-model) [s]'],axis=1)
+    breakpoint()
+
+    return
