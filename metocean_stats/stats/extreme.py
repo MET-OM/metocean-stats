@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
-from .aux_funcs import Tp_correction, add_direction_sector, Hs_Tp_curve, Gauss3, Gauss4, Weibull_method_of_moment, DVN_steepness, find_percentile
+from .aux_funcs import *
 
 
 def return_levels_pot(data, var, dist='Weibull_2P', 
@@ -914,7 +914,7 @@ def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100
     
 def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     from scipy.stats import percentileofscore, weibull_min
-    step = 0.01
+    #step = 0.01
     #hs = np.arange(0.5,data[var].max()+step,step)
     y_obs = np.arange(1,int(data[var].max())+0.5,0.5)
     prob_non_exceedance_obs = percentileofscore(data[var], y_obs)
@@ -926,8 +926,6 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     y_fitted = weibull_dist.rvs(size=num_samples)
     cdf = weibull_dist.cdf(y_fitted)
     #pdf=weib_3(np.arange(0.001,15.001,0.001),shape,location,scale)
-    
-    
     return y_obs, y_fitted, cdf, prob_non_exceedance_obs, shape, location, scale
     
 
@@ -950,59 +948,55 @@ def model_tp_given_hs(hs: float, a1, a2, a3, b1, b2, b3):
 
     return P5_model,Mean_model,P95_model
 
-def estimate_crest_height(Hs,Tm,depth=1000, sea_state='long-crested'):
+def estimate_forristal_maxCrest(Hs, Tp, depth=50, twindow=3, sea_state = 'short-crested'):
+    from scipy.optimize import minimize
+    # Example usage
+    #Hs = 3.0  # Significant wave height
+    #Tp = 10.0  # Peak period
+    #depth = 50.0  # Depth
+    #twindow = 3.0  # Duration in hours
     
-    # this function to estimate wave crest height
-    # Hs : wave height 
-    # Tm01 : mean wave period
-    # depth : depth 
-    #  sea_state='long-crested' or 'short-crested'
-    
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from scipy.signal import find_peaks
-    
-    # calculate k1
-    g = 9.80665 # m/s2, gravity 
-    Tm01 = Tm # second, period 
-    d = depth # m, depth
-    lamda1 = 1 # wave length from 8.5 to 212 
-    lamda2 = 500 # wave length from 8.5 to 212 
-    k1_temp=np.linspace(2*np.pi/lamda2,2*np.pi/lamda1,10000)
-    F = (2*np.pi)**2/(g*Tm01**2*np.tanh(k1_temp*d)) - k1_temp
-    
-    epsilon = abs(F)
-    try:
-        param = find_peaks(1/epsilon)
-        index = param[0][0]
-    except:
-        param = np.where(epsilon == epsilon.min())
-        index = param[0][0]
-        
-    k1 = k1_temp[index]
-    #lamda = 2*np.pi/k1
+    # Constants
+    LAT = 0  # Lowest astronomical Tide
+    SWL = 0  # Still Water Level
+    g = 9.81  # Gravity
 
-    Urs = Hs/(k1**2*d**3)
-    S1 = 2*np.pi/g*Hs/Tm01**2
-    
+    Tz = estimate_Tz(Tp,gamma = 2.5)
+    Tm01 = estimate_Tm01(Tp,gamma = 2.5)
+    S1 = (2 * np.pi) / g * (Hs / Tm01 ** 2)
+    k1 = (2 * np.pi) ** 2 / (g * Tm01 ** 2)  # Deep water
+
+    # Function to find k for finite depth
+    def delta(delta):
+        return abs((g / (2 * np.pi)) * Tm01 ** 2 * np.tanh(2 * np.pi * (depth / delta)) - delta)
+
+    res = minimize(delta, 100)
+    dlt = res.x[0]
+    k1 = (2 * np.pi) / dlt
+
+    Urs = Hs / (k1 ** 2 * depth ** 3)
+
     if sea_state == 'long-crested' :
-        AlphaC = 0.3536 + 0.2892*S1 + 0.1060*Urs
-        BetaC = 2 - 2.1597*S1 + 0.0968*Urs
+        alphaFC = 0.3536 + 0.2892 * S1 + 0.1060 * Urs 
+        betaFC = 2 - 2.1597 * S1 + 0.0969 * Urs ** 2
     elif sea_state == 'short-crested' :
-        AlphaC = 0.3536 + 0.2568*S1 + 0.08*Urs
-        AlphaC = 2 - 1.7912*S1 - 0.5302*Urs + 0.2824*Urs
+        alphaFC = 0.3536 + 0.2568 * S1 + 0.0800 * Urs 
+        betaFC = 2 - 1.7912 * S1 - 0.5302 * Urs + 0.284 * Urs ** 2 
     else:
         print ('please check sea state')
-        
-    
-    Tm02 = Tm
-    #t=5
-    #C_MPmax = AlphaC*Hs*(np.log(Tm02/t))**(1/BetaC) # Need to be checked 
-    
-    factor = 1.135 # this is between 1.13 and 1.14 
-    t=10800 # 3 hours 
+
+    # Number of waves
+    N = (twindow * 3600) / Tz
+
+    #Cmax = (SWL - LAT) + alphaFC * Hs * (np.log(N)) ** (1 / betaFC)
     p = 0.85
-    C_Pmax = AlphaC*Hs*(-np.log(1-p**(Tm02/t)))**(1/BetaC)
-    Cmax = C_Pmax*factor 
+    Cmax = (SWL - LAT) + alphaFC * Hs * (-np.log(1 - p ** (1 / N))) ** (1 / betaFC)
     
     return Cmax
+
+def estimate_Hmax(Hs, Tp, twindow=3, k=0.9):
+    Tz = estimate_Tz(Tp,gamma = 2.5)
+    N = (twindow*3600)/ Tz
+    Hmax =  Hs * ( np.sqrt(np.log(N)/2) + 0.2886/np.sqrt(2*np.log(N))  ) # Expected largest Hmax based on Max Wave Distribution
+    return Hmax
+

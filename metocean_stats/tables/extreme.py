@@ -353,13 +353,23 @@ def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heig
 
 
 
-def table_wave_crest_return_periods(ds,var_hs='HS', var_tp = 'TP', var_tm = 'TM',depth=200, periods=[1, 10, 100,10000]):
+def table_wave_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, periods=[1, 10, 100,10000], sea_state = 'short-crested', output_file='table_Hmax_crest_return_values.csv'):
     df = table_tp_for_rv_hs(ds, var_hs, var_tp,periods=periods,output_file=None)
+    time_step = ((ds.index[-1]-ds.index[0]).days + 1)*24/ds.shape[0]
+    df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] # according to Goda (1988)
+    df['T_Hmax(Mean-model) [s]'] =  0.9 * df['Tp(Mean-model) [s]'] # according to Goda (1988)
+    df['T_Hmax(P95-model) [s]'] =  0.9 * df['Tp(P95-model) [s]'] # according to Goda (1988)
+    df['Crest height[m]'] = np.nan
+    df['H_max[m]'] = np.nan
+    df['H_max/Hs'] = np.nan
+    for i in range(df.shape[0]):
+        df.loc[i,'Crest heigh[m]'] = estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'T_Hmax(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
+        #df.loc[i,'Crest heigh[m]'] = estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'Tp(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
+        df.loc[i,'H_max[m]'] = estimate_Hmax(df.loc[i,'Hs[m]'], df.loc[i,'T_Hmax(Mean-model) [s]'], twindow=3, k=1.0)
+        #df.loc[i,'H_max[m]'] = estimate_Hmax(df.loc[i,'Hs[m]'], df.loc[i,'Tp(Mean-model) [s]'], twindow=3, k=1.0)
+        df.loc[i,'H_max/Hs'] = df.loc[i,'H_max[m]']/ df.loc[i,'Hs[m]']
 
-    df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] 
-    df['T_Hmax(Mean-model) [s]'] =  0.9 * df['Tp(Mean-model) [s]'] 
-    df['T_Hmax(P95-model) [s]'] =  0.9 * df['Tp(P95-model) [s]'] 
-    df.drop(['Tp(P5-model) [s]','Tp(Mean-model) [s]', 'Tp(P95-model) [s]'],axis=1)
-    breakpoint()
-
-    return
+    if output_file:
+        df[['Return period [years]','Hs[m]', 'H_max/Hs','H_max[m]','Crest heigh[m]','T_Hmax(P5-model) [s]','T_Hmax(Mean-model) [s]','T_Hmax(P95-model) [s]']].round(2).to_csv(output_file,index=False)
+    
+    return df

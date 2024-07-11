@@ -327,3 +327,11 @@ def wind_gust(df,var='W10',var0='W10',z=10):
     return df 
 
 
+def estimate_Tz(Tp,gamma = 2.5):
+    Tz = (0.6673 + 0.05037 * gamma - 0.006230 * gamma ** 2 + 0.0003341 * gamma ** 3) * Tp
+    return Tz
+
+def estimate_Tm01(Tp,gamma = 2.5):
+    Tm01 = (0.7303 + 0.04936 * gamma - 0.006556 * gamma ** 2 + 0.0003610 * gamma ** 3) * Tp
+    return Tm01
+

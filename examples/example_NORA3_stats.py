@@ -54,8 +54,7 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #tables.table_wave_induced_current(ds, 'HS','TP',depth=200,ref_depth=200, spectrum = 'TORSEHAUGEN',output_file='TORSEHAUGEN_wave_induced_current_depth200.csv')
 #tables.table_tp_for_given_wind(ds, 'HS','W10', bin_width=2, max_wind=42, output_file='table_perc_tp_for_wind.csv')
 #plots.plot_hs_for_given_wind(ds, 'HS', 'W10',output_file='hs_for_given_wind.png')
-
-tables.table_wave_crest_return_periods(ds,var_hs='HS', var_tp='TP', var_tm = 'TM', depth=200, periods=[1, 10, 100,10000])
+tables.table_wave_crest_return_periods(ds,var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100,10000],sea_state='long-crested')
 
 
 # Air Temperature:
