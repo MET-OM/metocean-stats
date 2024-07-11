@@ -153,8 +153,8 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp
 
     return df
     
-def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
-    weibull_params, return_periods, sector_prob = directional_extremes(data=data, var=var1, var_dir=var_dir, periods=periods,distribution='Weibull', adjustment=adjustment)
+def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
+    weibull_params, return_periods, sector_prob = directional_extremes(data=data, var=var_hs, var_dir=var_dir, periods=periods,distribution='Weibull', adjustment=adjustment)
 
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']    
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
@@ -169,13 +169,13 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2
     for dir in range(0,360,30):
         k=k+1
         sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods,adjustment=adjustment)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var_hs,var2=var_tp,periods=periods,adjustment=adjustment)
         for i in range(len(periods)):
             rv_hs[k-1,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
             rv_tp[k-1,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     #append annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods,adjustment=None)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=periods,adjustment=None)
     for i in range(len(periods)):
         rv_hs[12,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
         rv_tp[12,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
@@ -196,8 +196,8 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2
     }
     # Fill in return values for each period
     for i, period in enumerate(periods):
-        table_data[f'H_s [{period} years]'] = rv_hs[:,i].tolist()
-        table_data[f'T_p [{period} years]'] = rv_tp[:,i].tolist()
+        table_data[f'Hs[m] [{period} years]'] = rv_hs[:,i].tolist()
+        table_data[f'Tp[s] [{period} years]'] = rv_tp[:,i].tolist()
     # Create DataFrame
     df = pd.DataFrame(table_data)
     if output_file:
@@ -353,7 +353,7 @@ def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heig
 
 
 
-def table_wave_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, periods=[1, 10, 100,10000], sea_state = 'short-crested', output_file='table_Hmax_crest_return_values.csv'):
+def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, periods=[1, 10, 100,10000], sea_state = 'short-crested', output_file='table_Hmax_crest_return_values.csv'):
     df = table_tp_for_rv_hs(ds, var_hs, var_tp,periods=periods,output_file=None)
     time_step = ((ds.index[-1]-ds.index[0]).days + 1)*24/ds.shape[0]
     df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] # according to Goda (1988)
@@ -372,4 +372,23 @@ def table_wave_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, per
     if output_file:
         df[['Return period [years]','Hs[m]', 'H_max/Hs','H_max[m]','Crest heigh[m]','T_Hmax(P5-model) [s]','T_Hmax(Mean-model) [s]','T_Hmax(P95-model) [s]']].round(2).to_csv(output_file,index=False)
     
+    return df
+
+def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[1, 10, 100,10000],adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv'):
+    df  = table_directional_joint_distribution_Hs_Tp_return_values(ds,var_hs=var_hs,var_tp=var_tp,var_dir=var_dir,periods=periods,adjustment=adjustment,output_file=None)
+    hs_columns = [col for col in df.columns if col.startswith('Hs')]
+    tp_columns = [col for col in df.columns if col.startswith('Tp')]
+    hmax_columns = [col.replace('Hs[m]', 'Hmax[m]') for col in df.columns if col.startswith('Hs[m]')]
+    df[hmax_columns] = np.nan
+
+
+    for i in range(len(hs_columns)):
+        for j in range(df.shape[0]):
+            df.loc[j,hmax_columns[i]] = estimate_Hmax(df.loc[j,hs_columns[i]], df.loc[j,tp_columns[i]], twindow=3, k=1.0)
+
+    if output_file:
+        selected_columns = ['Direction'] + hmax_columns
+        df[selected_columns].round(2).to_csv(output_file,index=False)
+    
+
     return df
