@@ -616,7 +616,7 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
     return shape, loc, scale, value
 
 
-def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], adjustment=None):  
+def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], adjustment=None):  
     
     """
     This fuction will plot Hs-Tp joint distribution using LogNoWe model (the Lognormal + Weibull distribution) 
@@ -633,8 +633,8 @@ def joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], 
     max_y = max(periods)
     period = np.array(periods)
     pd.options.mode.chained_assignment = None  # default='warn'
-    df.loc[:,'hs'] = df[var1].values
-    df.loc[:,'tp'] = Tp_correction(df[var2].values)
+    df.loc[:,'hs'] = df[var_hs].values
+    df.loc[:,'tp'] = Tp_correction(df[var_tp].values)
     
     import scipy.stats as stats
     from matplotlib import pyplot as plt

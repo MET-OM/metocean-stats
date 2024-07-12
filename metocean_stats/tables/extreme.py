@@ -169,13 +169,13 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',va
     for dir in range(0,360,30):
         k=k+1
         sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var_hs,var2=var_tp,periods=periods,adjustment=adjustment)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods,adjustment=adjustment)
         for i in range(len(periods)):
             rv_hs[k-1,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
             rv_tp[k-1,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     #append annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=periods,adjustment=None)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods,adjustment=None)
     for i in range(len(periods)):
         rv_hs[12,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
         rv_tp[12,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
@@ -233,7 +233,7 @@ def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10
 
 def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, max_hs=20, output_file='table_perc_tp_for_hs.csv'):
     df=data
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=[1000])
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=[1000])
     # Create bins
     min_hs = 0.5
     max_hs = max_hs
@@ -351,8 +351,6 @@ def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heig
     
     return df_wind_profile
 
-
-
 def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, periods=[1, 10, 100,10000], sea_state = 'short-crested', output_file='table_Hmax_crest_return_values.csv'):
     df = table_tp_for_rv_hs(ds, var_hs, var_tp,periods=periods,output_file=None)
     time_step = ((ds.index[-1]-ds.index[0]).days + 1)*24/ds.shape[0]
@@ -381,14 +379,22 @@ def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir=
     hmax_columns = [col.replace('Hs[m]', 'Hmax[m]') for col in df.columns if col.startswith('Hs[m]')]
     df[hmax_columns] = np.nan
 
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(ds,var_hs=var_hs,var_tp=var_tp,periods=[1000])
+    P5_model,Mean_model,P95_model = model_tp_given_hs(hs=df[hs_columns], a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
+
+    for i in range(len(hs_columns)):
+        df['T_Hmax(P5-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * P5_model[hs_columns[i]] # 0.9 according to Goda (1988)
+        df['T_Hmax(Mean-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * Mean_model[hs_columns[i]] # 0.9 according to Goda (1988)
+        df['T_Hmax(P95-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * P95_model[hs_columns[i]] # 0.9 according to Goda (1988)
+
+    tHmax_columns = [col for col in df.columns if col.startswith('T_Hmax')]
+
 
     for i in range(len(hs_columns)):
         for j in range(df.shape[0]):
             df.loc[j,hmax_columns[i]] = estimate_Hmax(df.loc[j,hs_columns[i]], df.loc[j,tp_columns[i]], twindow=3, k=1.0)
 
     if output_file:
-        selected_columns = ['Direction'] + hmax_columns
+        selected_columns = ['Direction'] + hmax_columns + tHmax_columns
         df[selected_columns].round(2).to_csv(output_file,index=False)
-    
-
     return df
