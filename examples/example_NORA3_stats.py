@@ -15,9 +15,9 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 
 # Map:
-#plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA10','NORKYST800'],bathymetry='NORA3')
-#plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_50y_extreme_gumbel_NORA3.nc',lon='rlon', lat='rlat', var='hs', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73], num_colors= 21)
-#plot_extreme_map(file='https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc',lon='x', lat='y', var='wind_speed', title='50-yr return values Hs (NORA3)', num_colors= 21)
+plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
+#plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
+#plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
 
 
 # Wind:
@@ -55,7 +55,7 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #tables.table_tp_for_given_wind(ds, 'HS','W10', bin_width=2, max_wind=42, output_file='table_perc_tp_for_wind.csv')
 #plots.plot_hs_for_given_wind(ds, 'HS', 'W10',output_file='hs_for_given_wind.png')
 #tables.table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100,10000],sea_state='long-crested')
-tables.table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[10, 100,10000],adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv')
+#tables.table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[10, 100,10000],adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv')
 
 
 # Air Temperature:
