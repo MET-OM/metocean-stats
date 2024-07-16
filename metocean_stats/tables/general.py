@@ -56,7 +56,7 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
     if output_file.split('.')[-1]=='csv':
         dfout.to_csv(output_file,index_label=var1+'/'+var2)
-    else:
+    elif output_file.split('.')[-1]=='png':
         hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
         plt.ylabel(var1)
         plt.xlabel(var2)
@@ -64,72 +64,92 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
         plt.savefig(output_file)
         plt.close()
 
-    return 
+    return dfout
 
-def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.txt'):
+def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs.csv'):
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
-    This will sort variable var e.g., 'tp' by 1 m interval og hs
+    This will sort variable var e.g., 'tp' by 1 m interval of hs
     then calculate min, percentile 5, mean, percentile 95 and max
-    data : panda series 
-    var  : variable 
-    output_file: extension .txt for latex table or .csv for csv table
+    data : pandas DataFrame
+    var  : variable to analyze
+    var_hs : variable for binning
+    output_file: CSV file to save the results
     """
     Hs = data[var_hs]
     Var = data[var]
-    binsHs = np.arange(0.,math.ceil(np.max(Hs))+0.1) # +0.1 to get the last one   
-    temp_file = output_file.split('.')[0]
+    binsHs = np.arange(0., math.ceil(np.max(Hs)) + 0.1)  # +0.1 to get the last one
 
     Var_binsHs = {}
-    for j in range(len(binsHs)-1) : 
-        Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))] = [] 
-    
+    for j in range(len(binsHs) - 1):
+        Var_binsHs[str(int(binsHs[j])) + '-' + str(int(binsHs[j + 1]))] = []
+
     N = len(Hs)
     for i in range(N):
-        for j in range(len(binsHs)-1) : 
-            if binsHs[j] <= Hs.iloc[i] < binsHs[j+1] : 
-                Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))].append(Var.iloc[i])
-    
-    with open(temp_file, 'w') as f:
-        f.write('\\begin{tabular}{l p{1.5cm}|p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
-        f.write('& & \multicolumn{5}{c}{'+var+'} \\\\' + '\n')
-        f.write('Hs & Entries & Min & 5\% & Mean & 95\% & Max \\\\' + '\n')
-        f.write('\hline' + '\n')
-    
-        for j in range(len(binsHs)-1) : 
-            Var_binsHs_temp = Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))]
-            
-            Var_min = round(np.min(Var_binsHs_temp), 1)
-            Var_P5 = round(np.percentile(Var_binsHs_temp , 5), 1)
-            Var_mean = round(np.mean(Var_binsHs_temp), 1)
-            Var_P95 = round(np.percentile(Var_binsHs_temp, 95), 1)
-            Var_max = round(np.max(Var_binsHs_temp), 1)
-            
-            hs_bin_temp = str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))
-            f.write(hs_bin_temp + ' & '+str(len(Var_binsHs_temp))+' & '+str(Var_min)+' & '+str(Var_P5)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_max)+' \\\\' + '\n')
-        hs_bin_temp = str(int(binsHs[-1]))+'-'+str(int(binsHs[-1]+1)) # +1 for one empty row 
-        f.write(hs_bin_temp + ' & 0 & - & - & - & - & - \\\\' + '\n')
-        
-        # annual row 
-        Var_min = round(np.min(Var), 1)
-        Var_P5 = round(np.percentile(Var , 5), 1)
-        Var_mean = round(np.mean(Var), 1)
-        Var_P95 = round(np.percentile(Var, 95), 1)
-        Var_max = round(np.max(Var), 1)
-        
-        hs_bin_temp = str(int(binsHs[0]))+'-'+str(int(binsHs[-1]+1)) # +1 for one empty row 
-        f.write(hs_bin_temp + ' & '+str(len(Var))+' & '+str(Var_min)+' & '+str(Var_P5)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_max)+' \\\\' + '\n')
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
-    
-    if output_file.split('.')[1] == 'csv':
-        convert_latexTab_to_csv(temp_file, output_file)
-        os.remove(temp_file)
-    else:
-        os.rename(temp_file, output_file)
-    
+        for j in range(len(binsHs) - 1):
+            if binsHs[j] <= Hs.iloc[i] < binsHs[j + 1]:
+                Var_binsHs[str(int(binsHs[j])) + '-' + str(int(binsHs[j + 1]))].append(Var.iloc[i])
 
-    return    
+    # Collecting data in a list of dictionaries
+    data_list = []
+
+    for j in range(len(binsHs) - 1):
+        Var_binsHs_temp = Var_binsHs[str(int(binsHs[j])) + '-' + str(int(binsHs[j + 1]))]
+
+        Var_min = round(np.min(Var_binsHs_temp), 1)
+        Var_P5 = round(np.percentile(Var_binsHs_temp, 5), 1)
+        Var_mean = round(np.mean(Var_binsHs_temp), 1)
+        Var_P95 = round(np.percentile(Var_binsHs_temp, 95), 1)
+        Var_max = round(np.max(Var_binsHs_temp), 1)
+
+        hs_bin_temp = str(int(binsHs[j])) + '-' + str(int(binsHs[j + 1]))
+        data_list.append({
+            'Hs': hs_bin_temp,
+            'Entries': len(Var_binsHs_temp),
+            'Min': Var_min,
+            '5%': Var_P5,
+            'Mean': Var_mean,
+            '95%': Var_P95,
+            'Max': Var_max
+        })
+
+    # Adding the last empty row
+    hs_bin_temp = str(int(binsHs[-1])) + '-' + str(int(binsHs[-1] + 1))
+    data_list.append({
+        'Hs': hs_bin_temp,
+        'Entries': 0,
+        'Min': '-',
+        '5%': '-',
+        'Mean': '-',
+        '95%': '-',
+        'Max': '-'
+    })
+
+    # Annual row
+    Var_min = round(np.min(Var), 1)
+    Var_P5 = round(np.percentile(Var, 5), 1)
+    Var_mean = round(np.mean(Var), 1)
+    Var_P95 = round(np.percentile(Var, 95), 1)
+    Var_max = round(np.max(Var), 1)
+
+    hs_bin_temp = str(int(binsHs[0])) + '-' + str(int(binsHs[-1] + 1))
+    data_list.append({
+        'Hs': hs_bin_temp,
+        'Entries': len(Var),
+        'Min': Var_min,
+        '5%': Var_P5,
+        'Mean': Var_mean,
+        '95%': Var_P95,
+        'Max': Var_max
+    })
+
+    # Creating DataFrame from the list of dictionaries
+    df = pd.DataFrame(data_list)
+
+    # Save DataFrame to CSV
+    df.to_csv(output_file, index=False)
+
+    return df
 
 def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):  
     """

@@ -1,70 +1,262 @@
 from metocean_api import ts
-from metocean_stats.stats import general_stats, dir_stats, extreme_stats, profile_stats, ml_stats
+from metocean_stats import plots, tables, stats
+from metocean_stats.stats.aux_funcs import *
+from metocean_stats.stats.map_funcs import *
 import os
 
 # Define TimeSeries-object for NORA3
-ds = ts.TimeSeries(lon=1.32, lat=53.324,start_time='2000-01-01', end_time='2010-12-31' , product='NORA3_wind_wave')
-# Import data from thredds.met.no and save it as csv
-#ds.load_data('tests/data/'+ds.datafile)
-ds.load_data('tests/data/'+ds.datafile)
+ds = readNora10File('tests/data/NORA_test.txt')
+
+def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
+    fig = plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0].round(2) == -0.71 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct")         
 
 def test_scatter_diagram(ds=ds):
-    general_stats.scatter_diagram(data=ds.data, var1='hs', step_var1=1, var2='tp', step_var2=1, output_file='test.png')
-    os.remove('test.png')
+    df = tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='test.csv')
+    if df.shape[0] == 14:
+        pass
+    else:
+        raise ValueError("Shape is not correct")  
 
 def test_table_var_sorted_by_hs(ds=ds):
-    general_stats.table_var_sorted_by_hs(data=ds.data, var='tp',var_hs='hs', output_file='test.csv')
-    os.remove('test.csv')
+    df = tables.table_var_sorted_by_hs(ds, var='TP', var_hs='HS', output_file='test.csv')
+    if df.shape == (16,7):
+        pass
+    else:
+        raise ValueError("Shape is not correct")  
 
-def test_table_monthly_percentile(ds=ds):
-    general_stats.table_monthly_percentile(data=ds.data, var='hs', output_file='test.csv')
-    os.remove('test.csv')
-
-def test_table_monthly_min_mean_max(ds=ds):
-    general_stats.table_monthly_min_mean_max(data=ds.data, var='hs', output_file='test.csv')
-    os.remove('test.csv')
-
-def test_rose(ds=ds):
-    dir_stats.var_rose(ds.data, 'thq','hs','test.png',method='overall')
-    os.remove('test.png')
-
-def test_directional_min_mean_max(ds=ds):
-    dir_stats.directional_min_mean_max(ds.data,'thq','hs','test.csv')
-    os.remove('test.csv')
-
-def test_return_levels_pot(ds=ds):
-    extreme_stats.return_levels_pot(data=ds.data, var='hs', periods=[20,100])
-
-def test_return_levels_annual_max(ds=ds):
-    extreme_stats.return_levels_annual_max(data=ds.data, var='hs', periods=[20,100]) 
-
-def test_return_levels_idm(ds=ds):
-    extreme_stats.return_levels_idm(data=ds.data, var='hs', periods=[20,100]) 
-
-def test_get_empirical_return_levels(ds=ds):
-    extreme_stats.get_empirical_return_levels(data=ds.data, var='hs')
-
-def test_threshold_sensitivity(ds=ds):
-    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
-                                        thresholds=[1,1.5])
-                                        
-def test_joint_distribution_Hs_Tp(ds=ds):
-    extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
-    os.remove('test.png')
-
-def test_mean_profile(ds=ds):
-    profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
+def test_table_monthly_non_exceedance(ds=ds):
+    df = tables.table_monthly_non_exceedance(ds,var1='HS',step_var1=0.5,output_file='test.csv')
+    if df.shape == (31,13):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
     
-def test_profile_shear(ds=ds):
-    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
+def test_plot_monthly_stats(ds=ds):
+    fig = plots.plot_monthly_stats(ds,var1='T2m',show=['Minimum','Mean','Maximum'], title = 'T2m', output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
 
-def test_predict_ts_GBR(ds=ds):
-    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
+def test_table_directional_non_exceedance(ds=ds):
+    df = tables.table_directional_non_exceedance(ds,var1='HS',step_var1=0.5,var_dir='DIRM',output_file='test.csv')
+    if df.shape == (30,13):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+    
+def test_plot_directional_stats(ds=ds):
+    fig = plots.plot_directional_stats(ds,var1='HS',step_var1=0.5, var_dir='DIRM', title = '$H_s$[m]', output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
 
-def test_predict_ts_SVR(ds=ds):
-    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
+def test_plot_joint_distribution_Hs_Tp(ds=ds):
+    fig = plots.plot_joint_distribution_Hs_Tp(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,1000], title='Hs-Tp joint distribution',output_file='test.png')
+    if int(fig.axes[0].lines[0].get_xdata()[0]) == 4 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
 
-def test_predict_ts_LSTM(ds=ds):
-    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
+def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
+    df = tables.table_monthly_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='test.png')
+    if df.shape == (13,6):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_directional_joint_distribution_Hs_Tp_param(ds=ds):
+    df = tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100,10000],output_file='test.png')
+    if df.shape == (13,6):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_plot_monthly_weather_window(ds=ds):
+    fig, table = plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=12,output_file='test.png')
+    if  table._loc == 17 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+
+def test_table_directional_return_periods(ds=ds):
+    df = tables.table_directional_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',var_dir = 'DIRM',distribution='Weibull', adjustment='NORSOK' ,output_file='test.png')
+    if df.shape == (14,9):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_plot_monthly_return_periods(ds=ds):
+    fig = plots.plot_monthly_return_periods(ds,var='HS',periods=[1, 10, 100],distribution='Weibull', units='m',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan' :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+
+def test_plot_directional_return_periods(ds=ds):
+    fig = plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000 ],distribution='GUM', units='m',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0] == '0°' :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+
+def test_plot_directional_return_periods(ds=ds):
+    fig = plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0] == '0°' :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+    
+def test_plot_polar_directional_return_periods(ds=ds):
+    fig = plots.plot_polar_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',output_file='test.png')
+    if fig.dpi == 100.0 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+    
+
+def test_table_monthly_joint_distribution_Hs_Tp_return_values(ds=ds):
+    df = tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='test.png')
+    if df.shape == (13,10):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_directional_joint_distribution_Hs_Tp_return_values(ds=ds):
+    df = tables.table_directional_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100],adjustment='NORSOK',output_file='test.png')
+    if df.shape == (13,8):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_table_Hs_Tpl_Tph_return_values(ds=ds):
+    df = tables.table_Hs_Tpl_Tph_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='test.png')
+    if df.shape == (10,12):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_plot_tp_for_given_hs(ds=ds):
+    fig = plots.plot_tp_for_given_hs(ds, 'HS', 'TP',output_file='test.png')
+    if fig.dpi == 100.0 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+    
+
+def test_table_tp_for_given_hs(ds=ds):
+    df = tables.table_tp_for_given_hs(ds, 'HS', 'TP',max_hs=20,output_file='test.png')
+    if df.shape == (20,8):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_tp_for_rv_hs(ds=ds):
+    df = tables.table_tp_for_rv_hs(ds, 'HS', 'TP',periods=[1,10,100,10000],output_file='test.png')
+    if df.shape == (4,5):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_wave_induced_current_JONSWAP(ds=ds):
+    df = tables.table_wave_induced_current(ds, 'HS','TP',depth=200,ref_depth=200, spectrum = 'JONSWAP',output_file='test.png')
+    if df.shape == (20,14):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_wave_induced_current_TORSEHAUGEN(ds=ds):
+    df = tables.table_wave_induced_current(ds, 'HS','TP',depth=200,ref_depth=200, spectrum = 'TORSEHAUGEN',output_file='test.png')
+    if df.shape == (20,14):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_table_tp_for_given_wind(ds=ds):
+    df = tables.table_tp_for_given_wind(ds, 'HS','W10', bin_width=2, max_wind=42, output_file='test.png')
+    if df.shape == (21,10):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_plot_hs_for_given_wind(ds=ds):
+    fig = plots.plot_hs_for_given_wind(ds, 'HS', 'W10',output_file='test.png')
+    if fig.dpi == 100.0 :
+         pass
+    else:
+        raise ValueError("FigValue is not correct")
+
+def test_table_Hmax_crest_return_periods(ds=ds):
+    df = tables.table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100,10000],sea_state='long-crested',output_file='test.png')
+    if df.shape == (4,12):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_directional_Hmax_return_periods(ds=ds):
+    df = tables.table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[10, 100],adjustment='NORSOK', output_file='test.png')
+    if df.shape == (13,14):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_monthly_return_periods_T2m_min(ds=ds):
+    df = tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L', method='minimum' ,units='°C',output_file='test.png')
+    if df.shape == (14,8):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_monthly_return_periods_T2m_max(ds=ds):
+    df = tables.table_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum' ,units='°C',output_file='test.png')
+    if df.shape == (14,8):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_plot_monthly_return_periods_T2m_min(ds=ds):
+    fig = plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM_L',method='minimum', units='°C',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan' :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+
+def test_plot_monthly_return_periods_T2m_max(ds=ds):
+    fig = plots.plot_monthly_return_periods(ds,var='T2m',periods=[1, 10, 100],distribution='GUM', method='maximum', units='°C',output_file='test.png')
+    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan' :
+         pass
+    else:
+        raise ValueError("FigValue is not correct") 
+    
+#def test_threshold_sensitivity(ds=ds):
+#    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
+#                                        thresholds=[1,1.5])
+                                        
+#def test_joint_distribution_Hs_Tp(ds=ds):
+#    extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
+#    os.remove('test.png')
+
+#def test_mean_profile(ds=ds):
+#    profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
+    
+#def test_profile_shear(ds=ds):
+#    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
+
+#def test_predict_ts_GBR(ds=ds):
+#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
+
+#def test_predict_ts_SVR(ds=ds):
+#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
+
+#def test_predict_ts_LSTM(ds=ds):
+#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
 
   

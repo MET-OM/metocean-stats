@@ -7,17 +7,17 @@ from ..stats.aux_funcs import *
 from ..stats.extreme import *
 
 
-def table_monthly_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
+def table_monthly_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
     # Calculate LoNoWe parameters for each month
     params = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
     for month in range(1,len(months)):
         month_data = data[data.index.month == month]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var1=var1,var2=var2,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
         params.append((a1, a2, a3, b1, b2, b3))
     # add annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     params.append((a1, a2, a3, b1, b2, b3))   
     headers = ['Month', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
     # Create DataFrame
@@ -30,7 +30,7 @@ def table_monthly_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',period
 
     return df
 
-def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
+def table_directional_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
     # Calculate LoNoWe parameters for each month
     params = []
     dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
@@ -38,10 +38,10 @@ def table_directional_joint_distribution_Hs_Tp_param(data,var1='hs',var2='tp',va
     add_direction_sector(data=data,var_dir=var_dir)
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var1=var1,var2=var2,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
         params.append((a1, a2, a3, b1, b2, b3))
     # add annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     params.append((a1, a2, a3, b1, b2, b3))       
     headers = ['Direction', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
     # Create DataFrame
@@ -114,7 +114,7 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
 
     return df
 
-def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_reurn_values.csv'):
+def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_reurn_values.csv'):
     # Calculate LoNoWe parameters for each month
     rv_hs = np.zeros((13,len(periods)))
     rv_tp = np.zeros((13,len(periods)))
@@ -123,13 +123,13 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var1='hs',var2='tp
     for month in range(1,len(months)):
         print(month)
         month_data = data[data.index.month == month]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var1=var1,var2=var2,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
         for i in range(len(periods)):
             rv_hs[month-1,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
             rv_tp[month-1,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
 
     #append annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     for i in range(len(periods)):
         rv_hs[12,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
         rv_tp[12,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
@@ -205,12 +205,12 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',va
     return df
 
 
-def table_Hs_Tpl_Tph_return_values(data,var1='hs',var2='tp',periods=[1,10,100,10000],output_file='Hs_Tpl_Tph_joint_reurn_values.csv'):
+def table_Hs_Tpl_Tph_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='Hs_Tpl_Tph_joint_reurn_values.csv'):
     # Calculate LoNoWe parameters for each month
     table = np.zeros((10,3*len(periods)))
 
     #append annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     k=0
     for i in range(len(periods)):
         max_hs = hs_tpl_tph['hs_'+str(periods[i])].max().round(1)

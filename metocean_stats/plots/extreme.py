@@ -433,8 +433,8 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
        
     return 
 
-def plot_joint_distribution_Hs_Tp(data,var1='hs',var2='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var1,var2=var2,periods=periods)
+def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     df = data
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
@@ -672,12 +672,13 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     
     plt.savefig(output_file)
 
-    return
+    return fig
 
 
 def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_file='tp_for_given_hs.png'):
     df = table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
     # Plot the 2D histogram
+    fig, ax = plt.subplots()
     plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
     plt.scatter(df['Hs[m]'], df['Tp(P5-obs) [s]'], marker='x', color='grey', label='P5')
     plt.scatter(df['Hs[m]'], df['Tp(Mean-obs) [s]'], marker='x', color='blue', label='Mean')
@@ -693,11 +694,12 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     plt.tight_layout()
     plt.savefig(output_file)
 
-    return
+    return fig
 
 def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
     df = table_tp_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
     # Plot the 2D histogram
+    fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
     plt.scatter(df['U[m/s]'], df['Hs(P5-obs) [m]'], marker='x', color='grey', label='P5')
     plt.scatter(df['U[m/s]'], df['Hs(Mean-obs) [m]'], marker='x', color='blue', label='Mean')
@@ -715,4 +717,4 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     plt.tight_layout()
     plt.savefig(output_file)
 
-    return
+    return fig

@@ -253,7 +253,7 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
     plt.tight_layout()
     plt.savefig(output_file)
 
-    return fig
+    return fig, table
 
 
 def plot_monthly_max_mean_min(df,var='T2m',out_file='plot_monthly_max_min_min.png'):
