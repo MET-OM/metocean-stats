@@ -271,7 +271,7 @@ def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width
 
 def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, periods=[1,10,1000,10000], output_file='table_perc_tp_for_hs.csv'):
     df=data
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var1=var_hs,var2=var_tp,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     # Create bins
     rv_hs = np.zeros(len(periods))
     result = []
