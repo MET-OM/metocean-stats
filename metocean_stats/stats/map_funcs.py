@@ -5,7 +5,7 @@ import cartopy.feature as cfeature
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 
-def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
+def plot_points_on_map(lon, lat, label, bathymetry='NORA3',output_file='map.png'):
     lon_list = lon
     lat_list = lat
     label_list = label
@@ -93,11 +93,11 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3'):
     ax.legend(loc='upper left')
 
     plt.tight_layout()
-    plt.savefig('map_'+str(lon)+'_'+str(lat)+'.png')
+    plt.savefig(output_file)
     plt.close()
     return fig
 
-def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title', set_extent = [0,30,52,73]):
+def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title', set_extent = [0,30,52,73], output_file='extreme_wave_map.png'):
     if product == 'NORA3':
         lon = 'rlon'
         lat = 'rlat'
@@ -174,13 +174,15 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
     cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05, ticks=np.arange(0, 21, 2))
     cb.set_label(ds[var].standard_name, fontsize=14)
     plt.tight_layout()
+
     if title is None:
         pass
     else:
         plt.title(title, fontsize=16)
-    plt.savefig(title+'.png',dpi=300)
+    plt.savefig(output_file,dpi=300)
+    return fig
      
-def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empty title', set_extent=[0, 30, 52, 73]):
+def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empty title', set_extent=[0, 30, 52, 73],output_file='extreme_wind_map.png'):
     if product == 'NORA3':
         lon = 'x'
         lat = 'y'
@@ -267,4 +269,5 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
     plt.tight_layout()
     if title is not None:
         plt.title(title, fontsize=16)
-    plt.savefig(title + '.png', dpi=300)
+    plt.savefig(output_file, dpi=300)
+    return fig
