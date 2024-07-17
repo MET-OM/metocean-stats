@@ -21,6 +21,28 @@ plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST8
 
 
 # Wind:
+var_rose(df,direc='D10',inten='W10',bins_range= np.arange(0, 25, step=5),title='Omni wind rose',output_file='wind_omni.png')
+general.plot_directional_stats(df,var1='W10',step_var1=0.1,var_dir='D10',title = '', output_file='directional_stats.png')
+general.table_directional_non_exceedance(df,var1='W10',step_var1=2,var_dir='D10',output_file='table_directional_non_exceedance.csv')
+general.plot_monthly_stats(df,var1='W10',step_var1=2,title = '', output_file='monthly_stats.png')
+general.table_monthly_non_exceedance(df,var1='W10',step_var1=2,output_file='table_monthly_non_exceedance.csv')
+plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var='W10',output_file='prob_non_exceedance_fitted_3p_weibull.png')
+plots.plot_directional_weibull_return_periods(df,var='W10',var_dir='D10',periods=[1, 10, 100, 1000], units='m/s',output_file='Wind.dir_extremes_weibull.png')
+tables.table_directional_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',output_file='directional_extremes_weibull.wind.csv')
+plots.plot_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 1000], units='m/s',output_file='monthly_extremes_weibull.wind.png')
+tables.table_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',output_file='monthly_extremes_weibull.wind.csv')
+plots.plot_monthly_weather_window(df,var='W10',threshold=10, window_size=12,output_file= 'NORA10_monthly_weather_window4_12_plot.png')
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Waves:
