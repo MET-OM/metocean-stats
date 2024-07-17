@@ -15,7 +15,7 @@ def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent):
     return fig
 
 
-def var_rose(data, direction,intensity, output_file, method='overall'):
+def var_rose(data, direction,intensity, method='overall',max_perc=40,decimal_places=1, units='m/s',output_file='rose.png'):
 
     direction2 = data[direction]
     intensity2 = data[intensity]
@@ -24,22 +24,25 @@ def var_rose(data, direction,intensity, output_file, method='overall'):
                    np.percentile(intensity2,60),
                    np.percentile(intensity2,80),
                    np.percentile(intensity2,99)])
-    
+
     if method == 'overall':
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot(111, projection="windrose")
-        ax.bar(direction2, intensity2, normed=True, bins=bins_range, opening=0.8, nsector=12)
-        ax.set_legend()
+        ax.bar(direction2, intensity2, normed=True, bins=bins_range, opening=0.99,cmap=cm.nipy_spectral_r, nsector=12)
+        ax.set_yticks(np.arange(5, max_perc+10, step=10))
+        ax.set_yticklabels(np.arange(5, max_perc+10, step=10))
+        ax.set_legend(decimal_places=decimal_places, units=units)
+        ax.set_title('Jan-Dec')
         ax.figure.set_size_inches(size, size)
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
 
     elif method == 'monthly':
-        monthly_var_rose(data,direction,intensity,output_file)
+        fig = monthly_var_rose(data=data,direction=direction,intensity=intensity,overall_bins_range=bins_range,max_perc=max_perc,decimal_places=decimal_places,units=units,output_file=output_file)
     
     plt.close()
-    return fig
+    return fig 
 
-def monthly_var_rose(data, direction,intensity,output_file) : 
+def monthly_var_rose(data, direction,intensity,overall_bins_range,max_perc,decimal_places=1, units='m/s',output_file='rose.png') : 
 
     # this function make monthly wind/wave rose
     # direction, intensity: panda series 
@@ -69,8 +72,10 @@ def monthly_var_rose(data, direction,intensity,output_file) :
     for j in range(12):
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot(111, projection="windrose")
-        ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, opening=0.8, nsector=12)
-        ax.set_legend()
+        ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, bins=overall_bins_range, opening=0.99,cmap=cm.nipy_spectral_r, nsector=12)
+        ax.set_yticks(np.arange(5, max_perc+10, step=10))
+        ax.set_yticklabels(np.arange(5, max_perc+10, step=10))
+        ax.set_legend(decimal_places=decimal_places, units=units)
         ax.set_title(months[j])
         size = 5
         ax.figure.set_size_inches(size, size)
