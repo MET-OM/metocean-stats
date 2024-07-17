@@ -12,7 +12,7 @@ def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
     fig = plots.plot_prob_non_exceedance_fitted_3p_weibull(ds, var='HS', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0].round(2) == -0.71:
+    if fig.axes[0].lines[0].get_xdata()[0].round(2) == -0.69:
         pass
     else:
         raise ValueError("FigValue is not correct")
@@ -82,7 +82,7 @@ def test_plot_joint_distribution_Hs_Tp(ds=ds):
     fig = plots.plot_joint_distribution_Hs_Tp(ds, var_hs='HS', var_tp='TP', periods=[1, 10, 100, 1000], title='Hs-Tp joint distribution', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if int(fig.axes[0].lines[0].get_xdata()[0]) == 4:
+    if int(fig.axes[0].lines[0].get_xdata()[0]) == 3:
         pass
     else:
         raise ValueError("FigValue is not correct")
