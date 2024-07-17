@@ -11,38 +11,27 @@ from metocean_stats.stats.map_funcs import *
 #ds.import_data(save_csv=True)
 # Load data from local file
 #ds.load_data('/home/konstantinosc/'+ds.datafile)
-ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
+#ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 
 # Map:
-plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
+#plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
 #plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
 #plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
 
 
 # Wind:
-var_rose(df,direc='D10',inten='W10',bins_range= np.arange(0, 25, step=5),title='Omni wind rose',output_file='wind_omni.png')
-general.plot_directional_stats(df,var1='W10',step_var1=0.1,var_dir='D10',title = '', output_file='directional_stats.png')
-general.table_directional_non_exceedance(df,var1='W10',step_var1=2,var_dir='D10',output_file='table_directional_non_exceedance.csv')
-general.plot_monthly_stats(df,var1='W10',step_var1=2,title = '', output_file='monthly_stats.png')
-general.table_monthly_non_exceedance(df,var1='W10',step_var1=2,output_file='table_monthly_non_exceedance.csv')
-plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var='W10',output_file='prob_non_exceedance_fitted_3p_weibull.png')
-plots.plot_directional_weibull_return_periods(df,var='W10',var_dir='D10',periods=[1, 10, 100, 1000], units='m/s',output_file='Wind.dir_extremes_weibull.png')
-tables.table_directional_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',output_file='directional_extremes_weibull.wind.csv')
-plots.plot_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 1000], units='m/s',output_file='monthly_extremes_weibull.wind.png')
-tables.table_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',output_file='monthly_extremes_weibull.wind.csv')
-plots.plot_monthly_weather_window(df,var='W10',threshold=10, window_size=12,output_file= 'NORA10_monthly_weather_window4_12_plot.png')
-
-
-
-
-
-
-
-
-
-
-
+#plots.var_rose(ds,direc='D10',inten='W10',bins_range= np.arange(0, 25, step=5),title='Omni wind rose',output_file='wind_omni.png')
+#general.plot_directional_stats(df,var1='W10',step_var1=0.1,var_dir='D10',title = '', output_file='directional_stats.png')
+#general.table_directional_non_exceedance(df,var1='W10',step_var1=2,var_dir='D10',output_file='table_directional_non_exceedance.csv')
+#general.plot_monthly_stats(df,var1='W10',step_var1=2,title = '', output_file='monthly_stats.png')
+#general.table_monthly_non_exceedance(df,var1='W10',step_var1=2,output_file='table_monthly_non_exceedance.csv')
+#plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var='W10',output_file='prob_non_exceedance_fitted_3p_weibull.png')
+#plots.plot_directional_weibull_return_periods(df,var='W10',var_dir='D10',periods=[1, 10, 100, 1000], units='m/s',output_file='Wind.dir_extremes_weibull.png')
+#tables.table_directional_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',output_file='directional_extremes_weibull.wind.csv')
+#plots.plot_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 1000], units='m/s',output_file='monthly_extremes_weibull.wind.png')
+#tables.table_monthly_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',output_file='monthly_extremes_weibull.wind.csv')
+#plots.plot_monthly_weather_window(df,var='W10',threshold=10, window_size=12,output_file= 'NORA10_monthly_weather_window4_12_plot.png')
 
 
 # Waves:
@@ -89,7 +78,10 @@ plots.plot_monthly_weather_window(df,var='W10',threshold=10, window_size=12,outp
 
 
 # Currents:
-
+import pandas as pd
+ds = pd.read_csv('NorkystDA_zdepth_lon3.73_lat64.6_20170102_20181231.csv',comment='#',index_col=0, parse_dates=True)
+plots.var_rose(ds, 'current_direction_0m','current_speed_0m',max_perc=30,decimal_places=2, units='m/s', method='monthly', output_file='monthly_rose.png')
+plots.var_rose(ds, 'current_direction_0m','current_speed_0m',max_perc=30,decimal_places=2, units='m/s', method='overall', output_file='overall_rose.png')
 
 
 # Water levels:

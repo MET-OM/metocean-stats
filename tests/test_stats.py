@@ -319,7 +319,7 @@ def test_plot_monthly_return_periods_T2m_max(ds=ds):
 
 def test_plot_var_rose(ds=ds):
     output_file = 'test_rose.png'
-    fig = plots.var_rose(ds,'DIRM' ,'HS', method='overall', output_file=output_file)
+    fig = plots.var_rose(ds,'DIRM' ,'HS', method='monthly', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.dpi == 100.0:
