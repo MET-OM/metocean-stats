@@ -37,7 +37,7 @@ def var_rose(data, direction,intensity, output_file, method='overall'):
         monthly_var_rose(data,direction,intensity,output_file)
     
     plt.close()
-    return 
+    return fig
 
 def monthly_var_rose(data, direction,intensity,output_file) : 
 
@@ -76,4 +76,4 @@ def monthly_var_rose(data, direction,intensity,output_file) :
         ax.figure.set_size_inches(size, size)
         plt.savefig(months[j]+'_'+output_file,dpi=100,facecolor='white',bbox_inches='tight')
         plt.close()
-    return
+    return fig

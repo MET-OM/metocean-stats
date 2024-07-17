@@ -380,14 +380,13 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     cumulative_percentage.loc['P99'] = data.groupby(data.index, observed=True)[var1].quantile(0.99)
     cumulative_percentage.loc['Maximum'] = data.groupby(data.index, observed=True)[var1].max()
     cumulative_percentage['Omni'] = cumulative_percentage.sum(axis=1)[:-6]
-    cumulative_percentage['Omni'].iloc[-6] = data[var1].mean()    
-    cumulative_percentage['Omni'].iloc[-5] = data[var1].quantile(0.50)
-    cumulative_percentage['Omni'].iloc[-4] = data[var1].quantile(0.75)
-    cumulative_percentage['Omni'].iloc[-3] = data[var1].quantile(0.95)
-    cumulative_percentage['Omni'].iloc[-2] = data[var1].quantile(0.99)
-    cumulative_percentage['Omni'].iloc[-1] = data[var1].max()
-
-
+    cumulative_percentage.loc[cumulative_percentage.index[-6], 'Omni'] = data[var1].mean()
+    cumulative_percentage.loc[cumulative_percentage.index[-5], 'Omni'] = data[var1].quantile(0.50)
+    cumulative_percentage.loc[cumulative_percentage.index[-4], 'Omni'] = data[var1].quantile(0.75)
+    cumulative_percentage.loc[cumulative_percentage.index[-3], 'Omni'] = data[var1].quantile(0.95)
+    cumulative_percentage.loc[cumulative_percentage.index[-2], 'Omni'] = data[var1].quantile(0.99)
+    #cumulative_percentage['Omni'].iloc[-1] = data[var1].max()
+    cumulative_percentage.loc[cumulative_percentage.index[-1], 'Omni'] = data[var1].max()
     # Round 2 decimals
     cumulative_percentage = round(cumulative_percentage,2)
 
