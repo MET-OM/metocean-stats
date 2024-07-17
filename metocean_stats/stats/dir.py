@@ -17,7 +17,7 @@ def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent):
     return fig
 
 
-def var_rose(data, intensity,direction,max_perc,decimal_places=1, units='m/s', method='overall', output_file='rose.png'):
+def var_rose(data, direction,intensity,max_perc,decimal_places=1, units='m/s', method='overall', output_file='rose.png'):
 
     direction2 = data[direction]
     intensity2 = data[intensity]
@@ -39,13 +39,13 @@ def var_rose(data, intensity,direction,max_perc,decimal_places=1, units='m/s', m
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
 
     elif method == 'monthly':
-        monthly_var_rose(data,intensity,direction,smax_perc=decimal_places,bins_range=bins_range,decimal_places=decimal_places, units=units, output_file=output_file)
+        monthly_var_rose(data,direction,intensity,max_perc=decimal_places,bins_range=bins_range,decimal_places=decimal_places, units=units, output_file=output_file)
     
     plt.close()
     return fig
 
 
-def monthly_var_rose(data, intensity, direction,bin_range,max_perc=40,decimal_places=1, units='m/s',output_file='rose.png') : 
+def monthly_var_rose(data, direction,intensity,bin_range,max_perc=40,decimal_places=1, units='m/s',output_file='rose.png') : 
 
     # this function make monthly wind/wave rose
     # direction, intensity: panda series 
