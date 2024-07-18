@@ -152,7 +152,7 @@ def plot_scatter(df,var1,var2,location,regression_line,qqplot=True):
     return fig
 
 
-def plot_monthly_stats(data: pd.DataFrame, var1: str, show: str, title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+def plot_monthly_stats(data: pd.DataFrame, var1: str, show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
@@ -184,7 +184,7 @@ def plot_monthly_stats(data: pd.DataFrame, var1: str, show: str, title: str='Var
     plt.savefig(output_file)
     return fig
 
-def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str, title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
+def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
     """
     Plot directional statistics of a variable from a DataFrame.
 
@@ -208,9 +208,11 @@ def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_
     """    
     fig, ax = plt.subplots()
     cumulative_percentage = table_directional_non_exceedance(data,var1,step_var1,var_dir)
-    cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
-    cumulative_percentage.loc['P99'][:-1].plot(marker = 'o')    
-    cumulative_percentage.loc['Mean'][:-1].plot(marker = 'o')
+    for i in show:
+        cumulative_percentage.loc[i][:-1].plot(marker = 'o')
+    #cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
+    #cumulative_percentage.loc['P99'][:-1].plot(marker = 'o')    
+    #cumulative_percentage.loc['Mean'][:-1].plot(marker = 'o')
     
     plt.title(title,fontsize=16)
     plt.xlabel('Direction[$⁰$]',fontsize=15)

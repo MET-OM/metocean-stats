@@ -272,7 +272,7 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var1: str, step_var1: float
 
 # Define  bins
     bins = np.arange(int(data[var1].min()), data[var1].max() + step_var1, step_var1).tolist()
-    labels =  [f'<{num}' for num in bins]
+    labels =  [f'<{num}' for num in [round(bin, 2) for bin in bins]]
 
     # Categorize data into bins
     data[var1+'-level'] = pd.cut(data[var1], bins=bins, labels=labels[1:])
@@ -355,7 +355,7 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
 
 # Define  bins
     bins = np.arange(0, data[var1].max() + step_var1, step_var1).tolist()
-    labels =  [f'<{num}' for num in bins]
+    labels =  [f'<{num}' for num in [round(bin, 2) for bin in bins]]
     
     add_direction_sector(data=data,var_dir=var_dir)
 

@@ -55,9 +55,9 @@ def table_directional_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp
 
     return df  
 
-def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull',method='default', units='m',output_file='monthly_extremes_weibull.csv'):
+def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='default',threshold='default', units='m',output_file='monthly_extremes_weibull.csv'):
     months = ['-','Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
-    params, return_periods = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution, method=method)    
+    params, return_periods, threshold_values, num_events_per_year = monthly_extremes(data=data, var=var, periods=periods, distribution=distribution, method=method, threshold=threshold)   
 
     # Initialize lists to store table data
     annual_prob = ['%'] + [np.round(100/12,2)] * 12 + [100.00]
@@ -73,6 +73,10 @@ def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dis
         'Scale': scale,
         'Location': location,
     }
+    if threshold_values:
+        table_data['Threshold'] = [units] + [round(x, 2) for x in threshold_values]
+    if num_events_per_year:
+        table_data['Events'] = ['1/year'] + [round(x, 1) for x in num_events_per_year]
     return_periods = return_periods.T.tolist()
     # Fill in return periods for each period
     for i, period in enumerate(periods):

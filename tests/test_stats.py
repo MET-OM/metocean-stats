@@ -126,10 +126,30 @@ def test_table_directional_return_periods(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
+    
+def test_table_monthly_return_periods(ds=ds):
+    output_file = 'test_monthly_return_periods.csv'
+    df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (14, 9):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_monthly_return_periods_POT(ds=ds):
+    output_file = 'test_monthly_return_periods_POT.csv'
+    df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (14, 11):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
 
 def test_plot_monthly_return_periods(ds=ds):
     output_file = 'test_monthly_return_periods.png'
-    fig = plots.plot_monthly_return_periods(ds, var='HS', periods=[1, 10, 100], distribution='Weibull', units='m', output_file=output_file)
+    fig = plots.plot_monthly_return_periods(ds, var='HS', periods=[1, 10, 100], distribution='Weibull3P_MOM', units='m', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.axes[0].lines[0].get_xdata()[0] == 'Jan':

@@ -556,7 +556,7 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
         if threshold == 'default' :
             annual_maxima = df.resample('Y').max() 
             threshold=annual_maxima.min()
-        data = get_extremes(df, method="POT", threshold=threshold, r="48H")
+        data = get_extremes(df, method="POT", threshold=threshold, r="48h")
     else:
         print ('Please check the method of filtering data')
     
@@ -602,6 +602,10 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
         #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull3P' : 
         shape, loc, scale = stats.weibull_min.fit(data) # (ML)
+        value = stats.weibull_min.isf(1/period, shape, loc, scale)
+        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+    elif distribution == 'Weibull3P_MOM' : 
+        shape, loc, scale = Weibull_method_of_moment(data)
         value = stats.weibull_min.isf(1/period, shape, loc, scale)
         #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     else:
@@ -779,47 +783,72 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
 
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
-def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull', method='default'):
+def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', method='default', threshold='default'):
     from scipy.stats import weibull_min
     # Calculate parameters for each month based on different method
     params = []
     return_values = [] #np.zeros((13, len(periods)))
+    num_events_per_year = []
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
     # years is converted to K-th
     periods1 = np.array(periods)*24*365.2422/time_step
+    threshold_values = []
     for month in range(1, 13):
         month_data = data[data.index.month == month]
-        if distribution == 'Weibull':
-            shape, loc, scale = Weibull_method_of_moment(month_data[var])
-            value = weibull_min.isf(1/periods1, shape, loc, scale)
+        
+        if isinstance(threshold, str) and threshold.startswith('P'):
+            threshold_value = month_data[var].quantile(int(threshold.split('P')[1])/100)
+            threshold_values.append(threshold_value)
+            # Calculate the number of events exceeding a threshold:
+            num_years = (month_data.index[-1]  - month_data.index[0] ).days / 365.25  # Using 365.25 to account for leap years
+            num_events_per_year.append((month_data[var] >= threshold_value).sum()/num_years)
         else:
-            if method == 'minimum': # used for negative temperature
-                shape, loc, scale, value = RVE_ALL(month_data.resample('ME').min().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-            elif method == 'maximum':
-                shape, loc, scale, value = RVE_ALL(month_data.resample('ME').max().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-            elif method == 'default':
-                shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
+            threshold_value = threshold
+
+        if method == 'minimum': # used for negative temperature
+            shape, loc, scale, value = RVE_ALL(month_data.resample('ME').min().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+        elif method == 'maximum': # used for positive temperature
+            shape, loc, scale, value = RVE_ALL(month_data.resample('ME').max().dropna(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+        elif method == 'default':
+            shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+        elif method == 'POT':
+            shape, loc, scale, value = RVE_ALL(month_data,var=var,periods=periods,distribution=distribution,method=method,threshold=threshold_value)
+        
         params.append((shape, loc, scale))
         return_values.append(value)
 
     # add annual
-    if distribution == 'Weibull':
-        shape, loc, scale = Weibull_method_of_moment(data[var])
-        value = weibull_min.isf(1/periods1, shape, loc, scale)
+    if isinstance(threshold, str) and threshold.startswith('P'):
+        threshold_value = data[var].quantile(int(threshold.split('P')[1])/100)
+        threshold_values.append(threshold_value)
+        # Calculate the number of events exceeding a threshold:
+        num_years = (data.index[-1]  - data.index[0] ).days / 365.25  # Using 365.25 to account for leap years
+        num_events_per_year.append((data[var] >= threshold_value).sum()/num_years)
     else:
-        if method == 'minimum':
-            shape, loc, scale, value = RVE_ALL(data.resample('YE').min(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-        elif method == 'maximum':
-            shape, loc, scale, value = RVE_ALL(data.resample('YE').max(),var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-        elif method == 'default':
-            shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold='default')
-                 
+        threshold_value = threshold
+
+    if method == 'minimum':
+        shape, loc, scale, value = RVE_ALL(data.resample('YE').min(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'maximum':
+        shape, loc, scale, value = RVE_ALL(data.resample('YE').max(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'default':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'POT':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method=method,threshold=threshold_value)
+            
 
     params.append((shape, loc, scale))       
     return_values.append(value)
     return_values = np.array(return_values)
 
-    return params, return_values
+    # Define the threshold values (annual values) for each column
+    thresholds = return_values[-1]
+
+    # Replace values in each column that exceed the thresholds
+    for col in range(return_values.shape[1]):
+        return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
+
+    return params, return_values, threshold_values, num_events_per_year
 
 def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull', adjustment='NORSOK'):
     from scipy.stats import weibull_min, gumbel_r
