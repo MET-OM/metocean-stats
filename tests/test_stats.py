@@ -328,6 +328,16 @@ def test_plot_var_rose(ds=ds):
         raise ValueError("FigValue is not correct")
 
 
+def test_table_hs_for_rv_wind(ds=ds):
+    output_file = 'test_table_hs_for_given_wind.csv'
+    df = tables.table_hs_for_given_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (4, 6):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])
