@@ -330,7 +330,7 @@ def test_plot_var_rose(ds=ds):
 
 def test_table_hs_for_rv_wind(ds=ds):
     output_file = 'test_table_hs_for_given_wind.csv'
-    df = tables.table_hs_for_given_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
+    df = tables.table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (4, 6):
