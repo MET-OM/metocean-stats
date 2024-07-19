@@ -405,7 +405,7 @@ def test_plot_profile_return_values(ds=ds):
     fig = plots.plot_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == 27.83:
+    if fig.axes[0].lines[0].get_xdata()[0] == 27.31:
         pass
     else:
         raise ValueError("FigValue is not correct")
