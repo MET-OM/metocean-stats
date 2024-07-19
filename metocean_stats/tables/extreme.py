@@ -351,15 +351,16 @@ def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth
     return df
 
 
-def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], heights=[10, 50, 80, 100, 150], period=[1, 10, 100, 10000], file_out='RVE_wind_profile.csv'):
-    df_wind_profile = pd.DataFrame()
-    df_wind_profile['Height above MSL']=heights
-    for p in period:
-        df_wind_profile[str(p)+'-year Return'] = [RVE_Weibull(data,var1,period=p) for var1 in var]
-        
-    df_wind_profile.to_csv(file_out, index=False)  
+def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],units = 'm/s' ,distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.csv'):
+    df = pd.DataFrame()
+    df['z']= ['m'] + [str(num) for num in z] 
+    for p in periods: 
+        df[f'Return period {p} [years]'] = [units] + [RVE_ALL(data,var=var1,periods=p,distribution=distribution,method=method,threshold=threshold)[3].round(2) for var1 in var]
     
-    return df_wind_profile
+    if output_file:
+        df.to_csv(output_file, index=False)  
+    
+    return df
 
 def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, periods=[1, 10, 100,10000], sea_state = 'short-crested', output_file='table_Hmax_crest_return_values.csv'):
     df = table_tp_for_rv_hs(ds, var_hs, var_tp,periods=periods,output_file=None)

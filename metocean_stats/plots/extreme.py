@@ -718,3 +718,24 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     plt.savefig(output_file)
 
     return fig
+
+def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=False,title='Return Periods over z',units = 'm/s',distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.png'):
+    df = table_profile_return_values(data,var=var, z=z, periods=periods,units = units ,distribution=distribution,method=method,threshold=threshold, output_file=None)
+    fig, ax = plt.subplots()
+    df.columns = [col.replace('Return period ', '') for col in df.columns] # for legends
+
+    for column in df.columns[1:]:
+        plt.plot(df[column][1:-1],df['z'][1:-1], label=column)
+    
+    plt.ylabel('z[m]')
+    plt.xlabel('[m/s]')
+    plt.title(title)
+    if reverse_yaxis == True:
+        plt.gca().invert_yaxis()
+    plt.legend()
+    plt.grid(True)
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return fig
