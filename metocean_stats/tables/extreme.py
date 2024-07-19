@@ -88,8 +88,8 @@ def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dis
     
     return df
 
-def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m',adjustment='NORSOK',output_file='directional_extremes_weibull.csv'):
-    params, return_periods, sector_prob = directional_extremes(data=data, var=var, var_dir=var_dir, periods=periods,distribution=distribution, adjustment=adjustment)    
+def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='default', threshold='default',output_file='directional_extremes_weibull.csv'):
+    params, return_periods, sector_prob,  threshold_values, num_events_per_year = directional_extremes(data=data, var=var, var_dir=var_dir, periods=periods,distribution=distribution, adjustment=adjustment, method=method, threshold=threshold)    
 
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
     # Initialize lists to store table data
@@ -107,10 +107,16 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
         'Scale': scale,
         'Location': location,
     }
+
+    if threshold_values:
+        table_data['Threshold'] = [units] + [round(x, 2) for x in threshold_values]
+    if num_events_per_year:
+        table_data['Events'] = ['1/year'] + [round(x, 1) for x in num_events_per_year]
+    
     return_periods = return_periods.T.tolist()
     # Fill in return values for each period
     for i, period in enumerate(periods):
-        table_data[f'Return period: {period} [years]'] = [units] + return_periods[i]
+        table_data[f'Return period: {period} [years]'] = [units] +  [round(x, 2) for x in return_periods[i]]
     # Create DataFrame
     df = pd.DataFrame(table_data)
     if output_file:
@@ -158,7 +164,7 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp
     return df
     
 def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
-    weibull_params, return_periods, sector_prob = directional_extremes(data=data, var=var_hs, var_dir=var_dir, periods=periods,distribution='Weibull', adjustment=adjustment)
+    weibull_params, return_periods, sector_prob, threshold_values, num_events_per_year = directional_extremes(data=data, var=var_hs, var_dir=var_dir, periods=periods,distribution='Weibull3P_MOM', adjustment=adjustment)
 
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']    
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
@@ -405,7 +411,7 @@ def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir=
 
 def table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
     df = table_tp_for_given_wind(ds, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
-    shape, loc, scale, value = RVE_ALL(ds,var='W10',periods=periods,distribution='Weibull3P',method='default',threshold='default')
+    shape, loc, scale, value = RVE_ALL(ds,var='W10',periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
     result_df = pd.DataFrame(value, columns=['U[m/s]'])
     result_df['Return period [years]'] = periods
     a_mean, b_mean, c_mean, d_mean = fit_hs_wind_model(df.dropna()['U[m/s]'].values,df.dropna()['Hs(Mean-obs) [m]'].values) 

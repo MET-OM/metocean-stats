@@ -850,61 +850,76 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
 
     return params, return_values, threshold_values, num_events_per_year
 
-def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull', adjustment='NORSOK'):
+def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull3_MOM', adjustment='NORSOK', method='default', threshold='default'):
+    
     from scipy.stats import weibull_min, gumbel_r
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
     sector_prob = []
     params = []
-
+    threshold_values = []
+    num_events_per_year = []
+    return_values = []
     add_direction_sector(data=data,var_dir=var_dir)
-
-    for dir in range(0,360,30):
-        sector_data = data[data['direction_sector']==dir]
-        if distribution == 'Weibull':
-            shape, loc, scale = Weibull_method_of_moment(sector_data[var])
-        else:
-            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
-        params.append((shape, loc, scale))            
-        sp = 100*len(sector_data)/len(data[var])
-        sector_prob.append(sp)
-    # add annual
-    if distribution == 'Weibull':
-        shape, loc, scale = Weibull_method_of_moment(data[var])
-    else:
-        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods, distribution=distribution,method='default',threshold='default')
-
-    params.append((shape, loc, scale))       
     # time step between each data, in hours
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
-    return_values = np.zeros((13, len(periods)))
-    # years is converted to K-th
-
-    periods_adj = np.array([x * 6 for x in periods])*24*365.2422/time_step
-    periods_noadj = np.array(periods)*24*365.2422/time_step
     
-    if adjustment == 'NORSOK':
-        pass
-    else:
-        periods_adj = periods_noadj
+    for dir in range(0,360,30):
+        sector_data = data[data['direction_sector']==dir]
 
-    # Calculate return periods for each month and period
-    for i, (shape, loc, scale) in enumerate(params):
-        if i == 12:
-            for j, period in enumerate(periods_noadj):
-                if distribution == 'Weibull':
-                    return_value = weibull_min.isf(1/period, shape, loc, scale)
-                elif distribution == 'GUM':
-                    return_value = gumbel_r.isf(1/period, loc, scale)
-                return_values[i, j] = round(return_value, 1)
+        if isinstance(threshold, str) and threshold.startswith('P'):
+            threshold_value = sector_data[var].quantile(int(threshold.split('P')[1])/100)
+            threshold_values.append(threshold_value)
+            # Calculate the number of events exceeding a threshold:
+            num_years = (sector_data.index[-1]  - sector_data.index[0] ).days / 365.25  # Using 365.25 to account for leap years
+            num_events_per_year.append((sector_data[var] >= threshold_value).sum()/num_years)
         else:
-            for j, period in enumerate(periods_adj):
-                if distribution == 'Weibull':
-                    return_value = weibull_min.isf(1/period, shape, loc, scale)
-                elif distribution == 'GUM':
-                    return_value = gumbel_r.isf(1/period, loc, scale)
-                return_values[i, j] = round(return_value, 1)
+            threshold_value = threshold
 
+        periods_adj = np.array([x * 6 for x in periods])*24*365.2422/time_step
+        periods_noadj = np.array(periods)*24*365.2422/time_step
+        
+        if adjustment == 'NORSOK':
+            pass
+        else:
+            periods_adj = periods_noadj
+
+        if method == 'minimum': # used for negative temperature
+            shape, loc, scale, value = RVE_ALL(sector_data.resample('ME').min().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+        elif method == 'maximum': # used for positive temperature
+            shape, loc, scale, value = RVE_ALL(sector_data.resample('ME').max().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+        elif method == 'default':
+            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
+        elif method == 'POT':
+            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
+    
+        sp = 100*len(sector_data)/len(data[var])
+        sector_prob.append(sp)
+        params.append((shape, loc, scale))
+        return_values.append(value)
+
+    # add annual
+    if isinstance(threshold, str) and threshold.startswith('P'):
+        threshold_value = data[var].quantile(int(threshold.split('P')[1])/100)
+        threshold_values.append(threshold_value)
+        # Calculate the number of events exceeding a threshold:
+        num_years = (data.index[-1]  - data.index[0] ).days / 365.25  # Using 365.25 to account for leap years
+        num_events_per_year.append((data[var] >= threshold_value).sum()/num_years)
+    else:
+        threshold_value = threshold
+
+    if method == 'minimum':
+        shape, loc, scale, value = RVE_ALL(data.resample('YE').min(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'maximum':
+        shape, loc, scale, value = RVE_ALL(data.resample('YE').max(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'default':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
+    elif method == 'POT':
+        shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method=method,threshold=threshold_value)
+            
+    params.append((shape, loc, scale))
+    return_values.append(value)
+    return_values = np.array(return_values)
     # Define the threshold values (annual values) for each column
     thresholds = return_values[-1]
 
@@ -912,8 +927,7 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     for col in range(return_values.shape[1]):
         return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
 
-
-    return params, return_values, sector_prob
+    return params, return_values, sector_prob,  threshold_values, num_events_per_year
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
     from scipy.stats import weibull_min

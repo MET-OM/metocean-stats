@@ -119,10 +119,10 @@ def test_plot_monthly_weather_window(ds=ds):
 
 def test_table_directional_return_periods(ds=ds):
     output_file = 'test_directional_return_periods.csv'
-    df = tables.table_directional_return_periods(ds, var='HS', periods=[1, 10, 100, 10000], units='m', var_dir='DIRM', distribution='Weibull', adjustment='NORSOK', output_file=output_file)
+    df = tables.table_directional_return_periods(ds, var='HS', periods=[1, 10, 100, 10000], units='m', var_dir='DIRM', distribution='Weibull3P_MOM', adjustment='NORSOK', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (14, 9):
+    if df.shape == (14, 9) and df['Return period: 10000 [years]'][13]==18.7:
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -132,7 +132,28 @@ def test_table_monthly_return_periods(ds=ds):
     df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (14, 9):
+    if df.shape == (14, 9) and df['Return period: 10000 [years]'][13]==18.7:
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+def test_table_directional_return_periods_POT(ds=ds):
+    output_file = 'test_dir_return_periods_POT.csv'
+    df = tables.table_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (14, 11) and df['Return period: 10000 [years]'][13]==20.73:
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_table_directional_return_periods(ds=ds):
+    output_file = 'test_dir_return_periods.csv'
+    df = tables.table_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (14, 9) and df['Return period: 10000 [years]'][13]==18.7:
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -142,7 +163,7 @@ def test_table_monthly_return_periods_POT(ds=ds):
     df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (14, 11):
+    if df.shape == (14, 11) and df['Return period: 10000 [years]'][13]==20.73:
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -169,7 +190,7 @@ def test_plot_directional_return_periods(ds=ds):
 
 def test_plot_polar_directional_return_periods(ds=ds):
     output_file = 'test_polar_directional_return_periods.png'
-    fig = plots.plot_polar_directional_return_periods(ds, var='HS', var_dir='DIRM', periods=[1, 10, 100, 10000], distribution='Weibull', units='m', adjustment='NORSOK', output_file=output_file)
+    fig = plots.plot_polar_directional_return_periods(ds, var='HS', var_dir='DIRM', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', units='m', adjustment='NORSOK', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.dpi == 100.0:

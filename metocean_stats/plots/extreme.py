@@ -551,7 +551,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     lower_bound = modelled_data['lower ci'].values
     
     # Plot the data
-    plt.plot(x, y, label='Weibull')
+    plt.plot(x, y, label='Weibull3P_MOM')
     plt.xscale('log')
     plt.fill_between(x, lower_bound, upper_bound, color='gray', alpha=0.3, label='Bounds')
     plt.xlabel('Years')
@@ -561,7 +561,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     return 
 
-def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull',method='default', units='m',output_file='monthly_extremes_weibull.png'):
+def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='default', units='m',output_file='monthly_extremes_weibull.png'):
     df = table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method, units=units, output_file=None)
     fig, ax = plt.subplots()
     for i in range(len(periods)):
@@ -589,9 +589,9 @@ def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 1
     return fig
 
 
-def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m', adjustment='NORSOK', output_file='monthly_extremes_weibull.png'):
-    df = table_directional_return_periods(data=data, var=var, var_dir=var_dir, periods=periods, distribution=distribution, units=units, adjustment=adjustment, output_file=None)
-    
+def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m', adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
+    df = table_directional_return_periods(data=data, var=var, var_dir=var_dir, periods=periods, distribution=distribution, units=units, adjustment=adjustment, method=threshold,threshold=threshold,output_file=None)
+
     # Remove degree symbols and convert to numeric
     directions_str = df['Direction sector'][1:-1].str.rstrip('°')
     directions = pd.to_numeric(directions_str, errors='coerce')
