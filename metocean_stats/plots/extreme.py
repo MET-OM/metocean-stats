@@ -575,12 +575,12 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
     return fig
 
 
-def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK', output_file='monthly_extremes_weibull.png'):
-    df = table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment, output_file=None)
+def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
+    df = table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
-    for i in range(len(periods)):
-        plt.plot(df['Direction sector'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
-    
+    for i in periods:
+        plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years')
+        
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Direction',fontsize=15)
     plt.legend()

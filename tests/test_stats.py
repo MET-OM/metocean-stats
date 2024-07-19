@@ -379,6 +379,17 @@ def test_table_hs_for_rv_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
+def test_plot_directional_return_periods_POT(ds=ds):
+    output_file = 'test_directional_return_periods_POT.png'
+    fig = plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='POT',threshold='P99',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.axes[0].lines[0].get_xdata()[0] == '0°':
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])
