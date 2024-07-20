@@ -11,8 +11,8 @@ from metocean_stats.stats.map_funcs import *
 #ds.import_data(save_csv=True)
 # Load data from local file
 #ds.load_data('/home/konstantinosc/'+ds.datafile)
-#ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
-ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
+ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
+#ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 
 # Map:
@@ -47,12 +47,12 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 # tables.table_monthly_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv')
 # tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100,10000],output_file='dir_Hs_Tp_joint_param.csv')
 # plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=12,output_file= 'NORA10_monthly_weather_window4_12_plot.png')
-# tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull', units='m',output_file='HS_monthly_extremes_Weibull.csv')
-# tables.table_directional_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',var_dir = 'DIRM',distribution='Weibull', adjustment='NORSOK' ,output_file='directional_extremes_weibull.csv')
-# plots.plot_monthly_return_periods(ds,var='HS',periods=[1, 10, 100],distribution='Weibull', units='m',output_file='HS_monthly_extremes.png')
+# tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file='HS_monthly_extremes_Weibull.csv')
+# tables.table_directional_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',var_dir = 'DIRM',distribution='Weibull3P_MOM', adjustment='NORSOK' ,output_file='directional_extremes_weibull.csv')
+# plots.plot_monthly_return_periods(ds,var='HS',periods=[1, 10, 100],distribution='Weibull3P_MOM', units='m',output_file='HS_monthly_extremes.png')
 # plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000 ],distribution='GUM', units='m',output_file='dir_extremes_GUM.png')
-# plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',output_file='dir_extremes_Weibull_norsok.png')
-# plots.plot_polar_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',output_file='dir_extremes_Weibull_polar.png')
+# plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',output_file='dir_extremes_Weibull_norsok.png')
+# plots.plot_polar_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',output_file='dir_extremes_Weibull_polar.png')
 # tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_return_values.csv')
 # tables.table_directional_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100,1000],adjustment='NORSOK',output_file='directional_Hs_Tp_joint_return_values.csv')
 # tables.table_Hs_Tpl_Tph_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='hs_tpl_tph_return_values.csv')
@@ -81,17 +81,25 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 # Currents:
 import pandas as pd
 #ds = pd.read_csv('../tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
-depth = '0m'
+#depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 #plots.var_rose(ds, f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='monthly', output_file='monthly_rose.png')
 #plots.var_rose(ds,f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='overall', output_file='overall_rose.png')
 #plots.plot_monthly_stats(ds,var1=f'current_speed_{depth}',show=['Mean','P99','Maximum'], title = f'Current[m/s], depth:{depth}', output_file=f'current{depth}_monthly_stats.png')
 #plots.plot_directional_stats(ds,var1=f'current_speed_{depth}',var_dir=f'current_direction_{depth}',step_var1=0.05,show=['Mean','P99','Maximum'], title = f'Current[m/s], depth:{depth}', output_file=f'current{depth}_dir_stats.png')
 #tables.table_directional_return_periods(ds,var=f'current_speed_{depth}',periods=[1, 10, 100, 10000], units='m/s',var_dir = f'current_direction_{depth}',distribution='Weibull', adjustment='NORSOK' ,output_file=f'directional_extremes_weibull_current{depth}.csv')
 #tables.table_monthly_return_periods(ds,var=f'current_speed_{depth}',periods=[1, 10, 100, 10000], units='m/s',distribution='Weibull3P_MOM',method='POT',threshold='P99',output_file=f'monthly_extremes_weibull_current{depth}.csv')
-tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',distribution='Weibull3P_MOM',method='POT',threshold='P99',output_file='HS_monthly_extremes_Weibull_POT_P99.csv')
-tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file='HS_monthly_extremes_Weibull.csv')
+#df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000], units='m',distribution='Weibull3P_MOM',method='POT',threshold='P99',output_file='HS_monthly_extremes_Weibull_POT_P99.csv')
+#df = tables.table_monthly_return_periods(ds,var='HS',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file='HS_monthly_extremes_Weibull.csv')
+#df = tables.table_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',output_file='HS_dir_extremes_Weibull.csv')
+df = tables.table_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m',output_file='HS_dir_extremes_Weibull_POT.csv')
+plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='POT',threshold='P99',output_file='dir_extremes_Weibull_norsok.png')
+df = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file='RVE_wind_profile.csv')
+fig = plots.plot_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file='RVE_wind_profile.png')
+df = tables.table_current_for_given_wind(ds, 'HS','W10', bin_width=2, max_wind=42, output_file='table_perc_current_for_wind.csv')
+plots.plot_current_for_given_wind(ds, 'HS', 'W10',output_file='curr_for_given_wind.png')
 
-
+#
+# breakpoint()
 # Water levels:
 
 
