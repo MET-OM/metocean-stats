@@ -425,3 +425,43 @@ def table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000
         result_df[['Return period [years]','U[m/s]', 'Hs(P5-model) [m]', 'Hs(Mean-model) [m]','Hs(P95-model) [m]' ]].round(2).to_csv(output_file,index=False)
     
     return result_df
+
+def table_current_for_given_wind(data: pd.DataFrame, var_curr: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_curr_for_wind.csv'):
+    df=data
+    # Create bins
+    min_wind = 0
+    bins = np.arange(min_wind, max_wind + bin_width, bin_width)
+    bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
+    bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
+    # Bin the wind values
+    df[var_wind+'_bin'] = pd.cut(df[var_wind], bins=bins, labels=bin_labels, right=False)
+    
+    # Calculate P5, Mean, and P95 for each bin
+    result = []
+    for i, bin_label in enumerate(bin_labels):
+        bin_df = df[df[var_wind+'_bin'] == bin_label]
+        if len(bin_df.index)>10:
+            P5 = bin_df[var_curr].quantile(0.05)
+            Mean = bin_df[var_curr].mean()
+            sigma = bin_df[var_curr].std()
+            P95 = bin_df[var_curr].quantile(0.95)
+        else:
+            P5 = np.nan
+            Mean = np.nan
+            sigma  = np.nan
+            P95 = np.nan
+
+        result.append([bin_label, bin_centers[i], P5, Mean, sigma, P95])
+
+    result_df = pd.DataFrame(result, columns=[var_curr+'_bin', 'U[m/s]','Uc(P5-obs) [m/s]','Uc(Mean-obs) [m/s]','Uc(std-obs) [m/s]', 'Uc(P95-obs) [m/s]'])
+    a_mean, b_mean, c_mean, d_mean = fit_Uc_wind_model(result_df.dropna()['U[m/s]'].values,result_df.dropna()['Uc(Mean-obs) [m/s]'].values) 
+    a_sigma, b_sigma, c_sigma, d_sigma = fit_Uc_wind_model(result_df.dropna()['U[m/s]'].values,result_df.dropna()['Uc(std-obs) [m/s]'].values) 
+    result_df['Uc(Mean-model) [m/s]'] = Uc_as_function_of_U(result_df['U[m/s]'], a_mean, b_mean, c_mean, d_mean)
+    result_df['Uc(std-model) [m/s]'] = Uc_as_function_of_U(result_df['U[m/s]'], a_sigma, b_sigma, c_sigma, d_sigma)
+    result_df['Uc(P5-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] - 1.65*result_df['Uc(std-model) [m/s]']
+    result_df['Uc(P95-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] + 1.65*result_df['Uc(std-model) [m/s]']
+
+    # Create a new dataframe with the results
+    if output_file:
+        result_df[['U[m/s]', 'Uc(P5-model) [m/s]','Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]']].round(2).to_csv(output_file,index=False)
+    return result_df

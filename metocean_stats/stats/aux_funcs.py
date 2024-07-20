@@ -288,6 +288,10 @@ from scipy.optimize import curve_fit
 def Hs_as_function_of_U(U, a, b, c, d):
     return a + b * U**(c + d * U)
 
+# Define the function Uc(U) # Uc for current speed 
+def Uc_as_function_of_U(U, a, b, c, d):
+    return a + b * U**(c + d * U)
+
 # Function to fit the parameters a, b, c, and d
 def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
     if initial_guesses is None:
@@ -299,8 +303,24 @@ def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
     
     # Extract the parameters
     a, b, c, d = params
+    #print(a,b,c,d)
+    return a, b, c, d
+
+
+# Function to fit the parameters a, b, c, and d
+def fit_Uc_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
+    if initial_guesses is None:
+        # If no initial guesses are provided, use some default values
+        initial_guesses = [13.5, 0.005, 2.0, 0.003]
+    
+    # Use curve_fit to fit the function to the data
+    params, covariance = curve_fit(Uc_as_function_of_U, U, H_values, p0=initial_guesses, maxfev=maxfev)
+    
+    # Extract the parameters
+    a, b, c, d = params
     print(a,b,c,d)
     return a, b, c, d
+
 
 def air_temperature_correction_nora10(df,var='T2m'):
     

@@ -410,7 +410,25 @@ def test_plot_profile_return_values(ds=ds):
     else:
         raise ValueError("FigValue is not correct")
 
+def test_plot_current_for_given_wind(ds=ds):
+    output_file = 'test_current_for_given_wind.png'
+    fig = plots.plot_current_for_given_wind(ds, 'HS', 'W10', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
 
+def test_table_current_for_given_wind(ds=ds):
+    output_file = 'test_table_current_for_given_wind.csv'
+    df = tables.table_current_for_given_wind(ds, 'HS', 'W10', max_wind=40, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (22, 4):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 

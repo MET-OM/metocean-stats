@@ -739,3 +739,27 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     plt.savefig(output_file)
 
     return fig
+
+
+def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,output_file='curr_for_given_wind.png'):
+    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
+    # Plot the 2D histogram
+    fig, ax = plt.subplots()
+    plt.hist2d(data[var_wind],data[var_curr], bins=50, cmap='hot', cmin=1)
+    plt.scatter(df['U[m/s]'], df['Uc(P5-obs) [m/s]'], marker='x', color='grey', label='P5')
+    plt.scatter(df['U[m/s]'], df['Uc(Mean-obs) [m/s]'], marker='x', color='blue', label='Mean')
+    plt.scatter(df['U[m/s]'], df['Uc(P95-obs) [m/s]'], marker='x', color='magenta', label='P95')
+    plt.plot(df['U[m/s]'],df['Uc(P5-model) [m/s]'],  color='grey', label='P5 fitted')
+    plt.plot(df['U[m/s]'],df['Uc(Mean-model) [m/s]'],  color='blue', label='Mean fitted')
+    plt.plot(df['U[m/s]'],df['Uc(P95-model) [m/s]'],  color='magenta', label='P95 fitted')
+
+    plt.ylabel('Current speed, $U_c$ [m/s]',fontsize=16)
+    plt.xlabel('Wind speed, $U$ [m/s]',fontsize=16)
+    plt.xlim(0,df['U[m/s]'].max())
+    plt.ylim(0,df['Uc(P95-model) [m/s]'].max())
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return fig
