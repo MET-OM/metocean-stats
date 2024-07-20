@@ -278,9 +278,9 @@ def test_table_wave_induced_current_TORSEHAUGEN(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_table_tp_for_given_wind(ds=ds):
-    output_file = 'test_table_tp_for_given_wind.csv'
-    df = tables.table_tp_for_given_wind(ds, 'HS', 'W10', bin_width=2, max_wind=42, output_file=output_file)
+def test_table_hshs_for_given_wind(ds=ds):
+    output_file = 'test_table_hs_for_given_wind.csv'
+    df = tables.table_hs_for_given_wind(ds, 'HS', 'W10', bin_width=2, max_wind=42, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (21, 10):
@@ -422,13 +422,39 @@ def test_plot_current_for_given_wind(ds=ds):
 
 def test_table_current_for_given_wind(ds=ds):
     output_file = 'test_table_current_for_given_wind.csv'
-    df = tables.table_current_for_given_wind(ds, 'HS', 'W10', max_wind=40, output_file=output_file)
+    ds['current_speed_0m'] = 0.05*ds['W10']
+    df = tables.table_current_for_given_wind(ds, var_curr='current_speed_0m', var_wind='W10', bin_width=2, max_wind=42, output_file=output_file)
+
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (21, 10):
         pass
     else:
         raise ValueError("Shape is not correct")
+
+def test_table_current_for_given_Hs(ds=ds):
+    output_file = 'test_table_current_for_given_Hs.csv'
+    ds['current_speed_0m'] = 0.05*ds['W10']
+    df = tables.table_current_for_given_Hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file=output_file)
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (10, 10):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_plot_current_for_given_Hs(ds=ds):
+    output_file = 'test_current_for_given_Hs.png'
+    ds['current_speed_0m'] = 0.05*ds['W10']
+    fig = plots.plot_current_for_given_Hs(ds, 'current_speed_0m', 'HS', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 

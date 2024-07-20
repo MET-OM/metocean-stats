@@ -322,7 +322,7 @@ def fit_Uc_wind_model(U, Uc, initial_guesses=None, maxfev=10000):
     
     # Extract the parameters
     a, b, c, d = params
-    print(a,b,c,d)
+    #print(a,b,c,d)
     return a, b, c, d
 
 # Function to fit the parameters a, b, c, and d
@@ -336,7 +336,7 @@ def fit_Uc_Hs_model(H_values, Uc, initial_guesses=None, maxfev=10000):
     
     # Extract the parameters
     a, b, c = params
-    print(a,b,c)
+    #print(a,b,c)
     return a, b, c
 
 def air_temperature_correction_nora10(df,var='T2m'):

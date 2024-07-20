@@ -300,7 +300,7 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
     return result_df
 
 
-def table_tp_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_tp_for_wind.csv'):
+def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_tp_for_wind.csv'):
     df=data
     # Create bins
     min_wind = 0
@@ -334,6 +334,18 @@ def table_tp_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_w
     result_df['Hs(std-model) [m]'] = Hs_as_function_of_U(result_df['U[m/s]'], a_sigma, b_sigma, c_sigma, d_sigma)
     result_df['Hs(P5-model) [m]'] =  result_df['Hs(Mean-model) [m]'] - 1.65*result_df['Hs(std-model) [m]']
     result_df['Hs(P95-model) [m]'] =  result_df['Hs(Mean-model) [m]'] + 1.65*result_df['Hs(std-model) [m]']
+
+    # Create the table data dictionary
+    table_data = {
+        'Hs(U)': ['Mean','Std. Dev.'],
+        'a': [a_mean,a_sigma],
+        'b': [b_mean,b_sigma],
+        'c': [c_mean,c_sigma],
+        'd': [c_mean,d_sigma],
+    }
+    df_coeff = pd.DataFrame(table_data)
+    if output_file:
+        df_coeff.round(3).to_csv(output_file.split('.')[0]+'_coeff.csv',index=False)
 
     # Create a new dataframe with the results
     if output_file:
@@ -411,7 +423,7 @@ def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir=
     return df
 
 def table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
-    df = table_tp_for_given_wind(ds, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
+    df = table_hs_for_given_wind(ds, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
     shape, loc, scale, value = RVE_ALL(ds,var='W10',periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
     result_df = pd.DataFrame(value, columns=['U[m/s]'])
     result_df['Return period [years]'] = periods
@@ -461,6 +473,19 @@ def table_current_for_given_wind(data: pd.DataFrame, var_curr: str,var_wind: str
     result_df['Uc(P5-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] - 1.65*result_df['Uc(std-model) [m/s]']
     result_df['Uc(P95-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] + 1.65*result_df['Uc(std-model) [m/s]']
 
+
+    # Create the table data dictionary
+    table_data = {
+        'Uc(U)': ['Mean','Std. Dev.'],
+        'a': [a_mean,a_sigma],
+        'b': [b_mean,b_sigma],
+        'c': [c_mean,c_sigma],
+        'd': [c_mean,d_sigma],
+    }
+    df_coeff = pd.DataFrame(table_data)
+    if output_file:
+        df_coeff.round(3).to_csv(output_file.split('.')[0]+'_coeff.csv',index=False)
+
     # Create a new dataframe with the results
     if output_file:
         result_df[['U[m/s]', 'Uc(P5-model) [m/s]','Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]']].round(2).to_csv(output_file,index=False)
@@ -502,7 +527,20 @@ def table_current_for_given_Hs(data: pd.DataFrame, var_curr: str,var_hs: str, bi
     result_df['Uc(P5-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] - 1.65*result_df['Uc(std-model) [m/s]']
     result_df['Uc(P95-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] + 1.65*result_df['Uc(std-model) [m/s]']
 
+    # Create the table data dictionary
+    table_data = {
+        'Uc(Hs)': ['Mean','Std. Dev.'],
+        'a': [a_mean,a_sigma],
+        'b': [b_mean,b_sigma],
+        'c': [c_mean,c_sigma],
+    }
+    df_coeff = pd.DataFrame(table_data)
+    if output_file:
+        df_coeff.round(3).to_csv(output_file.split('.')[0]+'_coeff.csv',index=False)
+
     # Create a new dataframe with the results
     if output_file:
         result_df[['Hs[m]', 'Uc(P5-model) [m/s]','Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]']].round(2).to_csv(output_file,index=False)
     return result_df
+
+

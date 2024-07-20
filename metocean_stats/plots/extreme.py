@@ -697,7 +697,7 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     return fig
 
 def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
-    df = table_tp_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
+    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
@@ -756,7 +756,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
     plt.ylabel('Current speed, $U_c$ [m/s]',fontsize=16)
     plt.xlabel('Wind speed, $U$ [m/s]',fontsize=16)
     plt.xlim(0,df['U[m/s]'].max())
-    plt.ylim(0,df['Uc(P95-model) [m/s]'].max())
+    plt.ylim(0,1.5*df['Uc(Mean-model) [m/s]'].max())
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
