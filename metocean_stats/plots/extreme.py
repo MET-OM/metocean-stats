@@ -741,7 +741,7 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     return fig
 
 
-def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,output_file='curr_for_given_wind.png'):
+def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,max_wind=40,output_file='curr_for_given_wind.png'):
     df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=max_wind, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
