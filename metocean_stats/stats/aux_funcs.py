@@ -292,6 +292,10 @@ def Hs_as_function_of_U(U, a, b, c, d):
 def Uc_as_function_of_U(U, a, b, c, d):
     return a + b * U**(c + d * U)
 
+# Define the function Uc(Hs) # Uc for current speed 
+def Uc_as_function_of_Hs(Hs, a, b, c):
+    return a + b * Hs**c
+
 # Function to fit the parameters a, b, c, and d
 def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
     if initial_guesses is None:
@@ -308,19 +312,32 @@ def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
 
 
 # Function to fit the parameters a, b, c, and d
-def fit_Uc_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
+def fit_Uc_wind_model(U, Uc, initial_guesses=None, maxfev=10000):
     if initial_guesses is None:
         # If no initial guesses are provided, use some default values
         initial_guesses = [13.5, 0.005, 2.0, 0.003]
     
     # Use curve_fit to fit the function to the data
-    params, covariance = curve_fit(Uc_as_function_of_U, U, H_values, p0=initial_guesses, maxfev=maxfev)
+    params, covariance = curve_fit(Uc_as_function_of_U, U, Uc, p0=initial_guesses, maxfev=maxfev)
     
     # Extract the parameters
     a, b, c, d = params
     print(a,b,c,d)
     return a, b, c, d
 
+# Function to fit the parameters a, b, c, and d
+def fit_Uc_Hs_model(H_values, Uc, initial_guesses=None, maxfev=10000):
+    if initial_guesses is None:
+        # If no initial guesses are provided, use some default values
+        initial_guesses = [14.5, 0.60, 1.8]
+    
+    # Use curve_fit to fit the function to the data
+    params, covariance = curve_fit(Uc_as_function_of_Hs, H_values, Uc, p0=initial_guesses, maxfev=maxfev)
+    
+    # Extract the parameters
+    a, b, c = params
+    print(a,b,c)
+    return a, b, c
 
 def air_temperature_correction_nora10(df,var='T2m'):
     
