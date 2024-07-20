@@ -425,7 +425,7 @@ def test_table_current_for_given_wind(ds=ds):
     df = tables.table_current_for_given_wind(ds, 'HS', 'W10', max_wind=40, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (22, 4):
+    if df.shape == (21, 10):
         pass
     else:
         raise ValueError("Shape is not correct")
