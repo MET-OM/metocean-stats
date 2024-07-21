@@ -720,13 +720,15 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     return fig
 
 def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=False,title='Return Periods over z',units = 'm/s',distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.png'):
+    import matplotlib.ticker as ticker
     df = table_profile_return_values(data,var=var, z=z, periods=periods,units = units ,distribution=distribution,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
     df.columns = [col.replace('Return period ', '') for col in df.columns] # for legends
+    plt.yticks(z)  # Set yticks to be the values in z
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
 
     for column in df.columns[1:]:
-        plt.plot(df[column][1:-1],df['z'][1:-1], label=column)
-    
+        plt.plot(df[column][1:],z,marker='.', label=column)
     plt.ylabel('z[m]')
     plt.xlabel('[m/s]')
     plt.title(title)
