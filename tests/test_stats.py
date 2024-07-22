@@ -2,10 +2,15 @@ from metocean_api import ts
 from metocean_stats import plots, tables, stats
 from metocean_stats.stats.aux_funcs import *
 from metocean_stats.stats.map_funcs import *
+import pandas as pd
+
 import os
 
 # Define TimeSeries-object for NORA3
 ds = readNora10File('tests/data/NORA_test.txt')
+ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
+depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
+
 
 def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
     output_file = 'test_prob_non_exceedance.png'
@@ -455,6 +460,15 @@ def test_plot_current_for_given_Hs(ds=ds):
         pass
     else:
         raise ValueError("FigValue is not correct")
+
+
+def test_table_extreme_current_profile_rv(ds=ds_ocean):
+    df = tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file=None)
+
+    if df.shape == (16, 17):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
