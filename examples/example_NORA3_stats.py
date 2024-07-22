@@ -98,7 +98,7 @@ depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50
 #df = tables.table_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m',output_file='HS_dir_extremes_Weibull_POT.csv')
 # plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='POT',threshold='P99',output_file='dir_extremes_Weibull_norsok.png')
 #df = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file='RVE_wind_profile.csv')
-fig = plots.plot_profile_return_values(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file='RVE_current_profile.png')
+#fig = plots.plot_profile_return_values(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file='RVE_current_profile.png')
 #df = tables.table_current_for_given_wind(ds_all, var_curr='current_speed_0m', var_wind='W10', bin_width=2, max_wind=42, output_file='table_perc_current_for_wind.csv')
 #plots.plot_current_for_given_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',max_wind=40 ,output_file='curr_for_given_wind.png')
 #df = tables.table_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
@@ -108,6 +108,7 @@ fig = plots.plot_profile_return_values(ds_ocean,var=['current_speed_' + d for d 
 
 #print(df.shape)
 #plots.plot_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', max_hs=20, output_file='curr_for_given_hs.png')
+tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file='table_extreme_current_profile_rv.csv')
 
 #
 # Water levels:

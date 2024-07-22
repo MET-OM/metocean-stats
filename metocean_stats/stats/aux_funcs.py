@@ -372,3 +372,54 @@ def estimate_Tm01(Tp,gamma = 2.5):
     Tm01 = (0.7303 + 0.04936 * gamma - 0.006556 * gamma ** 2 + 0.0003610 * gamma ** 3) * Tp
     return Tm01
 
+def fit_profile_polynomial(z, speeds, degree=3):
+    """
+    Fit a polynomial of a given degree to the data.
+    
+    Parameters:
+    z (array-like): Depths or heights
+    speeds (array-like): Current speeds at the given depths
+    degree (int): Degree of the polynomial to fit
+    
+    Returns:
+    numpy.ndarray: Coefficients of the fitted polynomial
+    """
+    # Convert inputs to numpy arrays
+    z = np.array(z)
+    speeds = np.array(speeds)
+    
+    # Fit a polynomial of the given degree to the data
+    coefficients = np.polyfit(z, speeds, degree)
+    
+    return coefficients
+
+def extrapolate_speeds(coefficients, z, target_speed, target_z):
+    """
+    Extrapolate speeds at given depths using the polynomial coefficients and adjust 
+    so that the speed at the target depth matches the target speed.
+    
+    Parameters:
+    coefficients (array-like): Coefficients of the polynomial
+    z (array-like): Depths at which to calculate the speeds
+    target_speed (float): The known speed at the target depth
+    target_z (float): The depth at which the speed is known
+    
+    Returns:
+    numpy.ndarray: Adjusted extrapolated speeds at the given depths
+    """
+    # Convert depths to numpy array
+    z = np.array(z)
+    
+    # Evaluate the polynomial at the given depths
+    extrapolated_speeds = np.polyval(coefficients, z)
+    
+    # Calculate the current speed at the target depth
+    current_speed_at_target_z = np.polyval(coefficients, target_z)
+    
+    # Calculate the adjustment factor
+    adjustment_factor = target_speed / current_speed_at_target_z
+    
+    # Adjust the speeds
+    adjusted_speeds = extrapolated_speeds * adjustment_factor
+    
+    return adjusted_speeds

@@ -543,4 +543,25 @@ def table_current_for_given_Hs(data: pd.DataFrame, var_curr: str,var_hs: str, bi
         result_df[['Hs[m]', 'Uc(P5-model) [m/s]','Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]']].round(2).to_csv(output_file,index=False)
     return result_df
 
+def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30], periods=[1,10,100], percentile=95, output_file='table_extreme_current_profile_rv.csv'):
+    for period in periods:
+        df = table_profile_return_values(data=data,var=var, z=z, periods=periods, output_file=None)
+        df[[f'{i}' for i in z]] = np.nan
+        df.loc[0, [f'{i}' for i in z]] =  df[f'Return period {period} [years]'][0] # add units
+        # Create a list of columns to drop, excluding the current period
+        columns_to_drop = [f'Return period {p} [years]' for p in periods if p != period]
+        # Drop the columns from the DataFrame
+        df = df.drop(columns=columns_to_drop)
+        
+        for i in range(len(z)):
+            index_events = data[data[var[i]]>data[var[i]].quantile(percentile/100)].index
+            mean_profile = data.loc[index_events][var].mean(axis=0)
+            coeffients = fit_profile_polynomial(z, mean_profile.values, degree=3)
+            df.loc[1:,f'{z[i]}'] = np.round(extrapolate_speeds(coefficients=coeffients, z=z, target_speed=df[f'Return period {period} [years]'][i+1], target_z=z[i]),2)
+        
+        # Create a new dataframe with the results
+        if output_file:
+            df.to_csv(output_file.split('.')[0]+f'period_{period}.csv',index=False)
+        
+    return df
 
