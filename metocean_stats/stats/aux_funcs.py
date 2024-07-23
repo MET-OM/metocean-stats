@@ -372,7 +372,7 @@ def estimate_Tm01(Tp,gamma = 2.5):
     Tm01 = (0.7303 + 0.04936 * gamma - 0.006556 * gamma ** 2 + 0.0003610 * gamma ** 3) * Tp
     return Tm01
 
-def fit_profile_polynomial(z, speeds, degree=3):
+def fit_profile_polynomial(z, speeds, degree=4):
     """
     Fit a polynomial of a given degree to the data.
     
@@ -393,16 +393,41 @@ def fit_profile_polynomial(z, speeds, degree=3):
     
     return coefficients
 
-def extrapolate_speeds(coefficients, z, target_speed, target_z):
+
+
+def fit_profile_spline(z, speeds, s=None):
+    from scipy.interpolate import UnivariateSpline
     """
-    Extrapolate speeds at given depths using the polynomial coefficients and adjust 
+    Fit a spline to the data.
+    
+    Parameters:
+    z (array-like): Depths or heights
+    speeds (array-like): Current speeds at the given depths
+    s (float or None): Smoothing factor. If None, the spline will interpolate through all points.
+    
+    Returns:
+    UnivariateSpline: A spline representation of the data
+    """
+    # Convert inputs to numpy arrays
+    z = np.array(z)
+    speeds = np.array(speeds)
+    
+    # Fit a spline to the data
+    spline = UnivariateSpline(z, speeds, s=s)
+    
+    return spline
+
+def extrapolate_speeds(fit_model, z, target_speed, target_z, method='polynomial'):
+    """
+    Extrapolate speeds at given depths using the fitted model and adjust 
     so that the speed at the target depth matches the target speed.
     
     Parameters:
-    coefficients (array-like): Coefficients of the polynomial
+    fit_model (array-like or UnivariateSpline): Coefficients of the polynomial or the spline model
     z (array-like): Depths at which to calculate the speeds
     target_speed (float): The known speed at the target depth
     target_z (float): The depth at which the speed is known
+    method (str): Method used for fitting, either 'polynomial' or 'spline'
     
     Returns:
     numpy.ndarray: Adjusted extrapolated speeds at the given depths
@@ -410,11 +435,21 @@ def extrapolate_speeds(coefficients, z, target_speed, target_z):
     # Convert depths to numpy array
     z = np.array(z)
     
-    # Evaluate the polynomial at the given depths
-    extrapolated_speeds = np.polyval(coefficients, z)
-    
-    # Calculate the current speed at the target depth
-    current_speed_at_target_z = np.polyval(coefficients, target_z)
+    if method == 'polynomial':
+        # Evaluate the polynomial at the given depths
+        extrapolated_speeds = np.polyval(fit_model, z)
+        
+        # Calculate the current speed at the target depth
+        current_speed_at_target_z = np.polyval(fit_model, target_z)
+    elif method == 'spline':
+        from scipy.interpolate import UnivariateSpline
+        # Evaluate the spline at the given depths
+        extrapolated_speeds = fit_model(z)
+        
+        # Calculate the current speed at the target depth
+        current_speed_at_target_z = fit_model(target_z)
+    else:
+        raise ValueError("Method must be either 'polynomial' or 'spline'")
     
     # Calculate the adjustment factor
     adjustment_factor = target_speed / current_speed_at_target_z
