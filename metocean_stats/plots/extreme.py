@@ -768,7 +768,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
 
 
 def plot_current_for_given_Hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
-    df = table_current_for_given_Hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df = table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_curr], bins=50, cmap='hot', cmin=1)

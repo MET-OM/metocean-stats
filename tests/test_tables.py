@@ -264,6 +264,16 @@ def test_table_current_for_rv_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
+def test_table_current_for_rv_hs(ds=ds):
+    output_file = 'test_table_current_for_given_hs.csv'
+    ds['current_speed_0m'] = 0.05*ds['W10']
+    df = tables.table_current_for_rv_hs(ds, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (4, 6):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
 
 def test_profile_return_values(ds=ds):
     output_file = 'test_profile_return_values.csv'
@@ -287,10 +297,10 @@ def test_table_current_for_given_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_table_current_for_given_Hs(ds=ds):
+def test_table_current_for_given_hs(ds=ds):
     output_file = 'test_table_current_for_given_Hs.csv'
     ds['current_speed_0m'] = 0.05*ds['W10']
-    df = tables.table_current_for_given_Hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file=output_file)
+    df = tables.table_current_for_given_hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file=output_file)
 
     if os.path.exists(output_file):
         os.remove(output_file)
@@ -298,6 +308,7 @@ def test_table_current_for_given_Hs(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
+
 
 
 def test_table_extreme_current_profile_rv(ds=ds_ocean):

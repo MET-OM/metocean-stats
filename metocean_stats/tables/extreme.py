@@ -492,7 +492,7 @@ def table_current_for_given_wind(data: pd.DataFrame, var_curr: str,var_wind: str
     return result_df
 
 
-def table_current_for_given_Hs(data: pd.DataFrame, var_curr: str,var_hs: str, bin_width=2, max_hs=20, output_file='table_perc_curr_for_hs.csv'):
+def table_current_for_given_hs(data: pd.DataFrame, var_curr: str,var_hs: str, bin_width=2, max_hs=20, output_file='table_perc_curr_for_hs.csv'):
     df=data
     # Create bins
     min_hs = 0
@@ -605,3 +605,23 @@ def table_current_for_rv_wind(data, var_curr='current_speed_0m', var_wind='W10',
         result_df[['Return period [years]','U[m/s]', 'Uc(P5-model) [m/s]', 'Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]' ]].round(2).to_csv(output_file,index=False)
     
     return result_df
+
+def table_current_for_rv_hs(data, var_curr='current_speed_0m', var_hs='HS',periods=[1,10],output_file='Uc_for_rv_hs.csv'):
+    df = table_current_for_given_hs(data=data, var_curr=var_curr,var_hs=var_hs, bin_width=2, max_hs=20, output_file=None)
+    shape, loc, scale, value = RVE_ALL(data,var=var_hs,periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
+    result_df = pd.DataFrame(value, columns=['Hs[m]'])
+    result_df['Return period [years]'] = periods
+    a_mean, b_mean, c_mean = fit_Uc_Hs_model(df.dropna()['Hs[m]'].values,df.dropna()['Uc(Mean-obs) [m/s]'].values) 
+    a_sigma, b_sigma, c_sigma = fit_Uc_Hs_model(df.dropna()['Hs[m]'].values,df.dropna()['Uc(std-obs) [m/s]'].values) 
+    result_df['Uc(Mean-model) [m/s]'] = Uc_as_function_of_Hs(result_df['Hs[m]'], a_mean, b_mean, c_mean)
+    result_df['Uc(std-model) [m/s]'] = Uc_as_function_of_Hs(result_df['Hs[m]'], a_sigma, b_sigma, c_sigma)
+    result_df['Uc(P5-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] - 1.65*result_df['Uc(std-model) [m/s]']
+    result_df['Uc(P95-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] + 1.65*result_df['Uc(std-model) [m/s]']
+    # set to 0 values that are negative, especially for P5
+    result_df[result_df < 0] = 0
+    
+    if output_file:
+        result_df[['Return period [years]','Hs[m]', 'Uc(P5-model) [m/s]', 'Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]' ]].round(2).to_csv(output_file,index=False)
+    
+    return result_df
+

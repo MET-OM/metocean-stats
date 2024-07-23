@@ -102,16 +102,18 @@ ds_all = ds_all.dropna(how='all')
 #fig = plots.plot_profile_return_values(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file='RVE_current_profile.png')
 #df = tables.table_current_for_given_wind(ds_all, var_curr='current_speed_0m', var_wind='W10', bin_width=2, max_wind=42, output_file='table_perc_current_for_wind.csv')
 #plots.plot_current_for_given_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',max_wind=40 ,output_file='curr_for_given_wind.png')
-#df = tables.table_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
+#df = tables.table_current_for_given_hs(ds_all, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
 #ds['current_speed_0m'] = 0.05*ds['W10']
 #df = tables.table_current_for_given_wind(ds, var_curr='current_speed_0m', var_wind='W10', bin_width=2, max_wind=42, output_file='table_perc_current_for_wind.csv')
-#df = tables.table_current_for_given_Hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
+#df = tables.table_current_for_given_hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
 
 #plots.plot_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', max_hs=20, output_file='curr_for_given_hs.png')
 #df = tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file='table_extreme_current_profile_rv.png')
 #df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file='table_profile_stats.csv')
 #fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file='stats_current_profile.png')
-df = tables.table_current_for_rv_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',periods=[1,10,100,10000],output_file='Uc_for_rv_wind.csv')
+#df = tables.table_current_for_rv_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',periods=[1,10,100,10000],output_file='Uc_for_rv_wind.csv')
+df = tables.table_current_for_rv_hs(ds_all, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file='Uc_for_rv_hs.csv')
+
 
 print(df.shape)
 
