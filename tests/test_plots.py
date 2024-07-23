@@ -183,6 +183,16 @@ def test_plot_profile_return_values(ds=ds):
     else:
         raise ValueError("FigValue is not correct")
 
+def test_plot_profile_stats(ds=ds_ocean):
+    output_file = 'test_plot_profile_stats.png'
+    fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.axes[0].lines[0].get_xdata()[0] == 0.17:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+
 def test_plot_current_for_given_wind(ds=ds):
     output_file = 'test_current_for_given_wind.png'
     fig = plots.plot_current_for_given_wind(ds, 'HS', 'W10', output_file=output_file)

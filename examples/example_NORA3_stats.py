@@ -110,10 +110,11 @@ depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50
 #print(df.shape)
 #plots.plot_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', max_hs=20, output_file='curr_for_given_hs.png')
 #df = tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file='table_extreme_current_profile_rv.png')
-df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file='table_profile_stats.csv')
-#
+#df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file='table_profile_stats.csv')
+
+fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file='stats_current_profile.png')
 # Water levels:
 
 
 
-print(df.shape)
+print(fig.axes[0].lines[0].get_xdata()[0])
