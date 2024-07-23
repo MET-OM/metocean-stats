@@ -12,16 +12,6 @@ ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, 
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
 
-def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
-    output_file = 'test_prob_non_exceedance.png'
-    fig = plots.plot_prob_non_exceedance_fitted_3p_weibull(ds, var='HS', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0].round(2) == -0.69:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
 def test_scatter_diagram(ds=ds):
     output_file = 'test_scatter_diagram.csv'
     df = tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file=output_file)
@@ -52,16 +42,6 @@ def test_table_monthly_non_exceedance(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_plot_monthly_stats(ds=ds):
-    output_file = 'test_monthly_stats.png'
-    fig = plots.plot_monthly_stats(ds, var1='T2m', show=['Minimum', 'Mean', 'Maximum'], title='T2m', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
 def test_table_directional_non_exceedance(ds=ds):
     output_file = 'test_directional_non_exceedance.csv'
     df = tables.table_directional_non_exceedance(ds, var1='HS', step_var1=0.5, var_dir='DIRM', output_file=output_file)
@@ -71,26 +51,6 @@ def test_table_directional_non_exceedance(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
-
-def test_plot_directional_stats(ds=ds):
-    output_file = 'test_directional_stats.png'
-    fig = plots.plot_directional_stats(ds, var1='HS', step_var1=0.5, var_dir='DIRM', title='$H_s$[m]', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_joint_distribution_Hs_Tp(ds=ds):
-    output_file = 'test_joint_distribution_Hs_Tp.png'
-    fig = plots.plot_joint_distribution_Hs_Tp(ds, var_hs='HS', var_tp='TP', periods=[1, 10, 100, 1000], title='Hs-Tp joint distribution', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if int(fig.axes[0].lines[0].get_xdata()[0]) == 3:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
 
 def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
     output_file = 'test_monthly_joint_distribution_Hs_Tp_param.csv'
@@ -111,16 +71,6 @@ def test_table_directional_joint_distribution_Hs_Tp_param(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
-
-def test_plot_monthly_weather_window(ds=ds):
-    output_file = 'test_monthly_weather_window.png'
-    fig, table = plots.plot_monthly_weather_window(ds, var='HS', threshold=4, window_size=12, output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if table._loc == 17:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
 
 def test_table_directional_return_periods(ds=ds):
     output_file = 'test_directional_return_periods.csv'
@@ -173,36 +123,6 @@ def test_table_monthly_return_periods_POT(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_plot_monthly_return_periods(ds=ds):
-    output_file = 'test_monthly_return_periods.png'
-    fig = plots.plot_monthly_return_periods(ds, var='HS', periods=[1, 10, 100], distribution='Weibull3P_MOM', units='m', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan':
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_directional_return_periods(ds=ds):
-    output_file = 'test_directional_return_periods.png'
-    fig = plots.plot_directional_return_periods(ds, var='HS', var_dir='DIRM', periods=[1, 10, 100, 10000], distribution='GUM', units='m', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == '0°':
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_polar_directional_return_periods(ds=ds):
-    output_file = 'test_polar_directional_return_periods.png'
-    fig = plots.plot_polar_directional_return_periods(ds, var='HS', var_dir='DIRM', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', units='m', adjustment='NORSOK', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
 def test_table_monthly_joint_distribution_Hs_Tp_return_values(ds=ds):
     output_file = 'test_monthly_joint_distribution_Hs_Tp_return_values.csv'
     df = tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds, var_hs='HS', var_tp='TP', periods=[1, 10, 100, 10000], output_file=output_file)
@@ -232,16 +152,6 @@ def test_table_Hs_Tpl_Tph_return_values(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
-
-def test_plot_tp_for_given_hs(ds=ds):
-    output_file = 'test_tp_for_given_hs.png'
-    fig = plots.plot_tp_for_given_hs(ds, 'HS', 'TP', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
 
 def test_table_tp_for_given_hs(ds=ds):
     output_file = 'test_table_tp_for_given_hs.csv'
@@ -293,16 +203,6 @@ def test_table_hshs_for_given_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_plot_hs_for_given_wind(ds=ds):
-    output_file = 'test_plot_hs_for_given_wind.png'
-    fig = plots.plot_hs_for_given_wind(ds, 'HS', 'W10', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
 def test_table_Hmax_crest_return_periods(ds=ds):
     output_file = 'test_table_Hmax_crest_return_periods.csv'
     df = tables.table_Hmax_crest_return_periods(ds, var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100, 10000], sea_state='long-crested', output_file=output_file)
@@ -343,37 +243,6 @@ def test_table_monthly_return_periods_T2m_max(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_plot_monthly_return_periods_T2m_min(ds=ds):
-    output_file = 'test_plot_monthly_return_periods_T2m_min.png'
-    fig = plots.plot_monthly_return_periods(ds, var='T2m', periods=[1, 10, 100], distribution='GUM_L', method='minimum', units='°C', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan':
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_monthly_return_periods_T2m_max(ds=ds):
-    output_file = 'test_plot_monthly_return_periods_T2m_max.png'
-    fig = plots.plot_monthly_return_periods(ds, var='T2m', periods=[1, 10, 100], distribution='GUM', method='maximum', units='°C', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan':
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_var_rose(ds=ds):
-    output_file = 'test_rose.png'
-    fig = plots.var_rose(ds,'DIRM' ,'HS', method='monthly', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-
 def test_table_hs_for_rv_wind(ds=ds):
     output_file = 'test_table_hs_for_given_wind.csv'
     df = tables.table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
@@ -384,16 +253,6 @@ def test_table_hs_for_rv_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_plot_directional_return_periods_POT(ds=ds):
-    output_file = 'test_directional_return_periods_POT.png'
-    fig = plots.plot_directional_return_periods(ds,var='HS',var_dir='DIRM',periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='POT',threshold='P99',output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == '0°':
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
 def test_profile_return_values(ds=ds):
     output_file = 'test_profile_return_values.csv'
     df = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=output_file)
@@ -403,27 +262,6 @@ def test_profile_return_values(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
-
-
-def test_plot_profile_return_values(ds=ds):
-    output_file = 'test_plot_profile_return_values.png'
-    fig = plots.plot_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=True, output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.axes[0].lines[0].get_xdata()[0] == 27.31:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-def test_plot_current_for_given_wind(ds=ds):
-    output_file = 'test_current_for_given_wind.png'
-    fig = plots.plot_current_for_given_wind(ds, 'HS', 'W10', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
 
 def test_table_current_for_given_wind(ds=ds):
     output_file = 'test_table_current_for_given_wind.csv'
@@ -450,18 +288,6 @@ def test_table_current_for_given_Hs(ds=ds):
         raise ValueError("Shape is not correct")
 
 
-def test_plot_current_for_given_Hs(ds=ds):
-    output_file = 'test_current_for_given_Hs.png'
-    ds['current_speed_0m'] = 0.05*ds['W10']
-    fig = plots.plot_current_for_given_Hs(ds, 'current_speed_0m', 'HS', output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if fig.dpi == 100.0:
-        pass
-    else:
-        raise ValueError("FigValue is not correct")
-
-
 def test_table_extreme_current_profile_rv(ds=ds_ocean):
     df = tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file=None)
 
@@ -469,6 +295,15 @@ def test_table_extreme_current_profile_rv(ds=ds_ocean):
         pass
     else:
         raise ValueError("Shape is not correct")
+
+
+def test_table_profile_stats(ds=ds_ocean):
+    df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file=None)
+
+    if df.shape == (16, 12) and df['P50'][1]== 0.16:
+        pass
+    else:
+        raise ValueError("Shape or value are not correct")
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 

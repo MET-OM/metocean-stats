@@ -429,3 +429,32 @@ def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, windo
     
     return results_df
 
+def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=None, output_file='table_profile_stats.csv'):
+    # Initialize an empty list to store the results
+    results = []
+    
+    # Iterate over each height in z
+    if var_dir is None:
+        for i in range(len(z)):
+            results.append([z[i], data[var[i]].mean().round(2), data[var[i]].std().round(2), 
+                            data[var[i]].quantile(0.05), data[var[i]].quantile(0.10),
+                            data[var[i]].quantile(0.50), data[var[i]].quantile(0.90),
+                            data[var[i]].quantile(0.95), data[var[i]].quantile(0.99),
+                            data[var[i]].max(), str(data[var[i]].idxmax())   ])
+        results.insert(0,['[m]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', 'YYYY-MM-DD hh:mm:ss'])
+        df = pd.DataFrame(results, columns=['z', 'Mean', 'Std.dev', 'P5', 'P10', 'P50', 'P90', 'P95', 'P99', 'Max', 'Max Speed Event'])
+
+    else:
+        for i in range(len(z)):
+            results.append([z[i], data[var[i]].mean().round(2), data[var[i]].std().round(2), 
+                            data[var[i]].quantile(0.05), data[var[i]].quantile(0.10),
+                            data[var[i]].quantile(0.50), data[var[i]].quantile(0.90),
+                            data[var[i]].quantile(0.95), data[var[i]].quantile(0.99),
+                            data[var[i]].max(),data[var_dir[i]].loc[data[var[i]].idxmax()] ,  str(data[var[i]].idxmax())   ])   
+        results.insert(0,['[m]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]', '[m/s]','[°]' ,'YYYY-MM-DD hh:mm:ss'])
+        df = pd.DataFrame(results, columns=['z', 'Mean', 'Std.dev', 'P5', 'P10', 'P50', 'P90', 'P95', 'P99', 'Max','Dir. Max Event', 'Time Max Event'])
+     
+    # Save the DataFrame to a CSV file
+    df.to_csv(output_file, index=False)
+    # Return the DataFrame
+    return df
