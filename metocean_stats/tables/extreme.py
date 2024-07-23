@@ -545,23 +545,41 @@ def table_current_for_given_Hs(data: pd.DataFrame, var_curr: str,var_hs: str, bi
 
 def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30], periods=[1,10,100], percentile=95, output_file='table_extreme_current_profile_rv.csv'):
     for period in periods:
-        df = table_profile_return_values(data=data,var=var, z=z, periods=periods, output_file=None)
+        df = table_profile_return_values(data=data, var=var, z=z, periods=periods, output_file=None)
         df[[f'{i}' for i in z]] = np.nan
-        df.loc[0, [f'{i}' for i in z]] =  df[f'Return period {period} [years]'][0] # add units
+        df.loc[0, [f'{i}' for i in z]] = df[f'Return period {period} [years]'][0] # add units
+        
         # Create a list of columns to drop, excluding the current period
         columns_to_drop = [f'Return period {p} [years]' for p in periods if p != period]
         # Drop the columns from the DataFrame
         df = df.drop(columns=columns_to_drop)
         
         for i in range(len(z)):
-            index_events = data[data[var[i]]>data[var[i]].quantile(percentile/100)].index
+            index_events = data[data[var[i]] > data[var[i]].quantile(percentile / 100)].index
             mean_profile = data.loc[index_events][var].mean(axis=0)
             coeffients = fit_profile_polynomial(z, mean_profile.values, degree=3)
-            df.loc[1:,f'{z[i]}'] = np.round(extrapolate_speeds(coefficients=coeffients, z=z, target_speed=df[f'Return period {period} [years]'][i+1], target_z=z[i]),2)
+            df.loc[1:, f'{z[i]}'] = np.round(extrapolate_speeds(coefficients=coeffients, z=z, target_speed=df[f'Return period {period} [years]'][i+1], target_z=z[i]), 2)
         
         # Create a new dataframe with the results
         if output_file:
-            df.to_csv(output_file.split('.')[0]+f'period_{period}.csv',index=False)
-        
+            file_extension = output_file.split('.')[1] 
+            if file_extension == 'csv':
+                df.to_csv(output_file.split('.')[0] + f'period_{period}.csv', index=False)
+            elif file_extension == 'png' or 'pdf':
+                import seaborn as sns
+                plt.figure(figsize=(10, 8))
+                df.rename(columns={ f'Return period {period} [years]': f'RP {period} [yrs]'}, inplace=True)
+                ax = sns.heatmap(df.iloc[1:, 1:].astype(float), annot=True, cmap="viridis", cbar=False, yticklabels=z)
+                #plt.title(f'Return Period {period} Years')
+                plt.xlabel('Associated values [m/s] per z')
+                plt.ylabel('z[m]')
+                ax.xaxis.tick_top()  # Move x-axis to the top
+                ax.xaxis.set_label_position('top')  # Move x-axis label to the top
+                plt.xticks(rotation=45, ha='left')  # Rotate x-axis labels by 45 degrees
+                plt.yticks(rotation=45, ha='right')  # Rotate y-axis labels by 45 degrees
+                plt.tight_layout()
+                plt.savefig(output_file.split('.')[0] + f'period_{period}.'+file_extension,dpi=100)
+            else:
+                print('File format is not supported')
     return df
 
