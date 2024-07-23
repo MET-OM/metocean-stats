@@ -422,9 +422,9 @@ def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir=
         df[selected_columns].round(2).to_csv(output_file,index=False)
     return df
 
-def table_hs_for_rv_wind(ds, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
-    df = table_hs_for_given_wind(ds, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
-    shape, loc, scale, value = RVE_ALL(ds,var='W10',periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
+def table_hs_for_rv_wind(data, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
+    df = table_hs_for_given_wind(data, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
+    shape, loc, scale, value = RVE_ALL(data,var='W10',periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
     result_df = pd.DataFrame(value, columns=['U[m/s]'])
     result_df['Return period [years]'] = periods
     a_mean, b_mean, c_mean, d_mean = fit_hs_wind_model(df.dropna()['U[m/s]'].values,df.dropna()['Hs(Mean-obs) [m]'].values) 
@@ -587,3 +587,21 @@ def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30
                 print('File format is not supported')
     return df
 
+def table_current_for_rv_wind(data, var_curr='current_speed_0m', var_wind='W10',periods=[1,10],output_file='Uc_for_rv_wind.csv'):
+    df = table_current_for_given_wind(data=data, var_curr=var_curr,var_wind=var_wind, bin_width=2, max_wind=40, output_file=None)
+    shape, loc, scale, value = RVE_ALL(data,var=var_wind,periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
+    result_df = pd.DataFrame(value, columns=['U[m/s]'])
+    result_df['Return period [years]'] = periods
+    a_mean, b_mean, c_mean, d_mean = fit_Uc_wind_model(df.dropna()['U[m/s]'].values,df.dropna()['Uc(Mean-obs) [m/s]'].values) 
+    a_sigma, b_sigma, c_sigma, d_sigma = fit_Uc_wind_model(df.dropna()['U[m/s]'].values,df.dropna()['Uc(std-obs) [m/s]'].values) 
+    result_df['Uc(Mean-model) [m/s]'] = Uc_as_function_of_U(result_df['U[m/s]'], a_mean, b_mean, c_mean, d_mean)
+    result_df['Uc(std-model) [m/s]'] = Uc_as_function_of_U(result_df['U[m/s]'], a_sigma, b_sigma, c_sigma, d_sigma)
+    result_df['Uc(P5-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] - 1.65*result_df['Uc(std-model) [m/s]']
+    result_df['Uc(P95-model) [m/s]'] =  result_df['Uc(Mean-model) [m/s]'] + 1.65*result_df['Uc(std-model) [m/s]']
+    # set to 0 values that are negative, especially for P5
+    result_df[result_df < 0] = 0
+    
+    if output_file:
+        result_df[['Return period [years]','U[m/s]', 'Uc(P5-model) [m/s]', 'Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]' ]].round(2).to_csv(output_file,index=False)
+    
+    return result_df

@@ -12,7 +12,7 @@ from metocean_stats.stats.map_funcs import *
 # Load data from local file
 #ds.load_data('/home/konstantinosc/'+ds.datafile)
 #ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
-#ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
+ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = wind_correction_nora10(ds,var='W10')
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 
@@ -84,8 +84,8 @@ import pandas as pd
 ds_ocean = pd.read_csv('../tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
-#ds_all = pd.concat([ds.loc['2017-01-02 00:00:00':'2018-12-31 21:00:00'], ds_ocean.resample('3h').mean()], axis=1)
-#ds_all = ds_all.dropna(how='all')
+ds_all = pd.concat([ds.loc['2017-01-02 00:00:00':'2018-12-31 21:00:00'], ds_ocean.resample('3h').mean()], axis=1)
+ds_all = ds_all.dropna(how='all')
 
 #plots.var_rose(ds, f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='monthly', output_file='monthly_rose.png')
 #plots.var_rose(ds,f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='overall', output_file='overall_rose.png')
@@ -107,14 +107,15 @@ depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50
 #df = tables.table_current_for_given_wind(ds, var_curr='current_speed_0m', var_wind='W10', bin_width=2, max_wind=42, output_file='table_perc_current_for_wind.csv')
 #df = tables.table_current_for_given_Hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file='table_perc_current_for_Hs.csv')
 
-#print(df.shape)
 #plots.plot_current_for_given_Hs(ds_all, var_curr='current_speed_0m', var_hs='HS', max_hs=20, output_file='curr_for_given_hs.png')
 #df = tables.table_extreme_current_profile_rv(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], periods=[1,100,1000],percentile=95, output_file='table_extreme_current_profile_rv.png')
 #df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file='table_profile_stats.csv')
+#fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file='stats_current_profile.png')
+df = tables.table_current_for_rv_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',periods=[1,10,100,10000],output_file='Uc_for_rv_wind.csv')
 
-fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file='stats_current_profile.png')
+print(df.shape)
+
 # Water levels:
 
 
 
-print(fig.axes[0].lines[0].get_xdata()[0])

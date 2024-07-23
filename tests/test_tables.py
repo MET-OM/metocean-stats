@@ -253,6 +253,18 @@ def test_table_hs_for_rv_wind(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
+def test_table_current_for_rv_wind(ds=ds):
+    output_file = 'test_table_current_for_given_wind.csv'
+    ds['current_speed_0m'] = 0.05*ds['W10']
+    df = tables.table_current_for_rv_wind(ds, var_curr='current_speed_0m', var_wind='W10',periods=[1,10,100,10000],output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (4, 6):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
 def test_profile_return_values(ds=ds):
     output_file = 'test_profile_return_values.csv'
     df = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=output_file)
