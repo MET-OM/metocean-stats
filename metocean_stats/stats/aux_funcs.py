@@ -296,6 +296,10 @@ def Uc_as_function_of_U(U, a, b, c, d):
 def Uc_as_function_of_Hs(Hs, a, b, c):
     return a + b * Hs**c
 
+# Define the function S(Hs) # S for storm surge 
+def S_as_function_of_Hs(Hs, a, b, c):
+    return a + b * Hs + c * np.log(Hs)
+
 # Function to fit the parameters a, b, c, and d
 def fit_hs_wind_model(U, H_values, initial_guesses=None, maxfev=10000):
     if initial_guesses is None:
@@ -458,3 +462,21 @@ def extrapolate_speeds(fit_model, z, target_speed, target_z, method='polynomial'
     adjusted_speeds = extrapolated_speeds * adjustment_factor
     
     return adjusted_speeds
+
+
+# Function to fit the parameters a, b, c, and d
+def fit_S_Hs_model(H_values, S, initial_guesses=None, maxfev=10000):
+    # S is storm surge
+    # H_values is significant wave height 
+
+    if initial_guesses is None:
+        # If no initial guesses are provided, use some default values
+        initial_guesses = [-2.5, 1.25, 4.4]
+    
+    # Use curve_fit to fit the function to the data
+    params, covariance = curve_fit(S_as_function_of_Hs, H_values, S, p0=initial_guesses, maxfev=maxfev)
+    
+    # Extract the parameters
+    a, b, c = params
+    #print(a,b,c)
+    return a, b, c

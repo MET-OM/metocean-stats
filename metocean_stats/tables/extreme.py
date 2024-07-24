@@ -625,3 +625,58 @@ def table_current_for_rv_hs(data, var_curr='current_speed_0m', var_hs='HS',perio
     
     return result_df
 
+
+def table_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str,var_hs: str, bin_width=1, max_hs=20, output_file='table_perc_storm_surge_for_hs.csv'):
+    df=data
+    # Create bins
+    min_hs = 0
+    bins = np.arange(min_hs, max_hs + bin_width, bin_width)
+    bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
+    bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
+    # Bin the wind values
+    df[var_hs+'_bin'] = pd.cut(df[var_hs], bins=bins, labels=bin_labels, right=False)
+    
+    # Calculate P5, Mean, and P95 for each bin
+    result = []
+    for i, bin_label in enumerate(bin_labels):
+        bin_df = df[df[var_hs+'_bin'] == bin_label]
+        if len(bin_df.index)>10:
+            P5 = bin_df[var_surge].quantile(0.05)
+            Mean = bin_df[var_surge].mean()
+            sigma = bin_df[var_surge].std()
+            P95 = bin_df[var_surge].quantile(0.95)
+        else:
+            P5 = np.nan
+            Mean = np.nan
+            sigma  = np.nan
+            P95 = np.nan
+
+        result.append([bin_label, bin_centers[i], P5, Mean, sigma, P95])
+
+    result_df = pd.DataFrame(result, columns=[var_surge+'_bin', 'Hs[m]','S(P5-obs) [m]','S(Mean-obs) [m]','S(std-obs) [m]', 'S(P95-obs) [m]'])
+    a_mean, b_mean, c_mean = fit_S_Hs_model(result_df.dropna()['Hs[m]'].values,result_df.dropna()['S(Mean-obs) [m]'].values) 
+    a_sigma, b_sigma, c_sigma = fit_S_Hs_model(result_df.dropna()['Hs[m]'].values,result_df.dropna()['S(std-obs) [m]'].values) 
+    a_p5, b_p5, c_p5 = fit_S_Hs_model(result_df.dropna()['Hs[m]'].values,result_df.dropna()['S(P5-obs) [m]'].values) 
+    a_p95, b_p95, c_p95 = fit_S_Hs_model(result_df.dropna()['Hs[m]'].values,result_df.dropna()['S(P95-obs) [m]'].values) 
+
+
+    result_df['S(Mean-model) [m]'] = S_as_function_of_Hs(result_df['Hs[m]'], a_mean, b_mean, c_mean)
+    result_df['S(std-model) [m]'] = S_as_function_of_Hs(result_df['Hs[m]'], a_sigma, b_sigma, c_sigma)
+    result_df['S(P5-model) [m]'] =  result_df['S(Mean-model) [m]'] - 1.65*result_df['S(std-model) [m]']
+    result_df['S(P95-model) [m]'] =  result_df['S(Mean-model) [m]'] + 1.65*result_df['S(std-model) [m]']
+
+    # Create the table data dictionary
+    table_data = {
+        'S(Hs)': ['Mean','Std. Dev.', 'P5', 'P95'],
+        'a': [a_mean,a_sigma,a_p5,a_p95],
+        'b': [b_mean,b_sigma,b_p5,b_p95],
+        'c': [c_mean,c_sigma,c_p5,c_p95],
+    }
+    df_coeff = pd.DataFrame(table_data)
+    if output_file:
+        df_coeff.round(3).to_csv(output_file.split('.')[0]+'_coeff.csv',index=False)
+
+    # Create a new dataframe with the results
+    if output_file:
+        result_df[['Hs[m]', 'S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]']].round(2).to_csv(output_file,index=False)
+    return result_df

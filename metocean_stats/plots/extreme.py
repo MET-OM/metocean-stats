@@ -767,7 +767,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
     return fig
 
 
-def plot_current_for_given_Hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
+def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
     df = table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
@@ -783,6 +783,30 @@ def plot_current_for_given_Hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
     plt.xlabel('$H_s$ [m]',fontsize=16)
     plt.xlim(0,df['Hs[m]'].max())
     plt.ylim(0,df['Uc(P95-model) [m/s]'].max())
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+    return fig
+
+
+def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: str,max_hs=20,output_file='surge_for_given_hs.png'):
+    df = table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    # Plot the 2D histogram
+    fig, ax = plt.subplots()
+    plt.hist2d(data[var_hs],data[var_surge], bins=50, cmap='hot', cmin=1)
+    plt.scatter(df['Hs[m]'], df['S(P5-obs) [m]'], marker='x', color='grey', label='P5')
+    plt.scatter(df['Hs[m]'], df['S(Mean-obs) [m]'], marker='x', color='blue', label='Mean')
+    plt.scatter(df['Hs[m]'], df['S(P95-obs) [m]'], marker='x', color='magenta', label='P95')
+    plt.plot(df['Hs[m]'],df['S(P5-model) [m]'],  color='grey', label='P5 fitted')
+    plt.plot(df['Hs[m]'],df['S(Mean-model) [m]'],  color='blue', label='Mean fitted')
+    plt.plot(df['Hs[m]'],df['S(P95-model) [m]'],  color='magenta', label='P95 fitted')
+
+    plt.ylabel('Storm Surge, S [m]',fontsize=16)
+    plt.xlabel('$H_s$ [m]',fontsize=16)
+    plt.xlim(0,df['Hs[m]'].max())
+    plt.ylim(df['S(P5-model) [m]'].min(),df['S(P95-model) [m]'].max())
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()

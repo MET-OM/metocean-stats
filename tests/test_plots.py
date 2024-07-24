@@ -194,10 +194,10 @@ def test_plot_current_for_given_wind(ds=ds):
         raise ValueError("FigValue is not correct")
 
 
-def test_plot_current_for_given_Hs(ds=ds):
+def test_plot_current_for_given_hs(ds=ds):
     output_file = 'test_current_for_given_Hs.png'
     ds['current_speed_0m'] = 0.05*ds['W10']
-    fig = plots.plot_current_for_given_Hs(ds, 'current_speed_0m', 'HS', output_file=output_file)
+    fig = plots.plot_current_for_given_hs(ds, 'current_speed_0m', 'HS', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.dpi == 100.0:
@@ -216,6 +216,16 @@ def test_plot_profile_monthly_stats(ds=ds_ocean):
     else:
         raise ValueError("FigValue is not correct")
 
+def test_plot_storm_surge_for_given_hs(ds=ds):
+    output_file = 'test_surge_for_given_Hs.png'
+    ds['zeta_0m'] = 0.02*ds['HS']  + 0.05*np.log(ds['HS'])
+    fig = plots.plot_storm_surge_for_given_hs(ds, 'zeta_0m', 'HS', max_hs=20, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 

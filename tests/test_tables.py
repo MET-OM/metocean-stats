@@ -338,6 +338,17 @@ def test_table_profile_monthly_stats(ds=ds_ocean):
         raise ValueError("Shape or value are not correct")
 
 
+def test_table_storm_surge_for_given_hs(ds=ds):
+    output_file = 'test_table_sotrm_surge_for_given_Hs.csv'
+    ds['zeta_0m'] = 0.02*ds['HS']  + 0.05*np.log(ds['HS'])
+    df = tables.table_storm_surge_for_given_hs(ds, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (20, 10):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])
