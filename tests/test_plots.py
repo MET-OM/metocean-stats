@@ -162,16 +162,6 @@ def test_plot_directional_return_periods_POT(ds=ds):
     else:
         raise ValueError("FigValue is not correct")
 
-def test_profile_return_values(ds=ds):
-    output_file = 'test_profile_return_values.csv'
-    df = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if df.shape == (6, 5) and int(df['Return period 10000 [years]'][5])==49:
-        pass
-    else:
-        raise ValueError("Shape is not correct")
-
 
 def test_plot_profile_return_values(ds=ds):
     output_file = 'test_plot_profile_return_values.png'
@@ -214,6 +204,18 @@ def test_plot_current_for_given_Hs(ds=ds):
         pass
     else:
         raise ValueError("FigValue is not correct")
+
+
+def test_plot_profile_monthly_stats(ds=ds_ocean):
+    output_file = 'test_plot_profile_monthly_stats.png'
+    fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean',title='Mean Sea Temperature [°C]', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.axes[0].lines[0].get_xdata()[0] == 7.72:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+
 
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 

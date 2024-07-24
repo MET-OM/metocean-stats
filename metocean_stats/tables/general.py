@@ -455,6 +455,59 @@ def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=No
         df = pd.DataFrame(results, columns=['z', 'Mean', 'Std.dev', 'P5', 'P10', 'P50', 'P90', 'P95', 'P99', 'Max','Dir. Max Event', 'Time Max Event'])
      
     # Save the DataFrame to a CSV file
-    df.to_csv(output_file, index=False)
-    # Return the DataFrame
+    if output_file:
+        df.to_csv(output_file, index=False)
+
+    return df
+
+
+
+def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], method = 'mean' , output_file='table_profile_monthly_stats.csv'):
+    params = []
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
+
+    for month in range(1,len(months)):
+        month_data = data[data.index.month == month]
+        if method == 'mean':
+            params.append(np.round(month_data[var].mean().values,2))
+        elif method == 'std.dev':
+            params.append(np.round(month_data[var].std().values,2))
+        elif method == 'minimum':
+            params.append(np.round(month_data[var].min().values,2))
+        elif method == 'maximum':
+            params.append(np.round(month_data[var].max().values,2))
+
+    #add annual
+    if method == 'mean':
+        params.append(np.round(data[var].mean().values,2))
+    elif method == 'std.dev':
+        params.append(np.round(data[var].std().values,2))
+    elif method == 'minimum':
+        params.append(np.round(data[var].min().values,2))
+    elif method == 'maximum':
+        params.append(np.round(data[var].max().values,2))
+
+    # Create DataFrame
+    df = pd.DataFrame(np.transpose(params), columns=months,  index=z)
+    df.index.name = 'z[m]'
+    # Save the DataFrame to a CSV file
+    if output_file:
+        file_extension = output_file.split('.')[1] 
+        if file_extension == 'csv':
+            df.to_csv(output_file, index=True)
+        elif file_extension == 'png' or 'pdf':
+            import seaborn as sns
+            plt.figure(figsize=(10, 8))
+            ax = sns.heatmap(df, annot=True, cmap="RdBu_r", cbar=False, yticklabels=z)
+            #plt.title(f'Return Period {period} Years')
+            plt.ylabel('z[m]')
+            ax.xaxis.tick_top()  # Move x-axis to the top
+            ax.xaxis.set_label_position('top')  # Move x-axis label to the top
+            plt.xticks(rotation=45, ha='left')  # Rotate x-axis labels by 45 degrees
+            plt.yticks(rotation=45, ha='right')  # Rotate y-axis labels by 45 degrees
+            plt.tight_layout()
+            plt.savefig(output_file,dpi=100)
+        else:
+            print('File format is not supported')
+
     return df

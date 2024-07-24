@@ -328,6 +328,16 @@ def test_table_profile_stats(ds=ds_ocean):
     else:
         raise ValueError("Shape or value are not correct")
 
+
+def test_table_profile_monthly_stats(ds=ds_ocean):
+    df = tables.table_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean', output_file=None)
+
+    if df.shape == (15, 13) and df['Jan'].loc[200.0]== 7.65:
+        pass
+    else:
+        raise ValueError("Shape or value are not correct")
+
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])

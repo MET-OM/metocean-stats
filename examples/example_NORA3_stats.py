@@ -112,12 +112,30 @@ ds_all = ds_all.dropna(how='all')
 #df = tables.table_profile_stats(ds_ocean, var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth], var_dir=['current_direction_' + d for d in depth], output_file='table_profile_stats.csv')
 #fig = plots.plot_profile_stats(ds_ocean,var=['current_speed_' + d for d in depth], z=[float(d[:-1]) for d in depth],reverse_yaxis=True, output_file='stats_current_profile.png')
 #df = tables.table_current_for_rv_wind(ds_all, var_curr='current_speed_0m', var_wind='W10',periods=[1,10,100,10000],output_file='Uc_for_rv_wind.csv')
-df = tables.table_current_for_rv_hs(ds_all, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file='Uc_for_rv_hs.csv')
+#df = tables.table_current_for_rv_hs(ds_all, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file='Uc_for_rv_hs.csv')
 
 
-print(df.shape)
+# Sea temperature
+df = tables.table_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean', output_file='table_mean_temp_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='std.dev', output_file='table_std_temp_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum', output_file='table_min_temp_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='maximum', output_file='table_max_temp_profile_monthly_stats.png')
+
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean',title='Mean Sea Temperature [°C]', output_file='plot_mean_temp_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='std.dev',title='St.Dev Sea Temperature [°C]', output_file='plot_std_temp_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum',title='Min. Sea Temperature [°C]', output_file='plot_min_temp_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='maximum',title='Max. Sea Temperature [°C]', output_file='plot_max_temp_profile_monthly_stats.png')
+
+# Sainity:
+df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean', output_file='table_mean_sal_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='std.dev', output_file='table_std_sal_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum', output_file='table_min_sal_profile_monthly_stats.png')
+df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='maximum', output_file='table_max_sal_profile_monthly_stats.png')
+
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean',title='Mean Salinity [PSU]', output_file='plot_mean_sal_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='std.dev',title='St.Dev Salinity [PSU]', output_file='plot_std_sal_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum',title='Min. Salinity [PSU]', output_file='plot_min_sal_profile_monthly_stats.png')
+fig = plots.plot_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='maximum',title='Max. Salinity [PSU]', output_file='plot_max_sal_profile_monthly_stats.png')
+
 
 # Water levels:
-
-
-
