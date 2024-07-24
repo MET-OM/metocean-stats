@@ -498,7 +498,7 @@ def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], me
         elif file_extension == 'png' or 'pdf':
             import seaborn as sns
             plt.figure(figsize=(10, 8))
-            ax = sns.heatmap(df, annot=True, cmap="RdBu_r", cbar=False, yticklabels=z)
+            ax = sns.heatmap(df, annot=True, cmap="RdBu_r", cbar=False, yticklabels=z, fmt='.2f')
             #plt.title(f'Return Period {period} Years')
             plt.ylabel('z[m]')
             ax.xaxis.tick_top()  # Move x-axis to the top
