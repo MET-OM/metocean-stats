@@ -543,7 +543,7 @@ def table_current_for_given_hs(data: pd.DataFrame, var_curr: str,var_hs: str, bi
         result_df[['Hs[m]', 'Uc(P5-model) [m/s]','Uc(Mean-model) [m/s]','Uc(P95-model) [m/s]']].round(2).to_csv(output_file,index=False)
     return result_df
 
-def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30], periods=[1,10,100], percentile=95, fitting_method='polynomial', output_file='table_extreme_current_profile_rv.csv'):
+def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30], periods=[1,10,100], percentile=95, fitting_method='polynomial', fmt=".2f", output_file='table_extreme_current_profile_rv.csv'):
     for period in periods:
         df = table_profile_return_values(data=data, var=var, z=z, periods=periods, output_file=None)
         df[[f'{i}' for i in z]] = np.nan
@@ -573,7 +573,7 @@ def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30
                 import seaborn as sns
                 plt.figure(figsize=(10, 8))
                 df.rename(columns={ f'Return period {period} [years]': f'RP {period} [yrs]'}, inplace=True)
-                ax = sns.heatmap(df.iloc[1:, 1:].astype(float), annot=True, cmap="pink_r", cbar=False, yticklabels=z)
+                ax = sns.heatmap(df.iloc[1:, 1:].astype(float), annot=True, cmap="pink_r", fmt=fmt, cbar=False, yticklabels=z)
                 #plt.title(f'Return Period {period} Years')
                 plt.xlabel('Associated values [m/s] per z')
                 plt.ylabel('z[m]')
@@ -581,7 +581,7 @@ def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30
                 ax.xaxis.set_label_position('top')  # Move x-axis label to the top
                 plt.xticks(rotation=45, ha='left')  # Rotate x-axis labels by 45 degrees
                 plt.yticks(rotation=45, ha='right')  # Rotate y-axis labels by 45 degrees
-                plt.tight_layout()
+                #plt.tight_layout()
                 plt.savefig(output_file.split('.')[0] + f'period_{period}.'+file_extension,dpi=100)
             else:
                 print('File format is not supported')
