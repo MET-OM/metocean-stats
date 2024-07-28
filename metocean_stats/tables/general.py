@@ -511,3 +511,49 @@ def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], me
             print('File format is not supported')
 
     return df
+
+import pandas as pd
+import numpy as np
+
+def table_tidal_levels(data: pd.DataFrame, var: str, output_file='tidal_levels.csv'):
+    """
+    Estimate various tidal levels from tidal data, including:
+    - Mean Sea Level (MSL)
+    - Highest Astronomical Tide (HAT)
+    - Lowest Astronomical Tide (LAT)
+    
+    Parameters:
+    data (pd.DataFrame): A dataframe with index 'time' and 
+    var: tidal elevation e.g., 'tidal_elevation'.
+    
+    Returns:
+    pd.DataFrame: A dataframe containing the estimated tidal levels.
+    """
+     # Ensure the 'time' column is a datetime type and set as index
+    data[var].index = pd.to_datetime(data[var].index)
+    
+    # Extract tidal elevations
+    tidal_elevations = data[var]
+    
+    # Calculate High Astr. Tide (HAT)
+    hat = tidal_elevations.max()
+
+    # Calculate Low Astr. Tide (LAT)
+    lat = tidal_elevations.min()
+    
+    # Calculate Mean Sea Level (MSL)
+    msl = tidal_elevations.mean()
+    
+    # Create a DataFrame for the results
+    results = {
+        'Tidal Level': ['HAT', 'MSL', 'LAT'],
+        '[m]': [hat, msl, lat]
+    }
+    
+    results_df = pd.DataFrame(results).round(2)
+    # Save the DataFrame to a CSV file
+    if output_file:
+        results_df.to_csv(output_file, index=False)
+
+    return results_df
+

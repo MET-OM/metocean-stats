@@ -341,3 +341,33 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     
     return fig
 
+
+def plot_tidal_levels(data, var='tide',start_time=None , end_time=None ,output_file='tidal_levels.png'):
+    df = table_tidal_levels(data=data, var=var, output_file=None)
+    if start_time and end_time is None:
+       data = data[var]
+    else:
+        data = data[var][start_time:end_time]
+
+
+    fig, ax = plt.subplots()
+    plt.plot(data,color='lightgrey')
+    plt.axhline(y=df.loc[df['Tidal Level'] == 'HAT'].values[0][1], color='r', linestyle='--',label='HAT')
+    plt.axhline(y=df.loc[df['Tidal Level'] == 'MSL'].values[0][1], color='k', linestyle='-',label='MSL')
+    plt.axhline(y=df.loc[df['Tidal Level'] == 'LAT'].values[0][1], color='r', linestyle='--',label='LAT')
+
+    plt.ylabel('tidal elevation [m]')
+    plt.grid()
+
+    plt.legend(loc='lower right')
+    plt.xticks(rotation=45)
+
+    # Set major locator for x-axis to avoid overlap
+    ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=10))  
+
+    plt.tight_layout()
+    # Save the figure
+    plt.savefig(output_file)
+
+    return fig
+

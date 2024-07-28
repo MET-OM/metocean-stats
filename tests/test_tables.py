@@ -349,6 +349,18 @@ def test_table_storm_surge_for_given_hs(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
+
+def test_table_tidal_levels(ds=ds):
+    output_file = 'test_table_tidal_levels.csv'
+    ds['tide'] = 0.001*ds['HS']  
+    df = tables.table_tidal_levels(ds, var='tide', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (3, 2):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])

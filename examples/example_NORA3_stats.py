@@ -81,11 +81,13 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 
 # Currents:
 import pandas as pd
-ds_ocean = pd.read_csv('../tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
-depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
+#ds_ocean = pd.read_csv('../tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
+#depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
-ds_all = pd.concat([ds.loc['2017-01-02 00:00:00':'2018-12-31 21:00:00'], ds_ocean.resample('3h').mean()], axis=1)
-ds_all = ds_all.dropna(how='all')
+#ds_all = pd.concat([ds.loc['2017-01-02 00:00:00':'2018-12-31 21:00:00'], ds_ocean.resample('3h').mean()], axis=1)
+#ds_all = ds_all.dropna(how='all')
+
+
 
 #plots.var_rose(ds, f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='monthly', output_file='monthly_rose.png')
 #plots.var_rose(ds,f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='overall', output_file='overall_rose.png')
@@ -139,6 +141,11 @@ ds_all = ds_all.dropna(how='all')
 
 
 # Water levels:
-df = tables.table_storm_surge_for_given_hs(ds_all, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file='table_perc_surge_for_Hs.csv')
-fig = plots.plot_storm_surge_for_given_hs(ds_all,var_surge='zeta_0m', var_hs='HS', max_hs=20, output_file='surge_for_given_hs.png')
+ds_tide = pd.read_csv('../tests/data/GTSM_test.csv',comment='#',index_col=0, parse_dates=True)
+df = tables.table_tidal_levels(ds_tide, var='tide', output_file='tidal_levels.csv')
+fig = plots.plot_tidal_levels(ds_tide, var='tide',start_time='2010-01-01',end_time='2010-03-30', output_file='tidal_levels.png')
+#df = tables.table_storm_surge_for_given_hs(ds_all, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file='table_perc_surge_for_Hs.csv')
+#fig = plots.plot_storm_surge_for_given_hs(ds_all,var_surge='zeta_0m', var_hs='HS', max_hs=20, output_file='surge_for_given_hs.png')
 #print(df.shape)
+
+breakpoint()
