@@ -227,6 +227,19 @@ def test_plot_storm_surge_for_given_hs(ds=ds):
     else:
         raise ValueError("FigValue is not correct")
 
+
+def test_plot_tidal_levels(ds=ds):
+    output_file = 'test_plot_tidal_levels.png'
+    ds['tide'] = 0.01*ds['HS'] 
+    fig = plots.plot_tidal_levels(ds,'tide', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+    
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])
