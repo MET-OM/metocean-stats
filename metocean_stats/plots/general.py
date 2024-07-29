@@ -334,7 +334,7 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
 
     plt.legend()
     plt.grid(True)
-    plt.legend(loc='lower right')
+    plt.legend(loc='best')
     plt.tight_layout()
     # Save the figure
     plt.savefig(output_file)
