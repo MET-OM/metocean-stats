@@ -792,7 +792,7 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
 
 
 def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: str,max_hs=20,output_file='surge_for_given_hs.png'):
-    df = table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df, df_coeff = table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_surge], bins=50, cmap='hot', cmin=1)

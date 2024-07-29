@@ -208,7 +208,7 @@ def test_table_Hmax_crest_return_periods(ds=ds):
     df = tables.table_Hmax_crest_return_periods(ds, var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100, 10000], sea_state='long-crested', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (4, 12):
+    if df.shape == (4, 11):
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -341,7 +341,7 @@ def test_table_profile_monthly_stats(ds=ds_ocean):
 def test_table_storm_surge_for_given_hs(ds=ds):
     output_file = 'test_table_sotrm_surge_for_given_Hs.csv'
     ds['zeta_0m'] = 0.02*ds['HS']  + 0.05*np.log(ds['HS'])
-    df = tables.table_storm_surge_for_given_hs(ds, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file=output_file)
+    df, df_coeff = tables.table_storm_surge_for_given_hs(ds, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (20, 10):
@@ -357,6 +357,32 @@ def test_table_tidal_levels(ds=ds):
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (3, 2):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def table_extreme_total_water_level(ds=ds):
+    output_file = 'table_extreme_total_water_level.csv'
+    ds['tide'] = ds['HS']*0.01
+    ds['zeta_0m'] = ds['HS']*0.015
+    df = tables.table_extreme_total_water_level(ds, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[100,10000], output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (2, 15):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+
+def test_table_storm_surge_for_rv_hs(ds=ds):
+    output_file = 'table_storm_surge_for_rv_hs.csv'
+    ds['tide'] = ds['HS']*0.01
+    ds['zeta_0m'] = ds['HS']*0.015
+    df = tables.table_storm_surge_for_rv_hs(ds, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[1,10,100,10000],depth=200, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (4, 17):
         pass
     else:
         raise ValueError("Shape is not correct")

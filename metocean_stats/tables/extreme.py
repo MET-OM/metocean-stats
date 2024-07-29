@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from ..stats.aux_funcs import *
 from ..stats.extreme import *
+from ..stats.general import *
 
 
 def table_monthly_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
@@ -380,7 +381,7 @@ def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, per
     df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] # according to Goda (1988)
     df['T_Hmax(Mean-model) [s]'] =  0.9 * df['Tp(Mean-model) [s]'] # according to Goda (1988)
     df['T_Hmax(P95-model) [s]'] =  0.9 * df['Tp(P95-model) [s]'] # according to Goda (1988)
-    df['Crest height[m]'] = np.nan
+    df['Crest heigh[m]'] = np.nan
     df['H_max[m]'] = np.nan
     df['H_max/Hs'] = np.nan
     for i in range(df.shape[0]):
@@ -679,4 +680,42 @@ def table_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str,var_hs: st
     # Create a new dataframe with the results
     if output_file:
         result_df[['Hs[m]', 'S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]']].round(2).to_csv(output_file,index=False)
-    return result_df
+    return result_df, df_coeff
+
+
+def table_extreme_total_water_level(data: pd.DataFrame, var_hs='HS',var_tp = 'TP', var_surge='zeta', var_tide='tide',depth=200,periods=[100,10000], sea_state = 'short-crested', output_file='table_extreme_total_water_level.csv'):
+    df = table_Hmax_crest_return_periods(data,var_hs=var_hs, var_tp =var_tp,depth=depth, periods=periods, sea_state = 'short-crested', output_file=None)
+    df['Tidal level(HAT)[m]'] = data[var_tide].max()
+    shape, loc, scale, df['Storm surge[m]'] = RVE_ALL(data,var=var_surge,periods=periods,distribution='GEV',method='default',threshold='default')
+    df['Total water level[m]'] = df['Crest heigh[m]'] + df['Storm surge[m]'] + df['Tidal level(HAT)[m]']
+
+    # Create a new dataframe with the results
+    if output_file:
+        df[['Return period [years]', 'Storm surge[m]','Tidal level(HAT)[m]','Crest heigh[m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
+    return df
+
+
+
+def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide',depth=200, periods=[1,10,100,10000], output_file='table_storm_surge_for_rv_hs.csv'):
+    df = table_Hmax_crest_return_periods(data,var_hs=var_hs, var_tp =var_tp,depth=depth, periods=periods, sea_state = 'short-crested', output_file=None)
+    df['Tidal level(HAT)[m]'] = data[var_tide].max()
+    df_S, df_coeff = table_storm_surge_for_given_hs(data, var_surge=var_surge,var_hs=var_hs, bin_width=1, max_hs=20, output_file=None)
+    a_mean = df_coeff.loc[df_coeff['S(Hs)'] == 'Mean', 'a'].values[0]
+    b_mean = df_coeff.loc[df_coeff['S(Hs)'] == 'Mean', 'b'].values[0]
+    c_mean = df_coeff.loc[df_coeff['S(Hs)'] == 'Mean', 'c'].values[0]
+
+    a_sigma = df_coeff.loc[df_coeff['S(Hs)'] == 'Std. Dev.', 'a'].values[0]
+    b_sigma = df_coeff.loc[df_coeff['S(Hs)'] == 'Std. Dev.', 'b'].values[0]
+    c_sigma = df_coeff.loc[df_coeff['S(Hs)'] == 'Std. Dev.', 'c'].values[0]
+
+    df['S(Mean-model) [m]'] = S_as_function_of_Hs(df['Hs[m]'], a_mean, b_mean, c_mean)
+    df['S(std-model) [m]'] = S_as_function_of_Hs(df['Hs[m]'], a_sigma, b_sigma, c_sigma)
+
+    df['S(P5-model) [m]'] =  df['S(Mean-model) [m]'] - 1.65*df['S(std-model) [m]']
+    df['S(P95-model) [m]'] = df['S(Mean-model) [m]'] + 1.65*df['S(std-model) [m]']
+
+    df['Total water level[m]'] = df['Crest heigh[m]'] + df['S(P95-model) [m]'] + df['Tidal level(HAT)[m]']
+
+    if output_file:
+        df[['Return period [years]', 'Hs[m]','Crest heigh[m]','Tidal level(HAT)[m]','S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
+    return df
