@@ -141,18 +141,12 @@ import pandas as pd
 
 
 # Water levels:
-ds['tide'] = ds['HS']*0.01
-ds['zeta_0m'] = ds['HS']*0.01
 #ds_tide = pd.read_csv('../tests/data/GTSM_test.csv',comment='#',index_col=0, parse_dates=True)
 #df = tables.table_tidal_levels(ds_tide, var='tide', output_file='tidal_levels.csv')
 #fig = plots.plot_tidal_levels(ds_tide, var='tide',start_time='2010-01-01',end_time='2010-03-30', output_file='tidal_levels.png')
 #df = tables.table_storm_surge_for_given_hs(ds_all, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file='table_perc_surge_for_Hs.csv')
-fig = plots.plot_storm_surge_for_given_hs(ds,var_surge='zeta_0m', var_hs='HS', max_hs=20, output_file='surge_for_given_hs.png')
-
-
-
+#fig = plots.plot_storm_surge_for_given_hs(ds,var_surge='zeta_0m', var_hs='HS', max_hs=20, output_file='surge_for_given_hs.png')
 #df = tables.table_extreme_total_water_level(ds, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[100,10000], output_file='table_extreme_total_water_level.csv')
+#df = tables.table_storm_surge_for_rv_hs(ds, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[1,10,100,10000],depth=200, output_file='table_storm_surge_for_rv_hs.csv')
 
-df = tables.table_storm_surge_for_rv_hs(ds, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[1,10,100,10000],depth=200, output_file='table_storm_surge_for_rv_hs.csv')
-
-print(df.shape)
+#print(df.shape)
