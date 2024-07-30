@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import sklearn
 from metocean_api import ts
-from metocean_stats.stats import ml_stats
+from metocean_stats.stats import ml
 
 # Import norac data
 df_norac = ts.TimeSeries(lon=6.08, lat=62.4,start_time='2018-01-01', end_time='2019-12-31' ,product='NORAC_wave')
@@ -23,8 +23,12 @@ model='GBR' # 'SVR_RBF', 'LSTM', GBR
 var_origin = ['hs','tp','Pdir']
 var_train  = ['hs']
 # Run ML model:
-ts_pred = ml_stats.predict_ts(ts_origin=df_nora3.data,var_origin=var_origin,ts_train=df_norac.data.loc[start_training:end_training],var_train=var_train, model=model)
+#ts_pred = ml.predict_ts(ts_origin=df_nora3.data,var_origin=var_origin,ts_train=df_norac.data.loc[start_training:end_training],var_train=var_train, model=model)
+from metocean_stats.stats.aux_funcs import *
+ds = readNora10File('../tests/data/NORA_test.txt')
+breakpoint()
 
+ts_pred = ml.predict_ts(ts_origin=ds,var_origin=['W10','TP','DIRP'],ts_train=ds.loc['1960-01-01':'1960-12-31'],var_train=['HS'], model='LSTM')
 
 # Plotting a month of data:
 fig, ax = plt.subplots(nrows=1, ncols=1,figsize=(12, 6),gridspec_kw={'top': 0.95,'bottom': 0.150,'left': 0.05,'right': 0.990,'hspace': 0.2,'wspace': 0.2})

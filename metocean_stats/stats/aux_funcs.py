@@ -42,6 +42,7 @@ def readNora10File(file):
     # Drop redundant columns
     df.drop(['YEAR', 'M', 'D', 'H'], axis=1, inplace=True)
     df['tp_corr_nora10'] = Tp_correction(df.TP.values)
+    df.index.rename('time', inplace=True)
     return df
 
 def wind_correction_nora10(df,var='W10'):
