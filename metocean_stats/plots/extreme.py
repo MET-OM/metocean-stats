@@ -565,7 +565,7 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
     df = table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method,threshold=threshold, units=units, output_file=None)
     fig, ax = plt.subplots()
     for i in range(len(periods)):
-        plt.plot(df['Month'][1:-1], df.iloc[1:-1,i+5],marker = 'o',label=df.keys()[i+5].split(':')[1])
+        plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1])
 
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Month',fontsize=15)

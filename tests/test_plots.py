@@ -240,6 +240,17 @@ def test_plot_tidal_levels(ds=ds):
         raise ValueError("FigValue is not correct")
     
 
+
+def test_plot_monthly_return_periods_cur_pot(ds=ds_ocean):
+    output_file = 'test_plot_monthly_return_periods_curr_pot.png'
+    fig = plots.plot_monthly_return_periods(ds_ocean,var='current_speed_0m',periods=[1, 10, 100],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m/s',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.axes[0].lines[0].get_xdata()[0] == 'Jan':
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+
 #def test_threshold_sensitivity(ds=ds):
 #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
 #                                        thresholds=[1,1.5])
