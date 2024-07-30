@@ -12,7 +12,7 @@ from metocean_stats.stats.map_funcs import *
 # Load data from local file
 #ds.load_data('/home/konstantinosc/'+ds.datafile)
 #ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
-ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
+#ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds = wind_correction_nora10(ds,var='W10')
 #ds = readNora10File('NORA10_5766N_0503E.1958-01-01.2022-12-31.txt') # for Hav
 
@@ -88,7 +88,7 @@ ds = readNora10File('NORA10_6036N_0336E.1958-01-01.2022-12-31.txt') # for Lun
 #ds_all = ds_all.dropna(how='all')
 
 
-
+#plots.plot_monthly_return_periods(ds_ocean,var='current_speed_0m',periods=[1, 10, 100],distribution='Weibull3P_MOM',method='POT',threshold='P99', units='m/s',output_file='csp0m_monthly_extremes.png')
 #plots.var_rose(ds, f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='monthly', output_file='monthly_rose.png')
 #plots.var_rose(ds,f'current_direction_{depth}',f'current_speed_{depth}',max_perc=30,decimal_places=2, units='m/s', method='overall', output_file='overall_rose.png')
 #plots.plot_monthly_stats(ds,var1=f'current_speed_{depth}',show=['Mean','P99','Maximum'], title = f'Current[m/s], depth:{depth}', output_file=f'current{depth}_monthly_stats.png')
