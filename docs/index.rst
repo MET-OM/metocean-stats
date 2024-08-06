@@ -243,6 +243,7 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 Plot joint Hs-Tp contours for different return periods:
 
 .. code-block:: python
+   
    plots.plot_joint_distribution_Hs_Tp(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,1000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=True)
 
 .. image:: Hs.Tp.joint.distribution.png
