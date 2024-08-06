@@ -240,15 +240,16 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 .. image:: return_levels_GEV.png
   :width: 700   
 
-Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
+Plot joint Hs-Tp contours for different return periods:
 
 .. code-block:: python
-   
-   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[50,100], 
-                                       output_file='2D_contours.png')
+   plots.plot_joint_distribution_Hs_Tp(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,1000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=True)
 
-.. image:: 2D_contours.png
+.. image:: Hs.Tp.joint.distribution.png
   :width: 700
+
+
+
 
 
 
@@ -278,20 +279,20 @@ Estimate and plot mean wind profile with percentiles in shaded region:
 Calculate the wind speed shear over any two heights of the input profile and plot in a histogram and output shear values. Percentiles are shown as shaded region.:
 .. code-block:: python
 
-profile_stats.profile_shear(data = ds.data, vars =       
-                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
-                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
-                'wind_speed_750m'],
-                height_levels=[10,20,50,100,250,500,750], 
-                z=[20,250], 
-                perc = [25,75], 
-                output_file='wind_profile_shear.png')
+   profile_stats.profile_shear(data = ds.data, vars =       
+                  ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
+                  'wind_speed_100m','wind_speed_250m','wind_speed_500m',
+                  'wind_speed_750m'],
+                  height_levels=[10,20,50,100,250,500,750], 
+                  z=[20,250], 
+                  perc = [25,75], 
+                  output_file='wind_profile_shear.png')
 
 .. image:: wind_profile_shear.png
   :width: 500
 
 
-Maps
+Map Statistics
 =====================================
 Plotting maps:
 
@@ -328,6 +329,7 @@ Plot extreme wind at 10 m height based on NORA3 data:
 
 .. image:: extreme_wind_map.png
   :width: 500
+
 
 .. toctree::
    :maxdepth: 2
