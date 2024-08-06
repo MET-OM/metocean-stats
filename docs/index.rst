@@ -379,9 +379,8 @@ Plot extreme wind at 10 m height based on NORA3 data:
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-   
+   :maxdepth: 1
+
    grid-table
    html-table
    csv-table
