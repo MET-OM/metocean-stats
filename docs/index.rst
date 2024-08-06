@@ -96,10 +96,11 @@ Create scatter Hs-Tp diagram:
 .. tabularcolumns:: |p{1cm}|p{7cm}|
 
 .. csv-table:: Scatter diagram
-   :file: files/Hs_Tp_scatter.csv
+   :file: Hs_Tp_scatter.csv
    :header-rows: 1
    :widths: 1 1
 
+.. tabularcolumns:: |p{1cm}|p{7cm}|
 
 .. code-block:: python
    
