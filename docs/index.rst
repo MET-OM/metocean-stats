@@ -319,7 +319,7 @@ Plot extreme signigicant wave height based on NORA3 data:
 .. image:: extreme_wave_map.png
   :width: 500
 
-Plot extreme wind at 100 m height based on NORA3 data:
+Plot extreme wind at 10 m height based on NORA3 data:
 
 .. code-block:: python
 
