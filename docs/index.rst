@@ -88,6 +88,10 @@ Create scatter Hs-Tp diagram:
    
    tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
 
+.. csv-table:: Scatter diagram
+   :file: files/Hs_Tp_scatter.csv 
+   :widths: 30, 70
+   :header-rows: 1
 
 .. csv-table:: files/Hs_Tp_scatter.csv
    :header-rows: 1
