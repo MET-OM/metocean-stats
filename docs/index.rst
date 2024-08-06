@@ -96,7 +96,7 @@ Create scatter Hs-Tp diagram:
 
 .. csv-table:: Scatter diagram
    :header-rows: 1
-   :file: files/Hs_Tp_scatter.csv
+   :file: /files/Hs_Tp_scatter.csv
 
 
 .. code-block:: python
