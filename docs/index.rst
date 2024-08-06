@@ -97,17 +97,7 @@ Create scatter Hs-Tp diagram:
 
 
 
-.. code-block:: python
-   
-   tables.scatter_diagram(ds, var1='HS', 
-                          step_var1=1, 
-                          var2='TP', 
-                          step_var2=1, 
-                          output_file='Hs_Tp_scatter.png')
 
-
-.. image:: files/Hs_Tp_scatter.png
-  :width: 500
 
 Create table with monthly percentiles:
 
