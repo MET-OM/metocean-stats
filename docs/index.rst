@@ -92,29 +92,10 @@ Create scatter Hs-Tp diagram:
                           step_var2=1, 
                           output_file='Hs_Tp_scatter.csv')
 
-.. csv-table:: Scatter diagram
-   :file: files/Hs_Tp_scatter.csv
-   :widths: 30, 70
-   :header-rows: 1
 
 .. csv-table:: 
    :header-rows: 1
-
-   Month , 5% , 50% , Mean , 95% , 99% 
-   jan , 0.5 , 1.3 , 1.4 , 2.7 , 3.7 
-   feb , 0.4 , 1.2 , 1.4 , 2.8 , 3.8 
-   mar , 0.4 , 1.1 , 1.2 , 2.5 , 3.4 
-   apr , 0.3 , 0.9 , 1.0 , 2.1 , 3.2 
-   mai , 0.3 , 0.9 , 0.9 , 1.9 , 2.5 
-   jun , 0.3 , 0.7 , 0.8 , 1.7 , 2.5 
-   jul , 0.2 , 0.7 , 0.8 , 1.6 , 2.2 
-   aug , 0.3 , 0.7 , 0.8 , 1.8 , 2.5 
-   sep , 0.3 , 0.9 , 1.1 , 2.3 , 3.2 
-   okt , 0.4 , 1.2 , 1.3 , 2.5 , 3.2 
-   nov , 0.5 , 1.3 , 1.4 , 2.7 , 3.6 
-   des , 0.4 , 1.3 , 1.4 , 2.8 , 3.5 
-   Annual , 0.4 , 1.3 , 1.4 , 2.8 , 3.5
-
+   :file: files/Hs_Tp_scatter.csv
 
 .. code-block:: python
    
