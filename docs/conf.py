@@ -10,8 +10,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
+import os
+import sys
+import shlex
+
 # sys.path.insert(0, os.path.abspath('.'))
 
 
@@ -27,14 +29,16 @@ release = 'latest'
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.todo',
+'sphinx.ext.mathjax',
 ]
 
 templates_path = ['_templates']
+source_suffix = '.rst'
 exclude_patterns = []
+
+# The master toctree document.
+master_doc = 'index'
+pygments_style = 'sphinx'
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'alabaster'
