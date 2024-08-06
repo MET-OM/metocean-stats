@@ -98,7 +98,6 @@ Create scatter Hs-Tp diagram:
 .. csv-table:: Scatter diagram
    :file: files/Hs_Tp_scatter.csv
    :header-rows: 1
-   :class: longtable
    :widths: 1 1
 
 
