@@ -80,7 +80,7 @@ To generate general/basic stastistics, import general_stats module:
 
 .. code-block:: python
    
-   from metocean_stats import plots, tables, stats
+   from metocean_stats import plots, tables
 
 Create scatter Hs-Tp diagram:
 
@@ -92,11 +92,9 @@ Create scatter Hs-Tp diagram:
                           step_var2=1, 
                           output_file='Hs_Tp_scatter.csv')
 
-.. csv-table:: Scatter diagram
-   :file: files/Hs_Tp_scatter.csv 
-   :widths: 30, 60
-   :header-rows: 1
-   :class: longtable
+.. csv-table::
+   :file: files/Hs_Tp_scatter.csv
+
 
 
 .. code-block:: python
