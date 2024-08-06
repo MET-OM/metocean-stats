@@ -96,6 +96,7 @@ Create scatter Hs-Tp diagram:
    :file: files/Hs_Tp_scatter.csv 
    :widths: 30, 60
    :header-rows: 1
+   :class: longtable
 
 
 .. code-block:: python
