@@ -291,6 +291,44 @@ profile_stats.profile_shear(data = ds.data, vars =
   :width: 500
 
 
+Maps
+=====================================
+Plotting maps:
+
+.. code-block:: python
+   
+   from metocean_stats.stats.map_funcs import *
+
+Plot map with points of interest:
+
+.. code-block:: python
+   
+   plot_points_on_map(lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
+
+
+.. image:: map.png
+  :height: 500
+
+Plot extreme signigicant wave height based on NORA3 data:
+
+.. code-block:: python
+
+plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
+
+
+.. image:: extreme_wave_map.png.png
+  :width: 500
+
+Plot extreme wind at 100 m height based on NORA3 data:
+
+.. code-block:: python
+
+plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
+
+
+.. image:: extreme_wind_map.png.png
+  :width: 500
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
