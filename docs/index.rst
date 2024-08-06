@@ -80,18 +80,25 @@ To generate general/basic stastistics, import general_stats module:
 
 .. code-block:: python
    
-   from metocean_stats.stats import general_stats
+   from metocean_stats import plots, tables, stats
 
 Create scatter Hs-Tp diagram:
 
 .. code-block:: python
    
-   general_stats.scatter_diagram(data=ts.data, 
-                     var1='hs', step_var1=1, 
-                     var2='tp', step_var2=2, 
-                     output_file='scatter_hs_tp_diagram.png')
+   tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
 
-.. image:: scatter_hs_tp_diagram.png
+
+.. csv-table:: Hs_Tp_scatter.csv'
+  :header-rows: 1
+
+
+.. code-block:: python
+   
+   tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.png')
+
+
+.. image:: Hs_Tp_scatter.png'
   :width: 500
 
 Create table with monthly percentiles:
@@ -218,7 +225,7 @@ To generate extreme stastistics, import extreme_stats module:
 
 .. code-block:: python
    
-   from metocean_stats.stats import extreme_stats
+   from metocean_stats import plots, tables
 
 Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 
@@ -240,11 +247,36 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
 .. image:: return_levels_GEV.png
   :width: 700   
 
-Plot joint Hs-Tp contours for different return periods:
 
 .. code-block:: python
    
-   plots.plot_joint_distribution_Hs_Tp(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,1000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=True)
+   plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
+
+
+.. image:: prob_non_exceedance_fitted_3p_weibull.png
+  :width: 700  
+
+
+
+
+
+
+
+
+
+
+
+
+Plot joint Hs-Tp contours for different return periods:
+
+.. code-block:: python
+
+   plots.plot_joint_distribution_Hs_Tp(ds,var_hs='HS',
+                                       var_tp='TP',
+                                       periods=[1,10,100,1000], 
+                                       title='Hs-Tp joint distribution',
+                                       output_file='Hs.Tp.joint.distribution.png',
+                                       density_plot=True)
 
 .. image:: Hs.Tp.joint.distribution.png
   :width: 700
