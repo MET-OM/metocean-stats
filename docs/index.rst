@@ -93,12 +93,10 @@ Create scatter Hs-Tp diagram:
                           output_file='Hs_Tp_scatter.csv')
 
 
-.. csv-table:: 
-   :header-rows: 1
-   :url: https://github.com/MET-OM/metocean-stats/blob/v1/docs/files/Hs_Tp_scatter.csv
-
-
-
+.. csv-table:: xyz
+        :header-rows: 1
+        :file: files/Hs_Tp_scatter.csv
+        :widths: 20, 30, 50
 
 .. code-block:: python
    
