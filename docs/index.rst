@@ -86,17 +86,25 @@ Create scatter Hs-Tp diagram:
 
 .. code-block:: python
    
-   tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
+   tables.scatter_diagram(ds, var1='HS', 
+                          step_var1=1, 
+                          var2='TP', 
+                          step_var2=1, 
+                          output_file='Hs_Tp_scatter.csv')
 
 .. csv-table:: Scatter diagram
    :file: files/Hs_Tp_scatter.csv 
-   :widths: 30, 70
+   :widths: 30, 60
    :header-rows: 1
 
 
 .. code-block:: python
    
-   tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.png')
+   tables.scatter_diagram(ds, var1='HS', 
+                          step_var1=1, 
+                          var2='TP', 
+                          step_var2=1, 
+                          output_file='Hs_Tp_scatter.png')
 
 
 .. image:: files/Hs_Tp_scatter.png
