@@ -89,7 +89,7 @@ Create scatter Hs-Tp diagram:
    tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.csv')
 
 
-.. csv-table:: Hs_Tp_scatter.csv
+.. csv-table:: files/Hs_Tp_scatter.csv
    :header-rows: 1
    :file: Hs_Tp_scatter.csv 
 
@@ -99,7 +99,7 @@ Create scatter Hs-Tp diagram:
    tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file='Hs_Tp_scatter.png')
 
 
-.. image:: Hs_Tp_scatter.png'
+.. image:: files/Hs_Tp_scatter.png'
   :width: 500
 
 Create table with monthly percentiles:
@@ -185,14 +185,14 @@ Create rose for overall data (**method='overall'**) or for each month (**method=
    
    dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='overall')
 
-.. image:: waverose.png
+.. image:: files/waverose.png
   :width: 300
 
 .. code-block:: python
    
    dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='monthly')
 
-.. image:: monthly_waveroses.png
+.. image:: files/monthly_waveroses.png
   :width: 500
 
 Create table with min, mean, and maximum values as a function direction:
@@ -236,35 +236,29 @@ Create time series of Hs with return levels using POT and Annual Maximum(GEV):
             periods=[20,50,100,1000], 
             output_file='return_levels_POT.png')
 
-.. image:: return_levels_POT.png
+.. image:: files/return_levels_POT.png
   :width: 700
 
 .. code-block:: python
    
-   rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', 
-           periods=[20,50,100,1000],method='GEV',
-           output_file='return_levels_GEV.png')
+   rl_am = extreme_stats.return_levels_annual_max(data=ds.data, 
+                                                  var='hs', 
+                                                  periods=[20,50,100,1000],method='GEV',
+                                                  output_file='return_levels_GEV.png')
 
-.. image:: return_levels_GEV.png
+.. image:: files/return_levels_GEV.png
   :width: 700   
 
 
 .. code-block:: python
    
-   plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var='HS',output_file='prob_non_exceedance_fitted_3p_weibull.png')
+   plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,
+                                                    var='HS',
+                                                    output_file='prob_non_exceedance_fitted_3p_weibull.png')
 
 
-.. image:: prob_non_exceedance_fitted_3p_weibull.png
+.. image:: files/prob_non_exceedance_fitted_3p_weibull.png
   :width: 700  
-
-
-
-
-
-
-
-
-
 
 
 
@@ -279,7 +273,7 @@ Plot joint Hs-Tp contours for different return periods:
                                        output_file='Hs.Tp.joint.distribution.png',
                                        density_plot=True)
 
-.. image:: Hs.Tp.joint.distribution.png
+.. image:: files/Hs.Tp.joint.distribution.png
   :width: 700
 
 
@@ -307,7 +301,7 @@ Estimate and plot mean wind profile with percentiles in shaded region:
                 perc=[25,75], 
                 output_file='wind_profile.png')
 
-.. image:: wind_profile.png
+.. image:: files/wind_profile.png
   :height: 500
 
 Calculate the wind speed shear over any two heights of the input profile and plot in a histogram and output shear values. Percentiles are shown as shaded region.:
@@ -322,7 +316,7 @@ Calculate the wind speed shear over any two heights of the input profile and plo
                   perc = [25,75], 
                   output_file='wind_profile_shear.png')
 
-.. image:: wind_profile_shear.png
+.. image:: files/wind_profile_shear.png
   :width: 500
 
 
@@ -338,30 +332,40 @@ Plot map with points of interest:
 
 .. code-block:: python
    
-   plot_points_on_map(lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
+   plot_points_on_map(lon=[3.35,3.10], 
+                      lat=[60.40,60.90],
+                      label=['NORA3','NORKYST800'], 
+                      bathymetry='NORA3')
 
 
-.. image:: map.png
+.. image:: files/map.png
   :height: 500
 
 Plot extreme signigicant wave height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
+   plot_extreme_wave_map(return_level=50, 
+                         product='NORA3', 
+                         title='50-yr return values Hs (NORA3)', 
+                         set_extent = [0,30,52,73])
 
 
-.. image:: extreme_wave_map.png
+.. image:: files/extreme_wave_map.png
   :width: 500
 
 Plot extreme wind at 10 m height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
+   plot_extreme_wind_map(return_level=100, 
+                         product='NORA3',
+                         level=0, 
+                         title='100-yr return values Wind at 10 m (NORA3)', 
+                         set_extent = [0,30,52,73])
 
 
-.. image:: extreme_wind_map.png
+.. image:: files/extreme_wind_map.png
   :width: 500
 
 
