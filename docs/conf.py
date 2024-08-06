@@ -31,6 +31,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.todo',
+    'crate.sphinx.csv'
 ]
 
 templates_path = ['_templates']
