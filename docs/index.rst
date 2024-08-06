@@ -92,10 +92,14 @@ Create scatter Hs-Tp diagram:
                           step_var2=1, 
                           output_file='Hs_Tp_scatter.csv')
 
+
+.. tabularcolumns:: |p{1cm}|p{7cm}|
+
 .. csv-table:: Scatter diagram
-   :file: Hs_Tp_scatter.csv
-   :widths: 30, 60
+   :file: files/Hs_Tp_scatter.csv
    :header-rows: 1
+   :class: longtable
+   :widths: 1 1
 
 
 .. code-block:: python
