@@ -313,7 +313,7 @@ Plot extreme signigicant wave height based on NORA3 data:
 
 .. code-block:: python
 
-plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
+   plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
 
 
 .. image:: extreme_wave_map.png
@@ -323,7 +323,7 @@ Plot extreme wind at 100 m height based on NORA3 data:
 
 .. code-block:: python
 
-plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
+   plot_extreme_wind_map(return_level=100, product='NORA3',level=0, title='100-yr return values Wind at 10 m (NORA3)', set_extent = [0,30,52,73])
 
 
 .. image:: extreme_wind_map.png
