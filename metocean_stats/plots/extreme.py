@@ -671,6 +671,7 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     plt.tight_layout()
     
     plt.savefig(output_file)
+    plt.close()
 
     return fig
 
