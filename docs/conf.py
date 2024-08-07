@@ -33,6 +33,7 @@ extensions = [
 ]
 
 templates_path = ['_templates']
+file_insertion_enabled = True
 source_suffix = '.rst'
 exclude_patterns = []
 
