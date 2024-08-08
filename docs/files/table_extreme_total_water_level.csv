@@ -1,0 +1,3 @@
+Return period [years],Storm surge[m],Tidal level(HAT)[m],Crest heigh[m],Total water level[m]
+100,0.91,0.27,16.08,17.26
+10000,0.93,0.27,20.22,21.42
