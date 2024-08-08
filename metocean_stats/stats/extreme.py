@@ -845,8 +845,9 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
     thresholds = return_values[-1]
 
     # Replace values in each column that exceed the thresholds
-    for col in range(return_values.shape[1]):
-        return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
+    if method != 'minimum':
+        for col in range(return_values.shape[1]):
+            return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
 
     return params, return_values, threshold_values, num_events_per_year
 
