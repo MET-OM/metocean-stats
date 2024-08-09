@@ -49,7 +49,7 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3',output_file='map.png'
     ax = plt.axes(projection=ccrs.PlateCarree())
     # Plot the points with automatic labels
     for i, (lon, lat, label) in enumerate(zip(lon_list, lat_list, label_list)):
-        ax.plot(lon, lat, marker='o', markersize=8, label=f'{label}', transform=ccrs.PlateCarree())
+        ax.plot(lon, lat, marker='o', markersize=8, linewidth=0, label=f'{label}', transform=ccrs.PlateCarree())
 
     # Calculate zoom-in extent
     lat_min = max(min(lat_list) - 3, -90)  # Ensure latitude does not go below -90
@@ -75,7 +75,7 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3',output_file='map.png'
         depth_extent = np.ma.masked_where(~mask_extent, depth)
 
         # Plot depth with masked data
-        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=100,
+        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=30,
                            cmap='binary', transform=ccrs.PlateCarree())
 
         # Add colorbar with limits based on the depth in the zoomed extent
@@ -151,7 +151,7 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
 
     # Plot the significant wave height using hexbin with a higher gridsize and discrete colors
-    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=150, cmap=cmap, vmin=0, vmax=21, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=0, vmax=21, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
 
     # Add the land feature on top of the hexbin plot
     ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
@@ -172,7 +172,7 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
 
     # Add colorbar with discrete colors
     cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05, ticks=np.arange(0, 21, 2))
-    cb.set_label(ds[var].standard_name, fontsize=14)
+    cb.set_label(ds[var].attrs.get('standard_name', var)+' ['+ds[var].attrs.get('units', var)+']', fontsize=14)
     plt.tight_layout()
 
     if title is None:
@@ -244,7 +244,7 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
     ax.coastlines(resolution='10m', zorder=3)
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
     # Plot the significant wave height using hexbin with a higher gridsize and discrete colors
-    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=150, cmap=cmap, vmin=hs_flat.min(), vmax=hs_flat.max(), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=100, cmap=cmap, vmin=hs_flat.min(), vmax=hs_flat.max(), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
 
     # Add the land feature on top of the hexbin plot
     ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
@@ -265,7 +265,7 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
 
     # Add colorbar with discrete colors
     cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
-    cb.set_label(ds[var].attrs.get('standard_name', var), fontsize=14)
+    cb.set_label(ds[var].attrs.get('standard_name', var)+' ['+ds[var].attrs.get('units', var)+']', fontsize=14)
     plt.tight_layout()
     if title is not None:
         plt.title(title, fontsize=16)
