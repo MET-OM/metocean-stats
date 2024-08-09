@@ -56,6 +56,27 @@ Import plots and tables from metocean-stats:
    
    from metocean_stats import plots, tables
 
+Scatter Plot
+------------
+
+.. code-block:: python
+   
+   plots.plot_scatter(
+      df,
+      var1='W10',
+      var2='W100',
+      var1_units='m/s',
+      var2_units='m/s', 
+      title='Scatter',
+      regression_line=True,
+      qqplot=False,
+      density=True,
+      output_file='scatter_plot.png')
+
+.. image:: files/scatter_plot.png
+   :width: 500
+
+
 Scatter Diagram
 ---------------
 

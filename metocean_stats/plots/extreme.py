@@ -31,7 +31,7 @@ def plot_return_levels(data, var, rl, output_file):
                   xmin=data[var].index[0], 
                   xmax=data[var].index[-1],
                   color=color[i], linestyle='dashed', linewidth=2,
-                  label=str(rl.return_levels.iloc[i].round(2))+\
+                  label=str(np.round(rl.return_levels.iloc[i],2))+\
                             ' ('+str(int(rl.index[i]))+'y)')
 
     if method == 'pot':
@@ -483,8 +483,8 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
     plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
     plt.legend()
-    plt.xlim([0,hs_tpl_tph['t2_'+str(np.max(periods))].max().round()])
-    plt.ylim([0,hs_tpl_tph['hs_'+str(np.max(periods))].max().round()])
+    plt.xlim([0,np.round(hs_tpl_tph['t2_'+str(np.max(periods))].max())])
+    plt.ylim([0,np.round(hs_tpl_tph['hs_'+str(np.max(periods))].max())])
     plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
     return fig

@@ -108,6 +108,8 @@ def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, 
 
 
 def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line=True,qqplot=True,density=True,output_file='scatter_plot.png'):
+    import scipy.stats as stats
+
     x=df[var1].values
     y=df[var2].values
     fig, ax = plt.subplots()
@@ -143,11 +145,11 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     corr = np.corrcoef(y,x)[0][1]
     si = np.std(x-y)/np.mean(x)
 
-    plt.annotate('rmse = '+str(round(rmse,3))
-                 +'\nbias = '+str(round(bias,3))
-                 +'\nmean = '+str(round(mae,3))
-                 +'\ncorr = '+str(round(corr,3))
-                 +'\nsi = '+str(round(si,3)), xy=(dmin+1,0.6*(dmin+dmax)))
+    plt.annotate('rmse = '+str(np.round(rmse,3))
+                 +'\nbias = '+str(np.round(bias,3))
+                 +'\nmae = '+str(np.round(mae,3))
+                 +'\ncorr = '+str(np.round(corr,3))
+                 +'\nsi = '+str(np.round(si,3)), xy=(dmin+1,0.6*(dmin+dmax)))
     plt.xlabel(var1+'['+var1_units+']', fontsize=15)
     plt.ylabel(var2+'['+var2_units+']', fontsize=15)
 

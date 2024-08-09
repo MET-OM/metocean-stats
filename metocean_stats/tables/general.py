@@ -436,7 +436,7 @@ def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=No
     # Iterate over each height in z
     if var_dir is None:
         for i in range(len(z)):
-            results.append([z[i], data[var[i]].mean().round(2), data[var[i]].std().round(2), 
+            results.append([z[i], np.round(data[var[i]].mean(),2), np.round(data[var[i]].std(),2), 
                             data[var[i]].quantile(0.05), data[var[i]].quantile(0.10),
                             data[var[i]].quantile(0.50), data[var[i]].quantile(0.90),
                             data[var[i]].quantile(0.95), data[var[i]].quantile(0.99),
@@ -446,7 +446,7 @@ def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=No
 
     else:
         for i in range(len(z)):
-            results.append([z[i], data[var[i]].mean().round(2), data[var[i]].std().round(2), 
+            results.append([z[i], np.round(data[var[i]].mean(),2), np.round(data[var[i]].std(),2), 
                             data[var[i]].quantile(0.05), data[var[i]].quantile(0.10),
                             data[var[i]].quantile(0.50), data[var[i]].quantile(0.90),
                             data[var[i]].quantile(0.95), data[var[i]].quantile(0.99),

@@ -136,14 +136,14 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp
         month_data = data[data.index.month == month]
         a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=month_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
         for i in range(len(periods)):
-            rv_hs[month-1,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
-            rv_tp[month-1,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
+            rv_hs[month-1,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+            rv_tp[month-1,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     #append annual
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     for i in range(len(periods)):
-        rv_hs[12,i] = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
-        rv_tp[12,i] = hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max().round(2)
+        rv_hs[12,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+        rv_tp[12,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
     
     # Initialize lists to store table data
     annual_prob =  [np.round(100/12,2)] * 12 + [100.00]
@@ -224,7 +224,7 @@ def table_Hs_Tpl_Tph_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,10
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     k=0
     for i in range(len(periods)):
-        max_hs = hs_tpl_tph['hs_'+str(periods[i])].max().round(1)
+        max_hs = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),1)
         for j in range(10):
             closest_index = (hs_tpl_tph['hs_'+str(periods[i])] - (max_hs-j)).abs().idxmin()
             #print(j,k,k+3)
@@ -287,7 +287,7 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
     rv_hs = np.zeros(len(periods))
     result = []
     for i in range(len(periods)):
-        rv_hs = hs_tpl_tph['hs_'+str(periods[i])].max().round(2)
+        rv_hs = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
         P5_model,Mean_model,P95_model = model_tp_given_hs(hs=rv_hs, a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
         result.append([periods[i],rv_hs,P5_model,Mean_model,P95_model])
 
