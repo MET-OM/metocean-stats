@@ -104,14 +104,20 @@ def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, 
     ax.set_ylabel('Probability density')
     plt.savefig(output_file)
     
-    return 
+    return fig
 
 
-def plot_scatter(df,var1,var2,location,regression_line,qqplot=True):
+def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line=True,qqplot=True,density=True,output_file='scatter_plot.png'):
     x=df[var1].values
     y=df[var2].values
     fig, ax = plt.subplots()
-    ax.scatter(x,y,marker='.',s=10,c='g')
+    if density == False:
+        ax.scatter(x,y,marker='.',s=10,c='g')
+    else:
+        from matplotlib.colors import LogNorm
+        plt.hist2d(x, y,bins=50, cmap='hot',cmin=1)
+        plt.colorbar()
+
     dmin, dmax = np.min([x,y])*0.9, np.max([x,y])*1.05
     diag = np.linspace(dmin, dmax, 1000)
     plt.plot(diag, diag, color='r', linestyle='--')
@@ -135,20 +141,20 @@ def plot_scatter(df,var1,var2,location,regression_line,qqplot=True):
     bias = np.mean(y-x)
     mae = np.mean(np.abs(y-x))
     corr = np.corrcoef(y,x)[0][1]
-    std = np.std(x-y)/np.mean(x)
+    si = np.std(x-y)/np.mean(x)
+
     plt.annotate('rmse = '+str(round(rmse,3))
                  +'\nbias = '+str(round(bias,3))
                  +'\nmean = '+str(round(mae,3))
                  +'\ncorr = '+str(round(corr,3))
-                 +'\nstd = '+str(round(std,3)), xy=(dmin+1,0.6*(dmin+dmax)))
-        
-    plt.xlabel(var1, fontsize=15)
-    plt.ylabel(var2, fontsize=15)
+                 +'\nsi = '+str(round(si,3)), xy=(dmin+1,0.6*(dmin+dmax)))
+    plt.xlabel(var1+'['+var1_units+']', fontsize=15)
+    plt.ylabel(var2+'['+var2_units+']', fontsize=15)
 
-    plt.title("$"+(location +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
+    plt.title("$"+(title +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
     plt.grid()
-    plt.close()
-    
+    plt.savefig(output_file)
+
     return fig
 
 

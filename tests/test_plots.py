@@ -12,6 +12,17 @@ ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, 
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
 
+def test_plot_scatter(ds=ds):
+    output_file = 'test_plot_scatter.png'
+    fig = plots.plot_scatter(ds, 'W10', 'W150', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+
+
 def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
     output_file = 'test_prob_non_exceedance.png'
     fig = plots.plot_prob_non_exceedance_fitted_3p_weibull(ds, var='HS', output_file=output_file)
