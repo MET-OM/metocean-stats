@@ -387,27 +387,16 @@ def test_table_storm_surge_for_rv_hs(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-#def test_threshold_sensitivity(ds=ds):
-#    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
-#                                        thresholds=[1,1.5])
-                                        
-#def test_joint_distribution_Hs_Tp(ds=ds):
-#    extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
-#    os.remove('test.png')
 
-#def test_mean_profile(ds=ds):
-#    profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
-    
-#def test_profile_shear(ds=ds):
-#    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
-
-#def test_predict_ts_GBR(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
-
-#def test_predict_ts_SVR(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
-
-#def test_predict_ts_LSTM(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
-
-  
+def test_table_max_min_water_level(ds=ds):
+    output_file = 'table_max_min_water_level.csv'
+    ds['z'] = ds['HS']*0.005
+    ds['tide'] = ds['HS']*0.0001
+    ds['storm_surge'] = ds['HS']*0.0005
+    df = tables.table_max_min_water_level(ds, var_total_water_level='z',var_tide='tide',var_surge='storm_surge', var_mslp='MSLP', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (2, 4):
+        pass
+    else:
+        raise ValueError("Shape is not correct")

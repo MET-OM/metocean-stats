@@ -559,3 +559,7 @@ def weather_window_length(time_series,month,threshold,op_duration,timestep):
     p90 = np.percentile(wt1[mon_s0==month],90)
     return mean, p10, p50, p90
 
+def pressure_surge(df,var='MSLP'):
+    surge_max = (min(df.MSLP)-np.mean(df.MSLP))*(-0.01)
+    surge_min = (max(df.MSLP)-np.mean(df.MSLP))*(-0.01)
+    return  surge_min, surge_max

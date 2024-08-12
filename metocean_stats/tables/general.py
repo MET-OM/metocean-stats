@@ -557,3 +557,32 @@ def table_tidal_levels(data: pd.DataFrame, var: str, output_file='tidal_levels.c
 
     return results_df
 
+def table_max_min_water_level(data: pd.DataFrame, var_total_water_level: str,var_tide: str,var_surge: str, var_mslp: str, output_file='table_max_min_water_level.csv'):
+    """
+    Creates a pandas DataFrame with max and min values for water level components.
+
+    Args:
+        data: Pandas DataFrame containing the data.
+        var_total_water_level: Column name for total water level.
+        var_tide: Column name for tide component.
+        var_surge: Column name for surge component.
+        var_mslp: Column name for mean sea level pressure for the estimation of pressure surge
+        output_file: Output file path for the DataFrame (default: 'table_max_min_water_level.csv').
+
+    Returns:
+        Pandas DataFrame with max and min values for specified variables.
+    """
+    min_pressure_surge, max_pressure_surge = pressure_surge(data,var=var_mslp)
+    var_list = [var_total_water_level, var_tide, var_surge]
+    max_values = data[var_list].max()
+    min_values = data[var_list].min()
+
+    df = pd.DataFrame({'variable': var_list, 'max': max_values, 'min': min_values})
+    new_row = {'variable': 'pressure_surge', 'max': max_pressure_surge, 'min': min_pressure_surge}  
+    df = df._append(new_row, ignore_index=True)
+    df = df.T
+    df.columns = df.iloc[0]
+    df = df.iloc[1:]   
+    df.to_csv(output_file, index=True)
+    
+    return df
