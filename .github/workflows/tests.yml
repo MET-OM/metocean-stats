@@ -18,7 +18,7 @@ jobs:
         shell: bash -l {0}
     strategy:
       matrix:
-        os: ["ubuntu", "windows"]
+        os: ["ubuntu","macos", "windows"]
         python-version: [ '3.8', '3.9', '3.10', '3.11' ]
     steps:
       - uses: actions/checkout@v2
