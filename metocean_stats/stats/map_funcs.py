@@ -79,7 +79,7 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3',output_file='map.png'
                            cmap='binary', transform=ccrs.PlateCarree())
 
         # Add colorbar with limits based on the depth in the zoomed extent
-        cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.8)
+        cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.6)
         cbar.set_label('Depth [m]')
     else:
         pass
@@ -235,7 +235,7 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
     #lon_flat = lon_flat[mask]
 
     # Create a colormap with discrete colors
-    cmap = plt.cm.get_cmap('viridis', num_colors)
+    cmap = plt.cm.get_cmap('terrain', num_colors)
     cmap = ListedColormap(cmap(np.linspace(0, 1, num_colors)))
 
     # Create the plot
