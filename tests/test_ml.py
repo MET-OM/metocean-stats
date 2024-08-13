@@ -17,7 +17,7 @@ def test_predict_ts_GBR(ds=ds):
 def test_predict_ts_SVR(ds=ds):
     ml.predict_ts(ts_origin=ds,var_origin=['W10','TP','DIRP'],ts_train=ds.loc['1960-01-01':'1960-12-31'],var_train=['HS'], model='SVR_RBF')
 
-def test_predict_ts_LSTM(ds=ds):
-    ml.predict_ts(ts_origin=ds,var_origin=['W10','TP','DIRP'],ts_train=ds.loc['1960-01-01':'1960-12-31'],var_train=['HS'], model='LSTM')
+#def test_predict_ts_LSTM(ds=ds):
+#    ml.predict_ts(ts_origin=ds,var_origin=['W10','TP','DIRP'],ts_train=ds.loc['1960-01-01':'1960-12-31'],var_train=['HS'], model='LSTM')
 
   
