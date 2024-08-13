@@ -8,7 +8,6 @@ on:
       - v*
   pull_request:
 
-
 jobs:
   tests:
     name: pytests (${{ matrix.os }}, Mambaforge)
@@ -18,27 +17,32 @@ jobs:
         shell: bash -l {0}
     strategy:
       matrix:
-        os: ["ubuntu","macos", "windows"]
-        python-version: [ '3.8', '3.9', '3.10', '3.11' ]
+        os: ["ubuntu", "macos", "windows"]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Check Git status
+        run: git status
+      - name: Show last few commits
+        run: git log -3 --oneline
       - uses: conda-incubator/setup-miniconda@v2
         with:
           environment-file: environment.yml
           miniforge-version: latest
           miniforge-variant: Mambaforge
+      - name: Update Conda
+        run: conda update conda -y
       - name: Run tests
         run: |
           conda activate test
-          pytest -vs --log-cli-level=debug
-
-
+          pytest -vs --log-cli-level=debug --timeout=300
       - name: Build wheels
         run: |
           conda activate test
           python setup.py sdist
           python setup.py bdist_wheel
-
       - name: Upload wheels
         if: matrix.python-version == '3.10' && matrix.os == 'ubuntu'
         uses: actions/upload-artifact@v2
