@@ -396,31 +396,41 @@ def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, per
     
     return df
 
-def table_directional_Hmax_return_periods(ds,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[1, 10, 100,10000],adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv'):
-    df  = table_directional_joint_distribution_Hs_Tp_return_values(ds,var_hs=var_hs,var_tp=var_tp,var_dir=var_dir,periods=periods,adjustment=adjustment,output_file=None)
+def table_directional_Hmax_return_periods(ds, var_hs='HS', var_tp='TP', var_dir='DIRM', periods=[1, 10, 100, 10000], adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv'):
+    df = table_directional_joint_distribution_Hs_Tp_return_values(ds, var_hs=var_hs, var_tp=var_tp, var_dir=var_dir, periods=periods, adjustment=adjustment, output_file=None)
     hs_columns = [col for col in df.columns if col.startswith('Hs')]
     tp_columns = [col for col in df.columns if col.startswith('Tp')]
     hmax_columns = [col.replace('Hs[m]', 'Hmax[m]') for col in df.columns if col.startswith('Hs[m]')]
+
+    if not hs_columns or not tp_columns:
+        raise ValueError("Hs or Tp columns are missing or empty in the dataframe.")
+
     df[hmax_columns] = np.nan
-
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(ds,var_hs=var_hs,var_tp=var_tp,periods=[1000])
-    P5_model,Mean_model,P95_model = model_tp_given_hs(hs=df[hs_columns], a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
-
+    
+    # Joint distribution calculation
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3, h3, X, hs_tpl_tph = joint_distribution_Hs_Tp(ds, var_hs=var_hs, var_tp=var_tp, periods=[1000])
+    
+    # Model prediction
+    P5_model, Mean_model, P95_model = model_tp_given_hs(hs=df[hs_columns], a1=a1, a2=a2, a3=a3, b1=b1, b2=b2, b3=b3)
+    
+    # Assign T_Hmax values
     for i in range(len(hs_columns)):
-        df['T_Hmax(P5-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * P5_model[hs_columns[i]] # 0.9 according to Goda (1988)
-        df['T_Hmax(Mean-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * Mean_model[hs_columns[i]] # 0.9 according to Goda (1988)
-        df['T_Hmax(P95-model) [s] ['+ str(periods[i])+' years]'] =  0.9 * P95_model[hs_columns[i]] # 0.9 according to Goda (1988)
-
+        df[f'T_Hmax(P5-model) [s] [{periods[i]} years]'] = 0.9 * P5_model[hs_columns[i]]
+        df[f'T_Hmax(Mean-model) [s] [{periods[i]} years]'] = 0.9 * Mean_model[hs_columns[i]]
+        df[f'T_Hmax(P95-model) [s] [{periods[i]} years]'] = 0.9 * P95_model[hs_columns[i]]
+    
     tHmax_columns = [col for col in df.columns if col.startswith('T_Hmax')]
-
-
-    for i in range(len(hs_columns)):
+    
+    # Estimate Hmax
+    for i in range(len(hmax_columns)):
         for j in range(df.shape[0]):
-            df.loc[j,hmax_columns[i]] = estimate_Hmax(df.loc[j,hs_columns[i]], df.loc[j,tp_columns[i]], twindow=3, k=1.0)
-
+            df.loc[j, hmax_columns[i]] = estimate_Hmax(df.loc[j, hs_columns[i]], df.loc[j, tp_columns[i]], twindow=3, k=1.0)
+    
+    # Output to file if specified
     if output_file:
         selected_columns = ['Direction'] + hmax_columns + tHmax_columns
-        df[selected_columns].round(2).to_csv(output_file,index=False)
+        df[selected_columns].round(2).to_csv(output_file, index=False)
+    
     return df
 
 def table_hs_for_rv_wind(data, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
