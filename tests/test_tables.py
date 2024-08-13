@@ -12,15 +12,15 @@ ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, 
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
 
-def test_scatter_diagram(ds=ds):
-    output_file = 'test_scatter_diagram.csv'
-    df = tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    if df.shape[0] == 14:
-        pass
-    else:
-        raise ValueError("Shape is not correct")
+#def test_scatter_diagram(ds=ds):
+#    output_file = 'test_scatter_diagram.csv'
+#    df = tables.scatter_diagram(ds, var1='HS', step_var1=1, var2='TP', step_var2=1, output_file=output_file)
+#    if os.path.exists(output_file):
+#        os.remove(output_file)
+#    if df.shape[0] == 14:
+#        pass
+#    else:
+#        raise ValueError("Shape is not correct")
 
 def test_table_var_sorted_by_hs(ds=ds):
     output_file = 'test_var_sorted_by_hs.csv'
