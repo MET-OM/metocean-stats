@@ -1,20 +1,16 @@
-.. metocean-stats documentation master file, created by
-   sphinx-quickstart on Thu Sep 14 10:18:36 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Welcome to metocean-stats's documentation!
-=====================================
+==========================================
 
-**metocean-stats** is a Python package (under developement) for metocean analysis of NORA3 (wind and wave) hindcast.
+**metocean-stats** is a Python package (under development) for metocean analysis of NORA3 (wind and wave) hindcast.
 
 The package contains functions that:
   * generate statistics (tables, diagrams etc)
 
 Installing **metocean-stats**
-=============================================
+=============================
+
 Alternative 1: Using Mambaforge (alternative to Miniconda)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+----------------------------------------------------------
 
 1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
 2. Set up a *Python 3* environment for metocean-stats and install metocean-stats
@@ -25,7 +21,8 @@ Alternative 1: Using Mambaforge (alternative to Miniconda)
    $ conda activate metocean-stats
 
 Alternative 2: Using Mambaforge (alternative to Miniconda) and Git
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+------------------------------------------------------------------
+
 1. Install `mambaforge <https://mamba.readthedocs.io/en/latest/installation.html>`_ (`download <https://github.com/conda-forge/miniforge#mambaforge>`_)
 2. Clone metocean-stats:
 
@@ -38,9 +35,9 @@ Alternative 2: Using Mambaforge (alternative to Miniconda) and Git
 
 .. code-block:: bash
 
-  $ mamba env create -f environment.yml
-  $ conda activate metocean-stats
-  $ pip install --no-deps -e .
+   $ mamba env create -f environment.yml
+   $ conda activate metocean-stats
+   $ pip install --no-deps -e .
 
 This installs the metocean-stats as an editable package. Therefore, you can directly make changes to the repository or fetch the newest changes with :code:`git pull`. 
 
@@ -48,249 +45,1550 @@ To update the local conda environment in case of new dependencies added to envir
 
 .. code-block:: bash
 
-  $ mamba env update -f environment.yml
+   $ mamba env update -f environment.yml
 
-Download metocean data
-=====================================
-Use metocean-api to download some sample data:
+Metocean Statistics
+===================
 
-.. code-block:: python
-
-   from metocean_api import ts
-   ds = ts.TimeSeries(lon=1.320, lat=53.324,
-                      start_time='2000-01-01', 
-                      end_time='2000-12-31', 
-                      product='NORA3_wind_wave')
-
-Import data from server and save it as csv:
-
-.. code-block:: python
-
-   ds.import_data(save_csv=True)
-
-Or import data from a local csv-file:
-
-.. code-block:: python
-
-   ds.load_data(local_file=ts.datafile)  
-
-General Statistics
-=====================================
-To generate general/basic stastistics, import general_stats module: 
+Import plots and tables from metocean-stats:
 
 .. code-block:: python
    
-   from metocean_stats.stats import general_stats
+   from metocean_stats import plots, tables
 
-Create scatter Hs-Tp diagram:
+Scatter Plot
+------------
 
 .. code-block:: python
    
-   general_stats.scatter_diagram(data=ts.data, 
-                     var1='hs', step_var1=1, 
-                     var2='tp', step_var2=2, 
-                     output_file='scatter_hs_tp_diagram.png')
+   plots.plot_scatter(
+      df,
+      var1='W10',
+      var2='W100',
+      var1_units='m/s',
+      var2_units='m/s', 
+      title='Scatter',
+      regression_line=True,
+      qqplot=False,
+      density=True,
+      output_file='scatter_plot.png')
 
-.. image:: scatter_hs_tp_diagram.png
-  :width: 500
+.. image:: files/scatter_plot.png
+   :width: 500
 
-Create table with monthly percentiles:
+
+Scatter Diagram
+---------------
+
+.. code-block:: python
+   
+   tables.scatter_diagram(
+       ds, 
+       var1='HS', 
+       step_var1=1, 
+       var2='TP', 
+       step_var2=1, 
+       output_file='Hs_Tp_scatter.csv'
+   )
+
+.. csv-table:: Scatter diagram
+   :header-rows: 1
+   :file: files/Hs_Tp_scatter.csv
+
+.. code-block:: python
+   
+   tables.scatter_diagram(
+       ds, 
+       var1='HS', 
+       step_var1=1, 
+       var2='TP', 
+       step_var2=1, 
+       output_file='Hs_Tp_scatter.png'
+   )
+
+.. image:: files/Hs_Tp_scatter.png
+   :width: 500
+
+
+Wind Profile Return Values Table
+--------------------------------
 
 .. code-block:: python
 
-   general_stats.table_monthly_percentile(data=ts.data, var='hs', output_file='hs_monthly_perc.csv')
+   tables.table_profile_return_values(
+       df,
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50, 80, 100, 150],
+       periods=[1, 10, 100, 10000],
+       output_file='RVE_wind_profile.csv'
+   )
 
 .. csv-table:: 
    :header-rows: 1
+   :file: files/RVE_wind_profile.csv
 
-   Month , 5% , 50% , Mean , 95% , 99% 
-   jan , 0.5 , 1.3 , 1.4 , 2.7 , 3.7 
-   feb , 0.4 , 1.2 , 1.4 , 2.8 , 3.8 
-   mar , 0.4 , 1.1 , 1.2 , 2.5 , 3.4 
-   apr , 0.3 , 0.9 , 1.0 , 2.1 , 3.2 
-   mai , 0.3 , 0.9 , 0.9 , 1.9 , 2.5 
-   jun , 0.3 , 0.7 , 0.8 , 1.7 , 2.5 
-   jul , 0.2 , 0.7 , 0.8 , 1.6 , 2.2 
-   aug , 0.3 , 0.7 , 0.8 , 1.8 , 2.5 
-   sep , 0.3 , 0.9 , 1.1 , 2.3 , 3.2 
-   okt , 0.4 , 1.2 , 1.3 , 2.5 , 3.2 
-   nov , 0.5 , 1.3 , 1.4 , 2.7 , 3.6 
-   des , 0.4 , 1.3 , 1.4 , 2.8 , 3.5 
-   Annual , 0.4 , 1.3 , 1.4 , 2.8 , 3.5
-
-Create table with monthly min, mean, and max based on monthly values:
+Wind Profile Return Values Plot
+-------------------------------
 
 .. code-block:: python
 
-   general_stats.table_monthly_min_mean_max(data=ts.data, var='hs',output_file='hs_montly_min_mean_max.csv')
+   plots.plot_profile_return_values(
+       df,
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50, 80, 100, 150],
+       periods=[1, 10, 100, 10000],
+       reverse_yaxis=False,
+       title='Return Periods over z',
+       units='m/s',
+       distribution='Weibull3P',
+       method='default',
+       threshold='default',
+       output_file='RVE_wind_profile.png'
+   )
+
+.. image:: files/RVE_wind_profile.png
+   :width: 500
+
+Wind Profile Statistics Plot
+----------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_stats(
+       df,
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50, 80, 100, 150],
+       reverse_yaxis=False,
+       output_file='wind_stats_profile.png'
+   )
+
+.. image:: files/wind_stats_profile.png
+   :width: 500
+
+
+Directional Wind Return Periods (NORSOK Adjustment)
+---------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_directional_return_periods(
+       df,
+       var='W10',
+       var_dir='D10',
+       periods=[1, 10, 100, 1000],
+       distribution='Weibull3P_MOM',
+       adjustment='NORSOK',
+       units='m/s',
+       output_file='Wind.dir_extremes_weibull_norsok.png'
+   )
+
+.. image:: files/Wind.dir_extremes_weibull_norsok.png
+   :width: 500
+
+Directional Wind Return Periods (No Adjustment)
+-----------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_directional_return_periods(
+       df,
+       var='W10',
+       var_dir='D10',
+       periods=[1, 10, 100, 1000],
+       distribution='Weibull3P_MOM',
+       adjustment=None,
+       units='m/s',
+       output_file='Wind.dir_extremes_weibull.png'
+   )
+
+.. image:: files/Wind.dir_extremes_weibull.png
+   :width: 500
+
+
+
+
+Monthly Non-Exceedance Table
+----------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_non_exceedance(
+       df, 
+       var1='HS', 
+       step_var1=0.5, 
+       output_file='Hs_table_monthly_non_exceedance.csv'
+   )
 
 .. csv-table:: 
    :header-rows: 1
+   :file: files/Hs_table_monthly_non_exceedance.csv
 
-   Month , Minimum , Mean , Maximum 
-   jan , 2.4 , 3.7 , 5.13 
-   feb , 2.62 , 3.7 , 5.53 
-   mar , 2.02 , 3.3 , 4.52 
-   apr , 1.95 , 3.0 , 4.67 
-   mai , 1.6 , 2.5 , 3.29 
-   jun , 1.46 , 2.4 , 3.32 
-   jul , 1.29 , 2.2 , 3.57 
-   aug , 1.7 , 2.5 , 4.42 
-   sep , 1.8 , 3.0 , 5.61 
-   okt , 2.04 , 3.2 , 4.43 
-   nov , 2.3 , 3.7 , 5.48 
-   des , 2.46 , 3.6 , 5.14 
-   Annual , 3.63 , 4.6 , 5.61 
-
-Create table with sorted statistics by Hs:
+Monthly Statistics Plot
+------------------------
 
 .. code-block:: python
 
-   general_stats.table_var_sorted_by_hs(data=ts.data, var='tp', var_hs='hs', output_file='tp_sorted_by_hs.csv')
+   plots.plot_monthly_stats(
+       df, 
+       var1='HS', 
+       show=['Maximum','P99','Mean'], 
+       title='Hs[m]', 
+       output_file='Hs_monthly_stats.png'
+   )
+
+.. image:: files/Hs_monthly_stats.png
+   :width: 500
+
+Directional Non-Exceedance Table
+--------------------------------
+
+.. code-block:: python
+
+   tables.table_directional_non_exceedance(
+       df, 
+       var1='HS', 
+       step_var1=0.5, 
+       var_dir='DIRM', 
+       output_file='table_directional_non_exceedance.csv'
+   )
 
 .. csv-table:: 
    :header-rows: 1
+   :file: files/table_directional_non_exceedance.csv
 
-   Hs , Entries , Min , 5% , Mean , 95% , Max 
-   0-1 , 140613 , 1.8 , 3.2 , 6.0 , 11.2 , 21.8 
-   1-2 , 111055 , 3.6 , 4.3 , 6.8 , 12.3 , 21.8 
-   2-3 , 24175 , 4.7 , 5.7 , 7.8 , 12.3 , 18.0 
-   3-4 , 4058 , 6.3 , 6.9 , 9.8 , 13.5 , 18.0 
-   4-5 , 571 , 7.6 , 9.2 , 11.6 , 14.9 , 18.0 
-   5-6 , 40 , 9.2 , 10.2 , 11.8 , 14.9 , 14.9 
-   6-7 , 0 , - , - , - , - , - 
-   0-7 , 280512 , 1.8 , 3.6 , 6.5 , 11.2 , 21.8 
+Directional Statistics Plot
+----------------------------
 
+.. code-block:: python
 
-Directional Statistics
-=====================================
+   plots.plot_directional_stats(
+       df, 
+       var1='HS', 
+       step_var1=0.5, 
+       var_dir='DIRM', 
+       title='$H_s$[m]', 
+       output_file='directional_stats.png'
+   )
 
-To generate directional stastistics, import dir_stats module: 
+.. image:: files/directional_stats.png
+   :width: 500
+
+Prob. of Non-Exceedance (fitted)
+--------------------------------
 
 .. code-block:: python
    
-   from metocean_stats.stats import dir_stats
+   plots.plot_prob_non_exceedance_fitted_3p_weibull(df,
+                                                    var='HS',
+                                                    output_file='prob_non_exceedance_fitted_3p_weibull.png')
 
-Create rose for overall data (**method='overall'**) or for each month (**method='monthly'**):
 
-.. code-block:: python
-   
-   dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='overall')
+.. image:: files/prob_non_exceedance_fitted_3p_weibull.png
+  :width: 700  
 
-.. image:: waverose.png
-  :width: 300
 
-.. code-block:: python
-   
-   dir_stats.var_rose(ts.data, 'thq','hs','waverose.png',method='monthly')
-
-.. image:: monthly_waveroses.png
-  :width: 500
-
-Create table with min, mean, and maximum values as a function direction:
+Joint Distribution Hs-Tp Plot
+------------------------------
 
 .. code-block:: python
 
-   dir_stats.directional_min_mean_max(ts.data,'thq','hs','hs_dir_min_mean_max.csv')
+   plots.plot_joint_distribution_Hs_Tp(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       periods=[1,10,100,1000], 
+       title='Hs-Tp joint distribution', 
+       output_file='Hs.Tp.joint.distribution.png', 
+       density_plot=True
+   )
+
+.. image:: files/Hs.Tp.joint.distribution.png
+   :width: 500
+
+Monthly Joint Distribution Hs-Tp Parameter Table
+------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_joint_distribution_Hs_Tp_param(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       periods=[1,10,100,10000], 
+       output_file='monthly_Hs_Tp_joint_param.csv'
+   )
 
 .. csv-table:: 
    :header-rows: 1
+   :file: files/monthly_Hs_Tp_joint_param.csv
 
-   Direction , Minimum , Mean , Maximum 
-   345-15 , 2.2 , 2.8 , 3.7 
-   15-45 , 2.2 , 3.0 , 4.0 
-   45-75 , 2.4 , 3.3 , 4.3 
-   75-105 , 2.5 , 3.3 , 4.1 
-   105-135 , 2.3 , 3.4 , 4.2 
-   135-165 , 2.8 , 4.1 , 5.5 
-   165-195 , 3.0 , 4.2 , 5.6 
-   195-225 , 1.9 , 3.4 , 5.5 
-   225-255 , 1.9 , 3.1 , 4.8 
-   255-285 , 2.0 , 2.9 , 4.4 
-   285-315 , 2.0 , 2.7 , 4.2 
-   315-345 , 2.0 , 2.9 , 4.1 
-   Annual , 3.6 , 4.6 , 5.6 
-
-Extreme Statistics
-=====================================
-
-To generate extreme stastistics, import extreme_stats module: 
+Directional Joint Distribution Hs-Tp Parameter Table
+----------------------------------------------------
 
 .. code-block:: python
-   
-   from metocean_stats.stats import extreme_stats
 
-Create time series of Hs with return levels using POT and Annual Maximum(GEV):
+   tables.table_directional_joint_distribution_Hs_Tp_param(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       var_dir='DIRM', 
+       periods=[1,10,100], 
+       output_file='dir_Hs_Tp_joint_param.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/dir_Hs_Tp_joint_param.csv
+
+Monthly Weather Window Plot
+---------------------------
 
 .. code-block:: python
-   
-   rl_pot = extreme_stats.return_levels_pot(data=ds.data, var='hs', 
-            periods=[20,50,100,1000], 
-            output_file='return_levels_POT.png')
 
-.. image:: return_levels_POT.png
+   plots.plot_monthly_weather_window(
+       df, 
+       var='HS', 
+       threshold=4, 
+       window_size=12, 
+       output_file='NORA10_monthly_weather_window4_12_plot.png'
+   )
+
+.. image:: files/NORA10_monthly_weather_window4_12_plot.png
+   :width: 500
+
+Monthly Return Periods Table
+----------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_return_periods(
+       df, 
+       var='HS', 
+       periods=[1, 10, 100, 10000], 
+       distribution='Weibull3P_MOM', 
+       units='m', 
+       output_file='HS_monthly_extremes_Weibull.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/HS_monthly_extremes_Weibull.csv
+
+Directional Return Periods Table
+--------------------------------
+
+.. code-block:: python
+
+   tables.table_directional_return_periods(
+       df, 
+       var='HS', 
+       periods=[1, 10, 100, 10000], 
+       units='m', 
+       var_dir='DIRM', 
+       distribution='Weibull3P_MOM', 
+       adjustment='NORSOK', 
+       output_file='directional_extremes_weibull.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/directional_extremes_weibull.csv
+
+Monthly Return Periods Plot
+---------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_return_periods(
+       df, 
+       var='HS', 
+       periods=[1, 10, 100], 
+       distribution='Weibull3P_MOM', 
+       units='m', 
+       output_file='HS_monthly_extremes.png'
+   )
+
+.. image:: files/HS_monthly_extremes.png
+   :width: 500
+
+Directional Return Periods Plot (GUM)
+-------------------------------------
+
+.. code-block:: python
+
+   plots.plot_directional_return_periods(
+       df, 
+       var='HS', 
+       var_dir='DIRM', 
+       periods=[1, 10, 100, 10000], 
+       distribution='GUM', 
+       units='m', 
+       output_file='dir_extremes_GUM.png'
+   )
+
+.. image:: files/dir_extremes_GUM.png
+   :width: 500
+
+Directional Return Periods Plot (Weibull)
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_directional_return_periods(
+       df, 
+       var='HS', 
+       var_dir='DIRM', 
+       periods=[1, 10, 100, 10000], 
+       distribution='Weibull3P_MOM', 
+       units='m', 
+       adjustment='NORSOK', 
+       output_file='dir_extremes_Weibull_norsok.png'
+   )
+
+.. image:: files/dir_extremes_Weibull_norsok.png
+   :width: 500
+
+Monthly Joint Distribution Hs-Tp Return Values Table
+----------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_joint_distribution_Hs_Tp_return_values(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       periods=[1,10,100,10000], 
+       output_file='monthly_Hs_Tp_joint_return_values.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/monthly_Hs_Tp_joint_return_values.csv
+
+Directional Joint Distribution Hs-Tp Return Values Table
+--------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_directional_joint_distribution_Hs_Tp_return_values(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       var_dir='DIRM', 
+       periods=[1,10,100,1000], 
+       adjustment='NORSOK', 
+       output_file='directional_Hs_Tp_joint_return_values.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/directional_Hs_Tp_joint_return_values.csv
+
+Hs-Tp Return Values Table
+-------------------------
+
+.. code-block:: python
+
+   tables.table_Hs_Tpl_Tph_return_values(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       periods=[1,10,100,10000], 
+       output_file='hs_tpl_tph_return_values.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/hs_tpl_tph_return_values.csv
+
+Tp for Given Hs Plot
+--------------------
+
+.. code-block:: python
+
+   plots.plot_tp_for_given_hs(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       output_file='tp_for_given_hs.png'
+   )
+
+.. image:: files/tp_for_given_hs.png
+   :width: 500
+
+Tp for Given Hs Table
+---------------------
+
+.. code-block:: python
+
+   tables.table_tp_for_given_hs(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       max_hs=20, 
+       output_file='tp_for_given_hs.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/tp_for_given_hs.csv
+
+Tp for RV Hs Table
+------------------
+
+.. code-block:: python
+
+   tables.table_tp_for_rv_hs(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       periods=[1,10,100,10000], 
+       output_file='tp_for_rv_hs.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/tp_for_rv_hs.csv
+
+Wave-Induced Current (JONSWAP) Table
+------------------------------------
+
+.. code-block:: python
+
+   tables.table_wave_induced_current(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       depth=200, 
+       ref_depth=200, 
+       spectrum='JONSWAP', 
+       output_file='JONSWAP_wave_induced_current_depth200.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/JONSWAP_wave_induced_current_depth200.csv
+
+Wave-Induced Current (TORSEHAUGEN) Table
+----------------------------------------
+
+.. code-block:: python
+
+   tables.table_wave_induced_current(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       depth=200, 
+       ref_depth=200, 
+       spectrum='TORSEHAUGEN', 
+       output_file='TORSEHAUGEN_wave_induced_current_depth200.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/TORSEHAUGEN_wave_induced_current_depth200.csv
+
+Hs for Given Wind Table
+-----------------------
+
+.. code-block:: python
+
+   tables.table_hs_for_given_wind(
+       df, 
+       var_hs='HS', 
+       var_wind='W10', 
+       bin_width=2, 
+       max_wind=42, 
+       output_file='table_perc_hs_for_wind.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_perc_hs_for_wind.csv
+
+Hs for Given Wind Plot
+----------------------
+
+.. code-block:: python
+
+   plots.plot_hs_for_given_wind(
+       df, 
+       var_hs='HS', 
+       var_wind='W10', 
+       output_file='hs_for_given_wind.png'
+   )
+
+.. image:: files/hs_for_given_wind.png
+   :width: 500
+
+Hs for RV Wind Table
+--------------------
+
+.. code-block:: python
+
+   tables.table_hs_for_rv_wind(
+       df, 
+       var_wind='W10', 
+       var_hs='HS', 
+       periods=[1,10,100,10000], 
+       output_file='hs_for_rv_wind.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/hs_for_rv_wind.csv
+
+Hmax Return Values Table
+------------------------
+
+.. code-block:: python
+
+   tables.table_Hmax_crest_return_periods(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       depth=200, 
+       periods=[1, 10, 100, 10000], 
+       sea_state='long-crested'
+   )
+
+Directional Hmax Return Values Table
+------------------------------------
+
+.. code-block:: python
+
+   tables.table_directional_Hmax_return_periods(
+       df, 
+       var_hs='HS', 
+       var_tp='TP', 
+       var_dir='DIRM', 
+       periods=[10, 100, 10000], 
+       adjustment='NORSOK', 
+       output_file='table_dir_Hmax_return_values.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_dir_Hmax_return_values.csv
+
+
+
+T2m Monthly Return Periods Plot (Negative)
+------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_return_periods(
+       df, 
+       var='T2m', 
+       periods=[1, 10, 100], 
+       distribution='GUM_L', 
+       method='minimum', 
+       units='°C', 
+       output_file='T2m_monthly_extremes_neg.png'
+   )
+
+.. image:: files/T2m_monthly_extremes_neg.png
+   :width: 500
+
+T2m Monthly Return Periods Table (Negative)
+-------------------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_return_periods(
+       df, 
+       var='T2m', 
+       periods=[1, 10, 100], 
+       distribution='GUM_L', 
+       method='minimum', 
+       units='°C', 
+       output_file='T2m_monthly_extremes_neg.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/T2m_monthly_extremes_neg.csv
+
+T2m Monthly Return Periods Plot (Positive)
+------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_return_periods(
+       df, 
+       var='T2m', 
+       periods=[1, 10, 100], 
+       distribution='GUM', 
+       method='maximum', 
+       units='°C', 
+       output_file='T2m_monthly_extremes_pos.png'
+   )
+
+.. image:: files/T2m_monthly_extremes_pos.png
+   :width: 500
+
+T2m Monthly Return Periods Table (Positive)
+-------------------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_return_periods(
+       df, 
+       var='T2m', 
+       periods=[1, 10, 100], 
+       distribution='GUM', 
+       method='maximum', 
+       units='°C', 
+       output_file='T2m_monthly_extremes_pos.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/T2m_monthly_extremes_pos.csv
+
+T2m Monthly Statistics Plot
+---------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_stats(
+       df, 
+       var1='T2m', 
+       show=['Minimum','Mean','Maximum'], 
+       title='T2m', 
+       output_file='T2m_monthly_stats.png'
+   )
+
+.. image:: files/T2m_monthly_stats.png
+   :width: 500
+
+T2m Monthly Non-Exceedance Table
+--------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_non_exceedance(
+       df, 
+       var1='T2m', 
+       step_var1=0.5, 
+       output_file='T2m_table_monthly_non_exceedance.csv'
+   )
+
+
+Current Speed Monthly Return Periods Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_return_periods(
+       ds_ocean, 
+       var='current_speed_0m', 
+       periods=[1, 10, 100], 
+       distribution='Weibull3P_MOM', 
+       method='POT', 
+       threshold='P99', 
+       units='m/s', 
+       output_file='csp0m_monthly_extremes.png'
+   )
+
+.. image:: files/csp0m_monthly_extremes.png
+   :width: 500
+
+Current Speed Monthly Rose Plot
+-------------------------------
+
+.. code-block:: python
+
+   plots.var_rose(
+       ds_ocean, 
+       'current_direction_0m', 
+       'current_speed_0m', 
+       max_perc=30, 
+       decimal_places=2, 
+       units='m/s', 
+       method='monthly', 
+       output_file='monthly_rose.png'
+   )
+
+.. image:: files/monthly_rose.png
+   :width: 500
+
+Current Speed Overall Rose Plot
+-------------------------------
+
+.. code-block:: python
+
+   plots.var_rose(
+       ds_ocean, 
+       'current_direction_0m', 
+       'current_speed_0m', 
+       max_perc=30, 
+       decimal_places=2, 
+       units='m/s', 
+       method='overall', 
+       output_file='overall_rose.png'
+   )
+
+.. image:: files/overall_rose.png
+   :width: 500
+
+Current Speed Monthly Statistics Plot
+-------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_stats(
+       ds_ocean, 
+       var1='current_speed_0m', 
+       show=['Mean', 'P99', 'Maximum'], 
+       title='Current[m/s], depth:0m', 
+       output_file='current_0m_monthly_stats.png'
+   )
+
+.. image:: files/current_0m_monthly_stats.png
+   :width: 500
+
+Current Speed Directional Statistics Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_directional_stats(
+       ds_ocean, 
+       var1='current_speed_0m', 
+       var_dir='current_direction_0m', 
+       step_var1=0.05, 
+       show=['Mean', 'P99', 'Maximum'], 
+       title='Current[m/s], depth:0m', 
+       output_file='current_0m_dir_stats.png'
+   )
+
+.. image:: files/current_0m_dir_stats.png
+   :width: 500
+
+Current Speed Directional Return Periods Table
+----------------------------------------------
+
+.. code-block:: python
+
+   tables.table_directional_return_periods(
+       ds_ocean, 
+       var='current_speed_0m', 
+       periods=[1, 10, 100, 10000], 
+       units='m/s', 
+       var_dir='current_direction_0m', 
+       distribution='Weibull3P_MOM', 
+       adjustment='NORSOK', 
+       output_file='directional_extremes_weibull_current_0m.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/directional_extremes_weibull_current_0m.csv
+
+Current Speed Monthly Return Periods Table
+------------------------------------------
+
+.. code-block:: python
+
+   tables.table_monthly_return_periods(
+       ds_ocean, 
+       var='current_speed_0m', 
+       periods=[1, 10, 100, 10000], 
+       units='m/s', 
+       distribution='Weibull3P_MOM', 
+       method='POT', 
+       threshold='P99', 
+       output_file='monthly_extremes_weibull_current_0m.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/monthly_extremes_weibull_current_0m.csv
+
+Current Speed Profile Return Values Plot
+----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_return_values(
+       ds_ocean, 
+       var=['current_speed_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       periods=[1, 10, 100, 10000], 
+       reverse_yaxis=True, 
+       output_file='RVE_current_profile.png'
+   )
+
+.. image:: files/RVE_current_profile.png
+   :width: 500
+
+Current Speed for Given Wind Table
+----------------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_given_wind(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_wind='W10', 
+       bin_width=2, 
+       max_wind=42, 
+       output_file='table_perc_current_for_wind.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_perc_current_for_wind.csv
+
+Current Speed for Given Wind Plot
+---------------------------------
+
+.. code-block:: python
+
+   plots.plot_current_for_given_wind(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_wind='W10', 
+       max_wind=40, 
+       output_file='curr_for_given_wind.png'
+   )
+
+.. image:: files/curr_for_given_wind.png
+   :width: 500
+
+Current Speed for Given Hs Table
+--------------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_given_hs(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_hs='HS', 
+       bin_width=2, 
+       max_hs=20, 
+       output_file='table_perc_current_for_Hs.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_perc_current_for_Hs.csv
+
+
+Current Speed for Given Wind Table
+----------------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_given_wind(
+       df, 
+       var_curr='current_speed_0m', 
+       var_wind='W10', 
+       bin_width=2, 
+       max_wind=42, 
+       output_file='table_perc_current_for_wind.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_perc_current_for_wind.csv
+
+Current Speed for Given Hs Table
+--------------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_given_hs(
+       df, 
+       var_curr='current_speed_0m', 
+       var_hs='HS', 
+       bin_width=2, 
+       max_hs=20, 
+       output_file='table_perc_current_for_Hs.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_perc_current_for_Hs.csv
+
+Current Speed for Given Hs Plot
+-------------------------------
+
+.. code-block:: python
+
+   plots.plot_current_for_given_hs(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_hs='HS', 
+       max_hs=20, 
+       output_file='curr_for_given_hs.png'
+   )
+
+.. image:: files/curr_for_given_hs.png
+   :width: 500
+
+Extreme Current Profile Return Values Table
+--------------------------------------------
+
+.. code-block:: python
+
+   tables.table_extreme_current_profile_rv(
+       ds_ocean, 
+       var=['current_speed_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       periods=[1, 100, 1000], 
+       percentile=95, 
+       output_file='table_extreme_current_profile_rv.png'
+   )
+
+.. image:: files/table_extreme_current_profile_rvperiod_1.png
+   :width: 500
+
+.. image:: files/table_extreme_current_profile_rvperiod_100.png
+   :width: 500
+
+.. image:: files/table_extreme_current_profile_rvperiod_1000.png
+   :width: 500
+
+Profile Statistics Table
+------------------------
+
+.. code-block:: python
+
+   tables.table_profile_stats(
+       ds_ocean, 
+       var=['current_speed_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       var_dir=['current_direction_' + d for d in depth], 
+       output_file='table_profile_stats.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/table_profile_stats.csv
+
+Profile Statistics Plot
+------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_stats(
+       ds_ocean, 
+       var=['current_speed_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       reverse_yaxis=True, 
+       output_file='stats_current_profile.png'
+   )
+
+.. image:: files/stats_current_profile.png
+   :width: 500
+
+Current Speed for RV Wind Table
+-------------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_rv_wind(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_wind='W10', 
+       periods=[1, 10, 100, 10000], 
+       output_file='Uc_for_rv_wind.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/Uc_for_rv_wind.csv
+
+Current Speed for RV Hs Table
+-----------------------------
+
+.. code-block:: python
+
+   tables.table_current_for_rv_hs(
+       ds_all, 
+       var_curr='current_speed_0m', 
+       var_hs='HS', 
+       periods=[1, 10, 100, 10000], 
+       output_file='Uc_for_rv_hs.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/Uc_for_rv_hs.csv
+
+Sea Temperature Profile Monthly Stats Table (Mean)
+---------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='mean', 
+       output_file='table_mean_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_mean_temp_profile_monthly_stats.png
+   :width: 500
+
+Sea Temperature Profile Monthly Stats Table (Standard Deviation)
+----------------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='std.dev', 
+       output_file='table_std_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_std_temp_profile_monthly_stats.png
+   :width: 500
+
+Sea Temperature Profile Monthly Stats Table (Minimum)
+------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='minimum', 
+       output_file='table_min_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_min_temp_profile_monthly_stats.png
+   :width: 500
+
+Sea Temperature Profile Monthly Stats Table (Maximum)
+------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='maximum', 
+       output_file='table_max_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_max_temp_profile_monthly_stats.png
+   :width: 500
+
+Mean Sea Temperature Profile Monthly Stats Plot
+------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='mean', 
+       title='Mean Sea Temperature [°C]', 
+       output_file='plot_mean_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_mean_temp_profile_monthly_stats.png
+   :width: 500
+
+
+Sea Temperature Profile Monthly Stats Plot (Minimum)
+-----------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='minimum', 
+       title='Min. Sea Temperature [°C]', 
+       output_file='plot_min_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_min_temp_profile_monthly_stats.png
+   :width: 500
+
+Sea Temperature Profile Monthly Stats Plot (Maximum)
+-----------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='maximum', 
+       title='Max. Sea Temperature [°C]', 
+       output_file='plot_max_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_max_temp_profile_monthly_stats.png
+   :width: 500
+
+Mean Sea Temperature Profile Monthly Stats Plot
+------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='mean', 
+       title='Mean Sea Temperature [°C]', 
+       output_file='plot_mean_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_mean_temp_profile_monthly_stats.png
+   :width: 500
+
+Min. Sea Temperature Profile Monthly Stats Plot
+------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='minimum', 
+       title='Min. Sea Temperature [°C]', 
+       output_file='plot_min_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_min_temp_profile_monthly_stats.png
+   :width: 500
+
+Max. Sea Temperature Profile Monthly Stats Plot
+------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['temp_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='maximum', 
+       title='Max. Sea Temperature [°C]', 
+       output_file='plot_max_temp_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_max_temp_profile_monthly_stats.png
+   :width: 500
+
+Mean Salinity Profile Monthly Stats Table
+------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='mean', 
+       output_file='table_mean_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_mean_sal_profile_monthly_stats.png
+   :width: 500
+
+Standard Deviation Salinity Profile Monthly Stats Table
+-------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='std.dev', 
+       output_file='table_std_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_std_sal_profile_monthly_stats.png
+   :width: 500
+
+Min. Salinity Profile Monthly Stats Table
+------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='minimum', 
+       output_file='table_min_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_min_sal_profile_monthly_stats.png
+   :width: 500
+
+Max. Salinity Profile Monthly Stats Table
+------------------------------------------
+
+.. code-block:: python
+
+   tables.table_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='maximum', 
+       output_file='table_max_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/table_max_sal_profile_monthly_stats.png
+   :width: 500
+
+Mean Salinity Profile Monthly Stats Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='mean', 
+       title='Mean Salinity [PSU]', 
+       output_file='plot_mean_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_mean_sal_profile_monthly_stats.png
+   :width: 500
+
+Standard Deviation Salinity Profile Monthly Stats Plot
+-------------------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='std.dev', 
+       title='St.Dev Salinity [PSU]', 
+       output_file='plot_std_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_std_sal_profile_monthly_stats.png
+   :width: 500
+
+Min. Salinity Profile Monthly Stats Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='minimum', 
+       title='Min. Salinity [PSU]', 
+       output_file='plot_min_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_min_sal_profile_monthly_stats.png
+   :width: 500
+
+Max. Salinity Profile Monthly Stats Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_profile_monthly_stats(
+       ds_ocean, 
+       var=['salt_' + d for d in depth], 
+       z=[float(d[:-1]) for d in depth], 
+       method='maximum', 
+       title='Max. Salinity [PSU]', 
+       output_file='plot_max_sal_profile_monthly_stats.png'
+   )
+
+.. image:: files/plot_max_sal_profile_monthly_stats.png
+   :width: 500
+
+
+Tidal Levels Table
+------------------
+
+.. code-block:: python
+
+   tables.table_tidal_levels(
+       ds_tide, 
+       var='tide', 
+       output_file='tidal_levels.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/tidal_levels.csv
+
+Tidal Levels Plot
+-----------------
+
+.. code-block:: python
+
+   plots.plot_tidal_levels(
+       ds_all, 
+       var='tide', 
+       start_time='2010-01-01', 
+       end_time='2010-03-30', 
+       output_file='tidal_levels.png'
+   )
+
+.. image:: files/tidal_levels.png
+   :width: 500
+
+Storm Surge for Given Hs Table
+------------------------------
+
+.. code-block:: python
+
+   tables.table_storm_surge_for_given_hs(
+       ds_all, 
+       var_surge='zeta_0m', 
+       var_hs='HS', 
+       bin_width=1, 
+       max_hs=20, 
+       output_file='table_perc_surge_for_Hs.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_perc_surge_for_Hs.csv
+
+Storm Surge for Given Hs Plot
+-----------------------------
+
+.. code-block:: python
+
+   plots.plot_storm_surge_for_given_hs(
+       ds_all,
+       var_surge='zeta_0m', 
+       var_hs='HS', 
+       max_hs=20, 
+       output_file='surge_for_given_hs.png'
+   )
+
+.. image:: files/surge_for_given_hs.png
+   :width: 500
+
+Extreme Total Water Level Table
+-------------------------------
+
+.. code-block:: python
+
+   tables.table_extreme_total_water_level(
+       ds_all, 
+       var_hs='HS',
+       var_tp='TP',
+       var_surge='zeta_0m', 
+       var_tide='tide', 
+       periods=[100,10000], 
+       output_file='table_extreme_total_water_level.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_extreme_total_water_level.csv
+
+Storm Surge for Return Values Hs Table
+--------------------------------------
+
+.. code-block:: python
+
+   tables.table_storm_surge_for_rv_hs(
+       ds_all, 
+       var_hs='HS',
+       var_tp='TP',
+       var_surge='zeta_0m', 
+       var_tide='tide', 
+       periods=[1,10,100,10000],
+       depth=200, 
+       output_file='table_storm_surge_for_rv_hs.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_storm_surge_for_rv_hs.csv
+
+
+
+
+
+
+Plot joint Hs-Tp contours for different return periods:
+
+.. code-block:: python
+
+   plots.plot_joint_distribution_Hs_Tp(df,var_hs='HS',
+                                       var_tp='TP',
+                                       periods=[1,10,100,1000], 
+                                       title='Hs-Tp joint distribution',
+                                       output_file='Hs.Tp.joint.distribution.png',
+                                       density_plot=True)
+
+.. image:: files/Hs.Tp.joint.distribution.png
   :width: 700
 
-.. code-block:: python
-   
-   rl_am = extreme_stats.return_levels_annual_max(data=ds.data, var='hs', 
-           periods=[20,50,100,1000],method='GEV',
-           output_file='return_levels_GEV.png')
-
-.. image:: return_levels_GEV.png
-  :width: 700   
-
-Plot joint Hs-Tp contours for different return periods (to get the contour values use: extreme_stats.get_joint_2D_contour):
+Map Statistics
+==============
 
 .. code-block:: python
    
-   extreme_stats.plot_joint_2D_contour(data=ds.data,var1='hs',var2='tp', periods=[50,100], 
-                                       output_file='2D_contours.png')
+   from metocean_stats.stats.map_funcs import *
 
-.. image:: 2D_contours.png
-  :width: 700
-
-
-
-Profile Statistics
-=====================================
-To generate profile stastistics, import profile_stats module: 
+Plot map with points of interest:
 
 .. code-block:: python
    
-   from metocean_stats.stats import profile_stats
+   plot_points_on_map(lon=[3.35,3.10], 
+                      lat=[60.40,60.90],
+                      label=['NORA3','NORKYST800'], 
+                      bathymetry='NORA3')
 
-Estimate and plot mean wind profile with percentiles in shaded region:
 
-.. code-block:: python
-   
-   mean_prof = profile_stats.mean_profile(data = ds.data, vars = 
-                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
-                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
-                'wind_speed_750m'],
-                height_levels=[10,20,50,100,250,500,750],
-                perc=[25,75], 
-                output_file='wind_profile.png')
-
-.. image:: wind_profile.png
+.. image:: files/map.png
   :height: 500
 
-Calculate the wind speed shear over any two heights of the input profile and plot in a histogram and output shear values. Percentiles are shown as shaded region.:
+Plot extreme signigicant wave height based on NORA3 data:
+
 .. code-block:: python
 
-profile_stats.profile_shear(data = ds.data, vars =       
-                ['wind_speed_10m','wind_speed_20m','wind_speed_50m',
-                'wind_speed_100m','wind_speed_250m','wind_speed_500m',
-                'wind_speed_750m'],
-                height_levels=[10,20,50,100,250,500,750], 
-                z=[20,250], 
-                perc = [25,75], 
-                output_file='wind_profile_shear.png')
+   plot_extreme_wave_map(return_level=50, 
+                         product='NORA3', 
+                         title='50-yr return values Hs (NORA3)', 
+                         set_extent = [0,30,52,73])
 
-.. image:: wind_profile_shear.png
+
+.. image:: files/extreme_wave_map.png
+  :width: 500
+
+Plot extreme wind at 10 m height based on NORA3 data:
+
+.. code-block:: python
+
+   plot_extreme_wind_map(return_level=100, 
+                         product='NORA3',
+                         level=0, 
+                         title='100-yr return values Wind at 10 m (NORA3)', 
+                         set_extent = [0,30,52,73])
+
+
+.. image:: files/extreme_wind_map.png
   :width: 500
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1

@@ -6,7 +6,7 @@ dependencies:
   - xarray
   - matplotlib>=3.1
   - numpy>=1.17
-  - pandas
+  - pandas>=2.2.1
   - pip
   - scipy
   - pytest
@@ -18,4 +18,5 @@ dependencies:
   - scikit-learn
   - keras
   - tensorflow
+  - cartopy
 

@@ -1,7 +1,0 @@
-.vscode
-cache
-.eggs
-*.egg-info
-*.pyc
-tests/data
-metocean_stats/stats/extreme_stats_dung.py
