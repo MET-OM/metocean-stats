@@ -1572,7 +1572,7 @@ Plot extreme signigicant wave height based on NORA3 data:
                          set_extent = [0,30,52,73])
 
 
-.. image:: files/extreme_wave_map.png
+.. image:: files/extreme_wave_map10m.png
   :width: 500
 
 Plot extreme wind at 10 m height based on NORA3 data:
