@@ -1589,6 +1589,19 @@ Plot extreme wind at 10 m height based on NORA3 data:
 .. image:: files/extreme_wind_map.png
   :width: 500
 
+Plot extreme wind at 100 m height based on NORA3 data:
+
+.. code-block:: python
+
+   plot_extreme_wind_map(return_level=100, 
+                         product='NORA3',
+                         level=2, 
+                         title='100-yr return values Wind at 100 m (NORA3)', 
+                         set_extent = [0,30,52,73])
+
+
+.. image:: files/extreme_wind_map100m.png
+  :width: 500
 
 .. toctree::
    :maxdepth: 1
