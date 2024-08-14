@@ -1581,7 +1581,7 @@ Plot extreme wind at 10 m height based on NORA3 data:
 
    plot_extreme_wind_map(return_level=100, 
                          product='NORA3',
-                         level=0, 
+                         z=10, 
                          title='100-yr return values Wind at 10 m (NORA3)', 
                          set_extent = [0,30,52,73])
 
@@ -1595,7 +1595,7 @@ Plot extreme wind at 100 m height based on NORA3 data:
 
    plot_extreme_wind_map(return_level=100, 
                          product='NORA3',
-                         level=2, 
+                         z=100, 
                          title='100-yr return values Wind at 100 m (NORA3)', 
                          set_extent = [0,30,52,73])
 
