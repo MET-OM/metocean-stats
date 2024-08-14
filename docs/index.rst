@@ -74,7 +74,7 @@ Scatter Plot
       output_file='scatter_plot.png')
 
 .. image:: files/scatter_plot.png
-   :width: 0
+   :width: 500
 
 
 Scatter Diagram
@@ -107,7 +107,7 @@ Scatter Diagram
    )
 
 .. image:: files/Hs_Tp_scatter.png
-   :width: 0
+   :width: 500
 
 
 Wind Profile Return Values Table
@@ -147,7 +147,7 @@ Wind Profile Return Values Plot
    )
 
 .. image:: files/RVE_wind_profile.png
-   :width: 0
+   :width: 500
 
 Wind Profile Statistics Plot
 ----------------------------
