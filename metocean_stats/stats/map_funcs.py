@@ -102,7 +102,7 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
         lon = 'rlon'
         lat = 'rlat'
         var = 'hs'
-        num_colors= 21
+        num_colors= 25
         file = f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_{return_level}y_extreme_gumbel_NORA3.nc'    
     else:
         print(product,'is not available')
@@ -151,7 +151,7 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
 
     # Plot the significant wave height using hexbin with a higher gridsize and discrete colors
-    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=0, vmax=21, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=0, vmax=num_colors, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
 
     # Add the land feature on top of the hexbin plot
     ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
@@ -171,7 +171,7 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
     gl.rotate_labels=False
 
     # Add colorbar with discrete colors
-    cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05, ticks=np.arange(0, 21, 2))
+    cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05, ticks=np.arange(0, num_colors, 2))
     cb.set_label(ds[var].attrs.get('standard_name', var)+' ['+ds[var].attrs.get('units', var)+']', fontsize=14)
     plt.tight_layout()
 
@@ -182,22 +182,20 @@ def plot_extreme_wave_map(return_level=50, product='NORA3', title='empty title',
     plt.savefig(output_file,dpi=300)
     return fig
      
-def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empty title', set_extent=[0, 30, 52, 73],output_file='extreme_wind_map.png'):
+def plot_extreme_wind_map(return_level=50, product='NORA3', z=0, title='empty title', set_extent=[0, 30, 52, 73],output_file='extreme_wind_map.png'):
     if product == 'NORA3':
         lon = 'x'
         lat = 'y'
         var = 'wind_speed'
-        num_colors= 21
+        num_colors= int(70/2.5)
         file= f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period{return_level}yr.nc'
+        height = []
     else:
         print(product,'is not available')
 
     ds = xr.open_dataset(file)
     # Extract the data variables
-    if isinstance(level, int):
-         hs = ds[var][:,:].values
-    else:
-         hs = ds[var][level,:,:].values
+    hs = ds[var].sel(z=z).values
 
     rlat = ds[lat].values
     rlon = ds[lon].values
@@ -229,10 +227,13 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
     # Create a mask for NaN values
     mask = ~np.isnan(hs_flat)
     hs_flat = hs_flat[mask]
-    # Remove values greater than 60
-    hs_flat = hs_flat[hs_flat <= 60]
-    #lat_flat = lat_flat[mask]
-    #lon_flat = lon_flat[mask]
+    # Remove values greater than 70
+    #hs_flat = hs_flat[hs_flat <= 70]
+    lat_flat = lat_flat[mask]
+    lon_flat = lon_flat[mask]
+    #lat_flat = lat_flat[hs_flat <= 70]
+    #lon_flat = lon_flat[hs_flat <= 70]
+
 
     # Create a colormap with discrete colors
     cmap = plt.cm.get_cmap('terrain', num_colors)
@@ -244,7 +245,8 @@ def plot_extreme_wind_map(return_level=50, product='NORA3', level=0, title='empt
     ax.coastlines(resolution='10m', zorder=3)
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
     # Plot the significant wave height using hexbin with a higher gridsize and discrete colors
-    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=100, cmap=cmap, vmin=hs_flat.min(), vmax=hs_flat.max(), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+#    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=100, cmap=cmap, vmin=hs_flat.min(), vmax=hs_flat.max(), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=100, cmap=cmap, vmin=0, vmax=70, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
 
     # Add the land feature on top of the hexbin plot
     ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
