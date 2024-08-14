@@ -74,7 +74,7 @@ Scatter Plot
       output_file='scatter_plot.png')
 
 .. image:: files/scatter_plot.png
-   :width: 500
+   :width: 0
 
 
 Scatter Diagram
@@ -107,7 +107,7 @@ Scatter Diagram
    )
 
 .. image:: files/Hs_Tp_scatter.png
-   :width: 500
+   :width: 0
 
 
 Wind Profile Return Values Table
@@ -117,8 +117,8 @@ Wind Profile Return Values Table
 
    tables.table_profile_return_values(
        df,
-       var=['W10', 'W50', 'W80', 'W100', 'W150'],
-       z=[10, 50, 80, 100, 150],
+       var=['W10', 'W', 'W80', 'W100', 'W1'],
+       z=[10, , 80, 100, 1],
        periods=[1, 10, 100, 10000],
        output_file='RVE_wind_profile.csv'
    )
@@ -134,8 +134,8 @@ Wind Profile Return Values Plot
 
    plots.plot_profile_return_values(
        df,
-       var=['W10', 'W50', 'W80', 'W100', 'W150'],
-       z=[10, 50, 80, 100, 150],
+       var=['W10', 'W', 'W80', 'W100', 'W1'],
+       z=[10, , 80, 100, 1],
        periods=[1, 10, 100, 10000],
        reverse_yaxis=False,
        title='Return Periods over z',
@@ -147,7 +147,7 @@ Wind Profile Return Values Plot
    )
 
 .. image:: files/RVE_wind_profile.png
-   :width: 500
+   :width: 0
 
 Wind Profile Statistics Plot
 ----------------------------
@@ -156,8 +156,8 @@ Wind Profile Statistics Plot
 
    plots.plot_profile_stats(
        df,
-       var=['W10', 'W50', 'W80', 'W100', 'W150'],
-       z=[10, 50, 80, 100, 150],
+       var=['W10', 'W', 'W80', 'W100', 'W1'],
+       z=[10, , 80, 100, 1],
        reverse_yaxis=False,
        output_file='wind_stats_profile.png'
    )
@@ -1566,9 +1566,9 @@ Plot extreme signigicant wave height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wave_map(return_level=50, 
+   plot_extreme_wave_map(return_level=100, 
                          product='NORA3', 
-                         title='50-yr return values Hs (NORA3)', 
+                         title='100-yr return values Hs (NORA3)', 
                          set_extent = [0,30,52,73])
 
 
