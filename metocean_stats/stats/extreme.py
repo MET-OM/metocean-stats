@@ -877,8 +877,8 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
         else:
             threshold_value = threshold
 
-        periods_adj = np.array([x * 6 for x in periods])*24*365.2422/time_step
-        periods_noadj = np.array(periods)*24*365.2422/time_step
+        periods_adj = [x * 6 for x in periods]#*24*365.2422/time_step
+        periods_noadj = periods#*24*365.2422/time_step
         
         if adjustment == 'NORSOK':
             pass
@@ -886,9 +886,9 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
             periods_adj = periods_noadj
 
         if method == 'minimum': # used for negative temperature
-            shape, loc, scale, value = RVE_ALL(sector_data.resample('ME').min().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+            shape, loc, scale, value = RVE_ALL(sector_data.min().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
         elif method == 'maximum': # used for positive temperature
-            shape, loc, scale, value = RVE_ALL(sector_data.resample('ME').max().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+            shape, loc, scale, value = RVE_ALL(sector_data.max().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
         elif method == 'default':
             shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
         elif method == 'POT':
@@ -923,7 +923,7 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     return_values = np.array(return_values)
     # Define the threshold values (annual values) for each column
     thresholds = return_values[-1]
-
+    
     # Replace values in each column that exceed the thresholds
     for col in range(return_values.shape[1]):
         return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
