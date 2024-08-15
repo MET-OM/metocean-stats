@@ -483,8 +483,8 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
     plt.ylabel('Hs - Significant Wave Height [m]')
     plt.grid()
     plt.legend()
-    plt.xlim([0,np.round(hs_tpl_tph['t2_'+str(np.max(periods))].max())])
-    plt.ylim([0,np.round(hs_tpl_tph['hs_'+str(np.max(periods))].max())])
+    plt.xlim([0,np.round(hs_tpl_tph['t2_'+str(np.max(periods))].max()+1)])
+    plt.ylim([0,np.round(hs_tpl_tph['hs_'+str(np.max(periods))].max()+1)])
     plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
     return fig
