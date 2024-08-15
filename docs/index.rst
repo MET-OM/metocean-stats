@@ -1524,24 +1524,6 @@ Storm Surge for Return Values Hs Table
    :file: files/table_storm_surge_for_rv_hs.csv
 
 
-
-
-
-
-Plot joint Hs-Tp contours for different return periods:
-
-.. code-block:: python
-
-   plots.plot_joint_distribution_Hs_Tp(df,var_hs='HS',
-                                       var_tp='TP',
-                                       periods=[1,10,100,1000], 
-                                       title='Hs-Tp joint distribution',
-                                       output_file='Hs.Tp.joint.distribution.png',
-                                       density_plot=True)
-
-.. image:: files/Hs.Tp.joint.distribution.png
-  :width: 700
-
 Map Statistics
 ==============
 
