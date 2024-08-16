@@ -1442,8 +1442,8 @@ Tidal Levels Plot
    plots.plot_tidal_levels(
        ds_all, 
        var='tide', 
-       start_time='2010-01-01', 
-       end_time='2010-03-30', 
+       start_time='1980-01-01', 
+       end_time='2014-12-31', 
        output_file='tidal_levels.png'
    )
 
