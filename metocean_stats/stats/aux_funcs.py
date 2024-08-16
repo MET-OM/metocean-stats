@@ -481,3 +481,18 @@ def fit_S_Hs_model(H_values, S, initial_guesses=None, maxfev=10000):
     a, b, c = params
     #print(a,b,c)
     return a, b, c
+
+def detrend_ts(df, column_name='tide'):
+    """
+    Detrend the specified column in the given DataFrame using scipy.signal.detrend.
+
+    Parameters:
+    ds_ocean (pd.DataFrame): The DataFrame containing the data.
+    column_name (str): The name of the column to detrend. Default is 'tide'.
+
+    Returns:
+    pd.DataFrame: The DataFrame with the detrended column.
+    """
+    import scipy.signal as signal
+    df[column_name] = signal.detrend(df[column_name])
+    return df
