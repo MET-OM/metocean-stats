@@ -1,5 +1,5 @@
 import os
-from metocean_stats.stats.map_funcs import *
+from metocean_stats.stats.maps import *
 
 # def test_plot_points_on_map():
 #     output_file = 'test_points.png'
@@ -17,7 +17,7 @@ from metocean_stats.stats.map_funcs import *
 
 # def test_plot_extreme_wave_map():
 #     output_file = 'test_wave.png'
-#     fig = plot_extreme_wave_map(return_level=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent=[0, 30, 52, 73], output_file=output_file)
+#     fig = plot_extreme_wave_map(return_period=50, product='NORA3', title='50-yr return values Hs (NORA3)', set_extent=[0, 30, 52, 73], output_file=output_file)
 #     if fig.dpi == 100.0:
 #         pass
 #     else:
@@ -31,7 +31,7 @@ from metocean_stats.stats.map_funcs import *
 
 # def test_plot_extreme_wind_map():
 #     output_file = 'test_wind.png'
-#     fig = plot_extreme_wind_map(return_level=100, product='NORA3', level=1, title='100-yr return values Wind at 10 m (NORA3)', set_extent=[0, 30, 52, 73], output_file=output_file)
+#     fig = plot_extreme_wind_map(return_period=100, product='NORA3', level=1, title='100-yr return values Wind at 10 m (NORA3)', set_extent=[0, 30, 52, 73], output_file=output_file)
 #     if fig.dpi == 100.0:
 #         pass
 #     else:

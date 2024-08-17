@@ -1,7 +1,7 @@
 from metocean_api import ts
 from metocean_stats import plots, tables, stats
 from metocean_stats.stats.aux_funcs import *
-from metocean_stats.stats.map_funcs import *
+from metocean_stats.stats.maps import *
 import pandas as pd
 
 import os
@@ -45,7 +45,7 @@ def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
 
 def test_plot_monthly_stats(ds=ds):
     output_file = 'test_monthly_stats.png'
-    fig = plots.plot_monthly_stats(ds, var1='T2m', show=['Minimum', 'Mean', 'Maximum'], title='T2m', output_file=output_file)
+    fig = plots.plot_monthly_stats(ds, var='T2m', show=['Minimum', 'Mean', 'Maximum'], title='T2m', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:
@@ -55,7 +55,7 @@ def test_plot_monthly_stats(ds=ds):
 
 def test_plot_directional_stats(ds=ds):
     output_file = 'test_directional_stats.png'
-    fig = plots.plot_directional_stats(ds, var1='HS', step_var1=0.5, var_dir='DIRM', title='$H_s$[m]', output_file=output_file)
+    fig = plots.plot_directional_stats(ds, var='HS', step_var=0.5, var_dir='DIRM', title='$H_s$[m]', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:

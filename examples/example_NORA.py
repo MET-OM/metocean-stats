@@ -1,7 +1,6 @@
 #from metocean_api import ts
-from metocean_stats import plots, tables, stats
+from metocean_stats import plots, tables, stats, maps
 from metocean_stats.stats.aux_funcs import *
-from metocean_stats.stats.map_funcs import *
 
 
 # Define TimeSeries-object
@@ -21,9 +20,9 @@ ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
 #fig = plots.plot_scatter(ds,var1='W10',var2='W100',var1_units='m/s',var2_units='m/s', title='Scatter',regression_line=True,qqplot=False,density=True,output_file='scatter_plot.png')
 
 # Map:
-#plot_points_on_map(  lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3')
-#plot_extreme_wave_map(return_level=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73])
-#plot_extreme_wind_map(return_level=100, product='NORA3',z=100, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73])
+#maps.plot_points_on_map(lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3',output_file='map.png')
+#maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file='wave_100yrs.png')
+#maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file='wind_100yrs.png')
 
 
 # Wind:
@@ -32,7 +31,7 @@ ds = readNora10File('../tests/data/NORA_test.txt') # for Lun
 #general.plot_directional_stats(df,var1='W10',step_var1=0.1,var_dir='D10',title = '', output_file='directional_stats.png')
 #general.table_directional_non_exceedance(df,var1='W10',step_var1=2,var_dir='D10',output_file='table_directional_non_exceedance.csv')
 #general.plot_monthly_stats(df,var1='W10',step_var1=2,title = '', output_file='monthly_stats.png')
-#general.table_monthly_non_exceedance(df,var1='W10',step_var1=2,output_file='table_monthly_non_exceedance.csv')
+tables.table_monthly_non_exceedance(ds,var1='W10',step_var1=2,output_file='table_monthly_non_exceedance.csv')
 #plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var='W10',output_file='prob_non_exceedance_fitted_3p_weibull.png')
 #plots.plot_directional_weibull_return_periods(df,var='W10',var_dir='D10',periods=[1, 10, 100, 1000], units='m/s',output_file='Wind.dir_extremes_weibull.png')
 #tables.table_directional_weibull_return_periods(df,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',output_file='directional_extremes_weibull.wind.csv')
