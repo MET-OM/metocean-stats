@@ -270,7 +270,7 @@ def plot_multi_diagnostic_return_levels(data, var,
     if output_file is not None:
         plt.savefig(output_file)
 
-    plt.show()
+    return fig
 
 def plot_threshold_sensitivity(df, output_file):
     """
@@ -300,8 +300,7 @@ def plot_threshold_sensitivity(df, output_file):
     # Save the plot if a path is given
     plt.savefig(output_file)
 
-    plt.show()
-
+    return fig
 
 def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png') -> Sequence[Dict]:
     contours, data_2D = get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)

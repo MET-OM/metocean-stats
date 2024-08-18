@@ -160,14 +160,14 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     return fig
 
 
-def plot_monthly_stats(data: pd.DataFrame, var1: str, show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+def plot_monthly_stats(data: pd.DataFrame, var: str, show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
     Parameters:
         data (pd.DataFrame): The DataFrame containing the data.
-        var1 (str): The name of the variable to plot.
-        step_var1 (float): The step size for computing cumulative statistics.
+        var (str): The name of the variable to plot.
+        step_var (float): The step size for computing cumulative statistics.
         title (str, optional): Title of the plot. Default is 'Variable [units] location'.
         output_file (str, optional): File path to save the plot. Default is 'monthly_stats.png'.
 
@@ -182,7 +182,7 @@ def plot_monthly_stats(data: pd.DataFrame, var1: str, show=['Mean','P99','Maximu
         plot_monthly_stats(data, 'temperature', 0.1, title='Monthly Temperature Statistics', output_file='temp_stats.png')
     """
     fig, ax = plt.subplots()
-    cumulative_percentage = table_monthly_non_exceedance(data,var1,step_var1=0.5)
+    cumulative_percentage = table_monthly_non_exceedance(data,var,step_var=0.5)
     for i in show:
         cumulative_percentage.loc[i][:-1].plot(marker = 'o')
     plt.title(title,fontsize=16)
@@ -192,14 +192,14 @@ def plot_monthly_stats(data: pd.DataFrame, var1: str, show=['Mean','P99','Maximu
     plt.savefig(output_file)
     return fig
 
-def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
+def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
     """
     Plot directional statistics of a variable from a DataFrame.
 
     Parameters:
         data (pd.DataFrame): The DataFrame containing the data.
-        var1 (str): The name of the variable to plot.
-        step_var1 (float): The step size for computing cumulative statistics.
+        var (str): The name of the variable to plot.
+        step_var (float): The step size for computing cumulative statistics.
         var_dir (str): The name of the directional variable.
         title (str, optional): Title of the plot. Default is 'Variable [units] location'.
         output_file (str, optional): File path to save the plot. Default is 'directional_stats.png'.
@@ -215,7 +215,7 @@ def plot_directional_stats(data: pd.DataFrame, var1: str, step_var1: float, var_
         plot_directional_stats(data, 'hs', 0.1, 'Pdir', title='Directional Wave Statistics', output_file='directional_hs_stats.png')
     """    
     fig, ax = plt.subplots()
-    cumulative_percentage = table_directional_non_exceedance(data,var1,step_var1,var_dir)
+    cumulative_percentage = table_directional_non_exceedance(data,var,step_var,var_dir)
     for i in show:
         cumulative_percentage.loc[i][:-1].plot(marker = 'o')
     #cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
