@@ -15,7 +15,10 @@ def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent):
     return fig
 
 
-def var_rose(data, direction,intensity, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png'):
+def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png'):
+    
+    direction = var_dir
+    intensity = var
 
     direction2 = data[direction]
     intensity2 = data[intensity]

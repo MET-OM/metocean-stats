@@ -214,8 +214,8 @@ Monthly Non-Exceedance Table
 
    tables.table_monthly_non_exceedance(
        df, 
-       var1='HS', 
-       step_var1=0.5, 
+       var='HS', 
+       step_var=0.5, 
        output_file='Hs_table_monthly_non_exceedance.csv'
    )
 
@@ -230,7 +230,7 @@ Monthly Statistics Plot
 
    plots.plot_monthly_stats(
        df, 
-       var1='HS', 
+       var='HS', 
        show=['Maximum','P99','Mean'], 
        title='Hs[m]', 
        output_file='Hs_monthly_stats.png'
@@ -246,8 +246,8 @@ Directional Non-Exceedance Table
 
    tables.table_directional_non_exceedance(
        df, 
-       var1='HS', 
-       step_var1=0.5, 
+       var='HS', 
+       step_var=0.5, 
        var_dir='DIRM', 
        output_file='table_directional_non_exceedance.csv'
    )
@@ -263,8 +263,8 @@ Directional Statistics Plot
 
    plots.plot_directional_stats(
        df, 
-       var1='HS', 
-       step_var1=0.5, 
+       var='HS', 
+       step_var=0.5, 
        var_dir='DIRM', 
        title='$H_s$[m]', 
        output_file='directional_stats.png'
@@ -754,7 +754,7 @@ T2m Monthly Statistics Plot
 
    plots.plot_monthly_stats(
        df, 
-       var1='T2m', 
+       var='T2m', 
        show=['Minimum','Mean','Maximum'], 
        title='T2m', 
        output_file='T2m_monthly_stats.png'
@@ -770,8 +770,8 @@ T2m Monthly Non-Exceedance Table
 
    tables.table_monthly_non_exceedance(
        df, 
-       var1='T2m', 
-       step_var1=0.5, 
+       var='T2m', 
+       step_var=0.5, 
        output_file='T2m_table_monthly_non_exceedance.csv'
    )
 
@@ -840,7 +840,7 @@ Current Speed Monthly Statistics Plot
 
    plots.plot_monthly_stats(
        ds_ocean, 
-       var1='current_speed_0m', 
+       var='current_speed_0m', 
        show=['Mean', 'P99', 'Maximum'], 
        title='Current[m/s], depth:0m', 
        output_file='current_0m_monthly_stats.png'
@@ -856,9 +856,9 @@ Current Speed Directional Statistics Plot
 
    plots.plot_directional_stats(
        ds_ocean, 
-       var1='current_speed_0m', 
+       var='current_speed_0m', 
        var_dir='current_direction_0m', 
-       step_var1=0.05, 
+       step_var=0.05, 
        show=['Mean', 'P99', 'Maximum'], 
        title='Current[m/s], depth:0m', 
        output_file='current_0m_dir_stats.png'
@@ -1529,13 +1529,13 @@ Map Statistics
 
 .. code-block:: python
    
-   from metocean_stats.stats.map_funcs import *
+   from metocean_stats import maps
 
 Plot map with points of interest:
 
 .. code-block:: python
    
-   plot_points_on_map(lon=[3.35,3.10], 
+   maps.plot_points_on_map(lon=[3.35,3.10], 
                       lat=[60.40,60.90],
                       label=['NORA3','NORKYST800'], 
                       bathymetry='NORA3')
@@ -1548,7 +1548,7 @@ Plot extreme signigicant wave height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wave_map(return_level=100, 
+  maps.plot_extreme_wave_map(return_period=100, 
                          product='NORA3', 
                          title='100-yr return values Hs (NORA3)', 
                          set_extent = [0,30,52,73])
@@ -1561,7 +1561,7 @@ Plot extreme wind at 10 m height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wind_map(return_level=100, 
+   maps.plot_extreme_wind_map(return_period=100, 
                          product='NORA3',
                          z=10, 
                          title='100-yr return values Wind at 10 m (NORA3)', 
@@ -1575,7 +1575,7 @@ Plot extreme wind at 100 m height based on NORA3 data:
 
 .. code-block:: python
 
-   plot_extreme_wind_map(return_level=100, 
+   plot_extreme_wind_map(return_period=100, 
                          product='NORA3',
                          z=100, 
                          title='100-yr return values Wind at 100 m (NORA3)', 

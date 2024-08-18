@@ -1,7 +1,6 @@
 from metocean_api import ts
-from metocean_stats import plots, tables, stats
+from metocean_stats import plots, tables, stats, maps
 from metocean_stats.stats.aux_funcs import *
-from metocean_stats.stats.map_funcs import *
 import pandas as pd
 
 import os
@@ -34,7 +33,7 @@ def test_table_var_sorted_by_hs(ds=ds):
 
 def test_table_monthly_non_exceedance(ds=ds):
     output_file = 'test_monthly_non_exceedance.csv'
-    df = tables.table_monthly_non_exceedance(ds, var1='HS', step_var1=0.5, output_file=output_file)
+    df = tables.table_monthly_non_exceedance(ds, var='HS', step_var=0.5, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (31, 13):
@@ -44,7 +43,7 @@ def test_table_monthly_non_exceedance(ds=ds):
 
 def test_table_directional_non_exceedance(ds=ds):
     output_file = 'test_directional_non_exceedance.csv'
-    df = tables.table_directional_non_exceedance(ds, var1='HS', step_var1=0.5, var_dir='DIRM', output_file=output_file)
+    df = tables.table_directional_non_exceedance(ds, var='HS', step_var=0.5, var_dir='DIRM', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (30, 13):
@@ -198,6 +197,7 @@ def test_table_hshs_for_given_wind(ds=ds):
     df = tables.table_hs_for_given_wind(ds, 'HS', 'W10', bin_width=2, max_wind=42, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
+        os.remove(output_file.split('.')[0]+'_coeff.csv')
     if df.shape == (21, 10):
         pass
     else:
@@ -292,6 +292,7 @@ def test_table_current_for_given_wind(ds=ds):
 
     if os.path.exists(output_file):
         os.remove(output_file)
+        os.remove(output_file.split('.')[0]+'_coeff.csv')
     if df.shape == (21, 10):
         pass
     else:
@@ -339,11 +340,12 @@ def test_table_profile_monthly_stats(ds=ds_ocean):
 
 
 def test_table_storm_surge_for_given_hs(ds=ds):
-    output_file = 'test_table_sotrm_surge_for_given_Hs.csv'
+    output_file = 'test_table_storm_surge_for_given_Hs.csv'
     ds['zeta_0m'] = 0.02*ds['HS']  + 0.05*np.log(ds['HS'])
     df, df_coeff = tables.table_storm_surge_for_given_hs(ds, var_surge='zeta_0m', var_hs='HS', bin_width=1, max_hs=20, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
+        os.remove(output_file.split('.')[0]+'_coeff.csv')
     if df.shape == (20, 10):
         pass
     else:
