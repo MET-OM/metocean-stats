@@ -11,7 +11,7 @@ from ..stats.aux_funcs import *
 from ..stats.general import *
 
 
-def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
+def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float,number_of_events=False, output_file='scatter_diagram.csv'):
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
@@ -21,6 +21,11 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
      """
 
     sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
+    start_date = data.index.min()
+    end_date = data.index.max() 
+    # Calculate the difference in years
+    number_of_years = (end_date - start_date).days / 365.25
+    dt = (data.index.to_series().diff().dropna().dt.total_seconds() / 3600).mean()
 
     # Convert to percentage
     tbl = sd.values
@@ -53,6 +58,13 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     #cols.insert(0,var1+' / '+var2 )
     rows = rows[::-1]
     tbl = tbl[::-1,:]
+    
+    if number_of_events==True:
+        #number of events 
+        tbl = np.flip(sd.values,axis=0)
+    else:
+        pass
+
     dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
     if output_file.split('.')[-1]=='csv':
         dfout.to_csv(output_file,index_label=var1+'/'+var2)
