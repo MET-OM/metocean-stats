@@ -379,7 +379,7 @@ Number Of Hours Per Year Below A Threshold Table
    tables.table_nb_hours_below_threshold(
        df,
        var='HS', 
-       thresholds=[3,5],
+       thresholds=[1,2,3,4,5,6,7,8,9,10],
        output_file='number_hours_per_year.csv'
    )
 
