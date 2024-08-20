@@ -563,3 +563,25 @@ def pressure_surge(df,var='MSLP'):
     surge_max = (min(df.MSLP)-np.mean(df.MSLP))*(-0.01)
     surge_min = (max(df.MSLP)-np.mean(df.MSLP))*(-0.01)
     return  surge_min, surge_max
+
+
+def nb_hours_below_threshold(df,var,thr_arr):
+    thr_arr=np.array(thr_arr)
+    delta_t=(df.index.to_series().diff().dropna().dt.total_seconds()/3600).mean()
+    years=df.index.year.to_numpy()
+    years_unique=np.unique(years)
+    # Calculate the number of hours with hs below a threshold
+    nbhr_arr=np.zeros((len(thr_arr),len(years_unique)))
+    j=0
+    for yr in years_unique:
+        df1=df[df.index.year == yr]
+        df1=df1[var]
+        i=0
+        for t in thr_arr:
+            nbhr_arr[i,j]=len(df1[(df1 < t)])*delta_t
+            i=i+1
+        j=j+1
+        del df1
+    del i,j
+    del years,years_unique,delta_t
+    return nbhr_arr

@@ -598,3 +598,37 @@ def table_max_min_water_level(data: pd.DataFrame, var_total_water_level: str,var
     df.to_csv(output_file, index=True)
     
     return df
+
+
+def table_nb_hours_below_threshold(df,var='hs',thresholds=[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,12.5,15,17.5,20],output_file='table_name.csv'):
+    # Inputs
+    # 1) df
+    # 2) var: a string
+    # 3) thr_arr: list of thresholds (should be a lot for smooth curve)
+    # 4) thresholds_chosen: list of thresholds to be included in the table
+    # 5) String with filename without extension
+    thr_arr=(np.arange(0.05,20.05,0.05)).tolist()
+    nbhr_arr=nb_hours_below_threshold(df,var,thr_arr)
+    # Create file
+    thresholds=np.array(thresholds)
+    arr1=np.zeros((len(thresholds),3))
+    rows=[]
+    for j in range(len(thresholds)):
+        # Needs to add/subtract 0.001 because of precision problem
+        t=np.where((thr_arr>=thresholds[j]-0.001) & (thr_arr<=thresholds[j]+0.001))[0]
+        arr1[j,0]=np.min(nbhr_arr[t,:])
+        arr1[j,1]=np.round(np.mean(nbhr_arr[t,:]),0)
+        arr1[j,2]=np.max(nbhr_arr[t,:])
+        del t
+        rows.append('<='+str(thresholds[j]))
+    # Convert numpy array to dataframe
+    cols=[var,'Minimum','Mean','Maximum']
+    df_out = pd.DataFrame()
+    df_out[var] = ['<'+str(thresholds[j]) for j in range(len(thresholds))]
+    #df_out = pd.DataFrame(data=np.round(arr1,0), index=rows, columns=cols)
+    df_out['Minimum'] = np.round(arr1[:,0],0).astype('int')
+    df_out['Mean'] = np.round(arr1[:,1],0).astype('int')
+    df_out['Maximum'] = np.round(arr1[:,2],0).astype('int')
+    # Save to csv format
+    df_out.to_csv(output_file, index=False)
+    return df_out
