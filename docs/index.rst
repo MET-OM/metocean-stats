@@ -363,12 +363,12 @@ Number Of Hours Per Year Below A Threshold Plot
 
    plots.plot_nb_hours_below_threshold(
        df, 
-       var='hs', 
+       var='HS', 
        thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),
        output_file='number_hours_per_year.png'
    )
 
-.. image:: files/number_hours_per_year.png
+.. image:: files/nb_hour_below_thr.png
    :width: 500
 
 Number Of Hours Per Year Below A Threshold Table
@@ -377,15 +377,15 @@ Number Of Hours Per Year Below A Threshold Table
 .. code-block:: python
 
    tables.table_nb_hours_below_threshold(
-       df, 
-       var='hs', 
-       thresholds=[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,12.5,15,17.5,20],
+       df,
+       var='HS', 
+       thresholds=[3,5],
        output_file='number_hours_per_year.csv'
    )
 
 .. csv-table:: 
    :header-rows: 1
-   :file: files/number_hours_per_year.csv
+   :file: files/nb_hour_below_thr.csv
 
 Monthly Return Periods Table
 ----------------------------
