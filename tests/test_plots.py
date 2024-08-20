@@ -286,10 +286,10 @@ def test_plot_monthly_return_periods_cur_pot(ds=ds_ocean):
 
 def test_plot_nb_hours_below_threshold(ds=ds):
     output_file = 'test_plot_nb_hr_below_t.png'
-    fig = plots.plot_nb_hours_below_threshold(ds,var='hs',thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),output_file=output_file)
+    fig = plots.plot_nb_hours_below_threshold(ds,var='HS',thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if fig.dpi == 150.0:
+    if fig.dpi == 100.0:
         pass
     else:
         raise ValueError("FigValue is not correct")
