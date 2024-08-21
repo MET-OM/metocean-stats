@@ -1636,7 +1636,7 @@ Auxiliary Functions
 
    from metocean_stats.stats.aux_funcs import *
 
-Convert lat/lon coordinates from degrees/minutes/seconds to decimal_places:
+Convert lat/lon coordinates from degrees/minutes/seconds to decimals:
 
 .. code-block:: python
 
