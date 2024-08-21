@@ -1616,5 +1616,29 @@ Plot extreme wind at 100 m height based on NORA3 data:
 .. image:: files/extreme_wind_map100m.png
   :width: 500
 
+Plot mean 2-m air temperature based on NORA3 data:
+
+.. code-block:: python
+   plot_mean_air_temperature_map(product='NORA3', 
+                                 title='Mean 2-m air temperature 1991-2020 (NORA3)', 
+                                 set_extent=[-25,-10,60.5,68], 
+                                 unit='degC')
+
+.. image:: files/mean_air_temperature_map.png
+  :width: 500
+
+Auxiliary Functions
+===================
+
+.. code-block:: python
+   from metocean_stats.stats.aux_funcs import *
+
+Convert lat/lon coordinates from degrees/minutes/seconds to decimal_places
+
+.. code-block:: python
+   lat = degminsec_to_decimals(60,30,00)
+   
+returns lat = 60.5
+
 .. toctree::
    :maxdepth: 1
