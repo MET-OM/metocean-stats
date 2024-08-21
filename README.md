@@ -4,7 +4,7 @@
 [![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)	[![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)
 
 ## Purpose 🎯
-Metocean-stats is your go-to tool for comprehensive statistics and visualization of metocean data. 
+Metocean-stats is a tool for comprehensive statistics and visualization of metocean data. 
 
 ![metocean-stats](https://github.com/MET-OM/metocean-stats/blob/dev1/docs/files/readme_plots.png)
 
