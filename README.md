@@ -4,7 +4,7 @@
 [![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)	[![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)
 
 ## Purpose 🎯
-Metocean-stats is a tool for comprehensive statistics and visualization of metocean data (wind, waves, ocean currents, tide levels, air and water temperature, ice, and more).
+Metocean-stats is a tool for comprehensive statistics and visualization of metocean data (wind, waves, ocean currents, tide levels, air and water temperature, ice, and more). The tool is also compatible with WEkEO Jupyter Lab 🌐, allowing for seamless integration and use.
 
 ![metocean-stats](https://github.com/MET-OM/metocean-stats/blob/dev1/docs/files/readme_plots.png)
 
