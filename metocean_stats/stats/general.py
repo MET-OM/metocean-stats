@@ -434,7 +434,7 @@ def calculate_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, w
     results = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     for month in range(1, 13):
-        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=3)
+        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],threshold=threshold,op_duration=window_size,timestep=3,month=month)
         results.append((p10,p50, avg_duration, p90))
     results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
     if output_file:
@@ -515,18 +515,17 @@ def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_si
     #breakpoint()
     return mean, p10, p50,p90
 
-def weather_window_length(time_series,month,threshold,op_duration,timestep):
-    print(month)
-    # time_series: input timeseries (numpy array)
+def weather_window_length(time_series,threshold,op_duration,timestep,month=None):
+    # time_series: input timeseries
     # threshold over which operation is possible (same unit as timeseries)
     # op_duration: duration of operation in hours
     # timestep: time resolution of time_series in hours
+    # month: default is all year
     # returns an array with all weather windows duration in hours
     month_ts = time_series.index.month
     ts_mask=np.where(time_series<threshold,1,0)
     od=int(op_duration/timestep)
     ts=np.zeros((len(ts_mask)-od+1))
-    mon=np.zeros((len(ts_mask)-od+1))
     for i in range(len(ts_mask)-od+1):
         ts[i]=np.sum(ts_mask[i:i+od])
     s0=np.where(ts==od)[0].tolist()
@@ -553,10 +552,16 @@ def weather_window_length(time_series,month,threshold,op_duration,timestep):
     wt1=(np.array(wt)+op_duration)/24
     # Note that we this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
-    mean = np.mean(wt1[mon_s0==month])
-    p10 = np.percentile(wt1[mon_s0==month],10)
-    p50 = np.percentile(wt1[mon_s0==month],50)
-    p90 = np.percentile(wt1[mon_s0==month],90)
+    if month==None:
+        mean = np.mean(wt1)
+        p10 = np.percentile(wt1,10)
+        p50 = np.percentile(wt1,50)
+        p90 = np.percentile(wt1,90)
+    else:
+        mean = np.mean(wt1[mon_s0==month])
+        p10 = np.percentile(wt1[mon_s0==month],10)
+        p50 = np.percentile(wt1[mon_s0==month],50)
+        p90 = np.percentile(wt1[mon_s0==month],90)
     return mean, p10, p50, p90
 
 def pressure_surge(df,var='MSLP'):

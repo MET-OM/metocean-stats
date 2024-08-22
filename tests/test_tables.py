@@ -406,10 +406,21 @@ def test_table_max_min_water_level(ds=ds):
 
 def test_table_nb_hours_below_threshold(ds=ds):
     output_file = 'table_nb_hr_below_t.csv'
-    df = tables.table_nb_hours_below_threshold(ds,var='HS',thresholds=[1,2,3,4,5,6,7,8,9,10],output_file=output_file)
+    df = tables.table_nb_hours_below_threshold(ds,var='HS',threshold=[1,2,3,4,5,6,7,8,9,10],output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (10, 4):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+    
+
+def test_table_weather_window_thresholds(ds=ds):
+    output_file = 'table_ww_threshold.csv'
+    df = tables.table_weather_window_thresholds(ds,var='HS',threshold=[0.5,1,2],op_duration=[6,12,24,48],output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (4, 4):
         pass
     else:
         raise ValueError("Shape is not correct")

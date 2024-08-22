@@ -379,13 +379,30 @@ Number Of Hours Per Year Below A Threshold Table
    tables.table_nb_hours_below_threshold(
        df,
        var='HS', 
-       thresholds=[1,2,3,4,5,6,7,8,9,10],
+       threshold=[1,2,3,4,5,6,7,8,9,10],
        output_file='number_hours_per_year.csv'
    )
 
 .. csv-table:: 
    :header-rows: 1
    :file: files/nb_hour_below_thr.csv
+
+All-Year Round Weather Window For Hs Under A Threshold Table
+---------------------------
+
+.. code-block:: python
+
+   tables.table_weather_window_thresholds(
+       df,
+       var='HS', 
+       threshold=[0.5,1,2],
+       op_duration=[6,12,24,48],
+       output_file='weather_window_thresholds.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/weather_window_thresholds.csv
 
 Monthly Return Periods Table
 ----------------------------
