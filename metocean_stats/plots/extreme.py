@@ -189,7 +189,7 @@ def plot_multi_diagnostic_return_levels(data, var,
                                                 block_size= str(interval_day) + "D")
         df_emp_rl.loc[:,'return_periods'] = df_emp_rl.loc[:,'return_periods']/(365.24/interval_day)
         df_emp_rl = df_emp_rl.loc[df_emp_rl.loc[:,'return_periods'] >= 1.0,:]
-                                                
+
     # Initialize plot and fill in empirical return levels
     fig, ax = plt.subplots()
 
@@ -200,8 +200,12 @@ def plot_multi_diagnostic_return_levels(data, var,
         # period greater than 1 year
         df_emp_rl_cut = df_emp_rl[df_emp_rl['return_periods'] >= 1]
 
+        #ax.scatter(df_emp_rl_cut['return_levels'],
+        #           df_emp_rl_cut['return_periods'],
+        #           marker="o", s=20, lw=1,
+        #           facecolor="k", edgecolor="w", zorder=20)
         ax.scatter(df_emp_rl_cut['return_levels'],
-                   df_emp_rl_cut['return_periods'],
+                   df_emp_rl_cut['prob_non_exceedance'],
                    marker="o", s=20, lw=1,
                    facecolor="k", edgecolor="w", zorder=20)
 
@@ -235,8 +239,11 @@ def plot_multi_diagnostic_return_levels(data, var,
 
         # Plot (return levels, return periods) lines corresponding
         if yaxis == 'prob':
+            #ax.plot(df_model_rl_tmp_cut['return_levels'],
+            #        df_model_rl_tmp_cut.index,
+            #        label=dist)
             ax.plot(df_model_rl_tmp_cut['return_levels'],
-                    df_model_rl_tmp_cut.index,
+                    df_model_rl_tmp_cut['prob_non_exceedance'],
                     label=dist)
 
         elif yaxis == 'rp':
@@ -251,19 +258,23 @@ def plot_multi_diagnostic_return_levels(data, var,
     # of non-exceedance or return period
     if yaxis == 'prob':
         ax.set_ylabel("Probability of non-exceedance")
-        list_yticks = [1/0.9, 2, 10]\
-                    + [10**i for i in range(2, 5) if max(periods) > 10**i]
-        if max(periods) > max(list_yticks):
-            list_yticks = list_yticks + [max(periods)]
-
+        #list_yticks = [1/0.9, 2, 10]\
+        #            + [10**i for i in range(2, 5) if max(periods) > 10**i]
+        #if max(periods) > max(list_yticks):
+        #    list_yticks = list_yticks + [max(periods)]
+        #ax.set_yticks(list_yticks)
+        #ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
+        list_yticks = [10**-1,10**(np.log10(0.5)),10**0]
+        list_ytickslabels = ['0.1','0.5','1']
         ax.set_yticks(list_yticks)
-        ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
+        ax.set_yticklabels(list_ytickslabels)
+        ax.set_ylim(0.05,1.02)
 
     elif yaxis == 'rp':
-        ax.set_ylabel("Return period")
+        ax.set_ylabel("Return period [yr]")
 
-    ax.set_xlabel("Return levels")
-    plt.legend()
+    ax.set_xlabel("Return levels "+var)
+    plt.legend(loc='lower right')
     plt.tight_layout()
 
     # Save the plot if a path is given
