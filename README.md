@@ -29,5 +29,8 @@ Looking for more details? Our documentation (under development) provides informa
 
 Let's dive into the world of metocean data! 🌊🏄‍♀️
 
+<img src="https://github.com/MET-OM/metocean-stats/blob/dev1/docs/files/animation.gif" width="400" height="400" />
+
+
 
 
