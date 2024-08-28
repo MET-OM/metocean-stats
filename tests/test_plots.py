@@ -284,4 +284,12 @@ def test_plot_monthly_return_periods_cur_pot(ds=ds_ocean):
 #def test_predict_ts_LSTM(ds=ds):
 #    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
 
-  
+def test_plot_nb_hours_below_threshold(ds=ds):
+    output_file = 'test_plot_nb_hr_below_t.png'
+    fig = plots.plot_nb_hours_below_threshold(ds,var='HS',thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")

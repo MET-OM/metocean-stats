@@ -379,3 +379,34 @@ def plot_tidal_levels(data, var='tide',start_time=None , end_time=None ,output_f
 
     return fig
 
+
+def plot_nb_hours_below_threshold(df,var='hs',thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),output_file='plot_name.png'):
+    # Inputs
+    # 1) ds
+    # 2) var: a string
+    # 3) thr_arr: list of thresholds (should be a lot for smooth curve)
+    # 4) String with filename without extension
+    nbhr_arr=nb_hours_below_threshold(df,var,thr_arr)
+    years=df.index.year.to_numpy()
+    years_unique=np.unique(years)
+    yr1=int(years_unique[0])
+    yr2=int(years_unique[-1])
+    del df,years,years_unique
+    from matplotlib.patches import Patch
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.fill_between(thr_arr,np.min(nbhr_arr,axis=1),np.max(nbhr_arr,axis=1),color='lightgray')
+    ax.plot(thr_arr,np.mean(nbhr_arr,axis=1),linewidth=2,color='k')
+    ax.grid(axis='both', color='gray',linestyle='dashed')
+    ax.set_ylim(0,9000)
+    ax.set_xlim(0,20)
+    ax.set_xlabel(var+' threshold [m]',fontsize=20)
+    ax.set_ylabel('Number of hours',fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=18)
+    ax.set_title('Mean number of hours per year with '+var+' < threshold\n'+str(yr1)+'-'+str(yr2),fontsize=20)
+    legend_elements = [Patch(facecolor='lightgray', edgecolor=None, label='Min-Max range')]
+    ax.legend(handles=legend_elements, loc='lower right', prop={'size': 20})
+    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    plt.close()
+    del ax
+    return fig
+

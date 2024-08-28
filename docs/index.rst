@@ -356,6 +356,54 @@ Monthly Weather Window Plot
 .. image:: files/NORA10_monthly_weather_window4_12_plot.png
    :width: 500
 
+Number Of Hours Per Year Below A Threshold Plot
+---------------------------
+
+.. code-block:: python
+
+   plots.plot_nb_hours_below_threshold(
+       df, 
+       var='HS', 
+       thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),
+       output_file='number_hours_per_year.png'
+   )
+
+.. image:: files/nb_hour_below_thr.png
+   :width: 500
+
+Number Of Hours Per Year Below A Threshold Table
+---------------------------
+
+.. code-block:: python
+
+   tables.table_nb_hours_below_threshold(
+       df,
+       var='HS', 
+       threshold=[1,2,3,4,5,6,7,8,9,10],
+       output_file='number_hours_per_year.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/nb_hour_below_thr.csv
+
+All-Year Round Weather Window For Hs Under A Threshold Table
+---------------------------
+
+.. code-block:: python
+
+   tables.table_weather_window_thresholds(
+       df,
+       var='HS', 
+       threshold=[0.5,1,2],
+       op_duration=[6,12,24,48],
+       output_file='weather_window_thresholds.csv'
+   )
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/weather_window_thresholds.csv
+
 Monthly Return Periods Table
 ----------------------------
 
@@ -1584,6 +1632,35 @@ Plot extreme wind at 100 m height based on NORA3 data:
 
 .. image:: files/extreme_wind_map100m.png
   :width: 500
+
+Plot mean 2-m air temperature based on NORA3 data:
+
+.. code-block:: python
+
+   plot_mean_air_temperature_map(product='NORA3', 
+                                 title='Mean 2-m air temperature 1991-2020 (NORA3)', 
+                                 set_extent=[-25,-10,60.5,68], 
+                                 unit='degC')
+
+.. image:: files/mean_air_temperature_map.png
+  :width: 500
+
+
+Auxiliary Functions
+===================
+
+.. code-block:: python
+
+   from metocean_stats.stats.aux_funcs import *
+
+Convert lat/lon coordinates from degrees/minutes/seconds to decimals:
+
+.. code-block:: python
+
+   lat = degminsec_to_decimals(60,30,00)
+   
+returns lat = 60.5
+
 
 .. toctree::
    :maxdepth: 1

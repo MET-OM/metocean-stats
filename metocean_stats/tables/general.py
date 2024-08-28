@@ -11,7 +11,7 @@ from ..stats.aux_funcs import *
 from ..stats.general import *
 
 
-def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
+def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float,number_of_events=False, output_file='scatter_diagram.csv'):
     """
     The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
@@ -21,6 +21,11 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
      """
 
     sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
+    start_date = data.index.min()
+    end_date = data.index.max() 
+    # Calculate the difference in years
+    number_of_years = (end_date - start_date).days / 365.25
+    dt = (data.index.to_series().diff().dropna().dt.total_seconds() / 3600).mean()
 
     # Convert to percentage
     tbl = sd.values
@@ -53,6 +58,13 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     #cols.insert(0,var1+' / '+var2 )
     rows = rows[::-1]
     tbl = tbl[::-1,:]
+    
+    if number_of_events==True:
+        #number of events 
+        tbl = np.flip(sd.values,axis=0)
+    else:
+        pass
+
     dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
     if output_file.split('.')[-1]=='csv':
         dfout.to_csv(output_file,index_label=var1+'/'+var2)
@@ -586,3 +598,63 @@ def table_max_min_water_level(data: pd.DataFrame, var_total_water_level: str,var
     df.to_csv(output_file, index=True)
     
     return df
+
+
+def table_nb_hours_below_threshold(df,var='hs',threshold=[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,12.5,15,17.5,20],output_file='table_hours_below_thresh.csv'):
+    # Inputs
+    # 1) df
+    # 2) var: a string
+    # 3) thr_arr: list of thresholds (should be a lot for smooth curve)
+    # 4) thresholds_chosen: list of thresholds to be included in the table
+    # 5) output_file: String with filename without extension
+    thr_arr=(np.arange(0.05,20.05,0.05)).tolist()
+    nbhr_arr=nb_hours_below_threshold(df,var,thr_arr)
+    # Create file
+    threshold=np.array(threshold)
+    arr1=np.zeros((len(threshold),3))
+    rows=[]
+    for j in range(len(threshold)):
+        # Needs to add/subtract 0.001 because of precision problem
+        t=np.where((thr_arr>=threshold[j]-0.001) & (thr_arr<=threshold[j]+0.001))[0]
+        arr1[j,0]=np.min(nbhr_arr[t,:])
+        arr1[j,1]=np.round(np.mean(nbhr_arr[t,:]),0)
+        arr1[j,2]=np.max(nbhr_arr[t,:])
+        del t
+        rows.append('<='+str(threshold[j]))
+    # Convert numpy array to dataframe
+    df_out = pd.DataFrame()
+    df_out[var] = ['<'+str(threshold[j]) for j in range(len(threshold))]
+    #df_out = pd.DataFrame(data=np.round(arr1,0), index=rows, columns=cols)
+    df_out['Minimum'] = np.round(arr1[:,0],0).astype('int')
+    df_out['Mean'] = np.round(arr1[:,1],0).astype('int')
+    df_out['Maximum'] = np.round(arr1[:,2],0).astype('int')
+    # Save to csv format
+    df_out.to_csv(output_file, index=False)
+    return df_out
+
+def table_weather_window_thresholds(ds,var,threshold,op_duration=[6,12,24,48],output_file='table_ww.csv'):
+    # ds: dataframe
+    # var: string with var name
+    # threshold: list of thresholds appropriate for the variable
+    # op_duration: list, default is 6h, 12, 24h, and 48h
+    # output_file: string with file name
+    ds = ds[var]
+    timestep = (ds.index.to_series().diff().dropna().dt.total_seconds()/3600).mean()
+    arr_o=np.zeros((len(op_duration),len(threshold)))
+    t1=0
+    for t in threshold:
+        op1=0
+        for op in op_duration:
+            arr_o[op1,t1],p1,p2,p3 = weather_window_length(ds,threshold=t,op_duration=op,timestep=timestep,month=None)
+            op1=op1+1
+            del p1,p2,p3
+        t1=t1+1
+    # Convert numpy array to dataframe
+    cols=[var+'<'+str(th)+'m' for th in threshold]
+    df_tmp1 = pd.DataFrame(data=op_duration, columns=['Operation duration [h]'])
+    df_tmp2 = pd.DataFrame(data=np.round(arr_o,2), columns=cols)
+    df_out = pd.concat([df_tmp1, df_tmp2], axis=1, sort=True)
+    del df_tmp1,df_tmp2
+    # Save to csv format
+    df_out.to_csv(output_file, index=False)
+    return df_out
