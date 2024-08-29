@@ -1,6 +1,7 @@
-# metocean-stats 🌊📊
-
-<img src="https://github.com/MET-OM/metocean-stats/blob/main/docs/files/logo.png" width="200" height="200" />
+<h1>
+  metocean-stats
+  <img src="https://github.com/MET-OM/metocean-stats/blob/main/docs/files/logo.png" width="40" height="40" />
+</h1>
 
 [![Tests (python)](https://github.com/MET-OM/metocean-stats/actions/workflows/tests.yml/badge.svg)](https://github.com/MET-OM/metocean-stats/actions/workflows/tests.yml)
 [![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)	[![Documentation Status](https://readthedocs.org/projects/metocean-stats/badge/?version=latest)](https://metocean-stats.readthedocs.io/en/latest/?badge=latest)
