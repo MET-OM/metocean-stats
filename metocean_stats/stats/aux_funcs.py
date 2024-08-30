@@ -496,3 +496,12 @@ def detrend_ts(df, column_name='tide'):
     import scipy.signal as signal
     df[column_name] = signal.detrend(df[column_name])
     return df
+
+
+def degminsec_to_decimals(degrees,minutes,seconds):
+    if degrees<=0:
+        loc_decimals=degrees-(minutes/60)-(seconds/3600)
+    else:
+        loc_decimals=degrees+(minutes/60)+(seconds/3600)
+    return loc_decimals
+

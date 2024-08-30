@@ -45,3 +45,18 @@ from metocean_stats import maps
 #     else:
 #         raise FileNotFoundError(f"{output_file} was not created")
 #     return
+
+#def test_plot_mean_air_temperature_map():
+#     output_file = 'test_temp.png'
+#     fig = maps.plot_mean_air_temperature_map(product='NORA3', title='Mean 2-m air temperature 1991-2020 (NORA3)', set_extent=[-25, -10, 60.5, 68], unit='degC', output_file=output_file)
+#     if fig.dpi == 100.0:
+#         pass
+#     else:
+#         raise ValueError("FigValue is not correct")
+#    
+#     # Check if file is created
+#     if os.path.isfile(output_file):
+#         os.remove(output_file)
+#     else:
+#         raise FileNotFoundError(f"{output_file} was not created")
+#     return

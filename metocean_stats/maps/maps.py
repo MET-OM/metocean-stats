@@ -128,6 +128,7 @@ def plot_extreme_wave_map(return_period=50, product='NORA3', title='empty title'
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
     gl.right_labels = False
     gl.top_labels = False
+    gl.rotate_labels=False
 
     cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
     cb.set_label(ds['hs'].attrs.get('standard_name', 'hs') + ' [' + ds['hs'].attrs.get('units', 'm') + ']', fontsize=14)
@@ -186,9 +187,82 @@ def plot_extreme_wind_map(return_period=50, product='NORA3', z=0, title='empty t
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
     gl.right_labels = False
     gl.top_labels = False
+    gl.rotate_labels=False
 
     cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
     cb.set_label(ds['wind_speed'].attrs.get('standard_name', 'wind_speed') + ' [' + ds['wind_speed'].attrs.get('units', 'm/s') + ']', fontsize=14)
+    plt.tight_layout()
+
+    if title:
+        plt.title(title, fontsize=16)
+    plt.savefig(output_file, dpi=300)
+    return fig
+
+# Function to plot mean air temperature map
+def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], unit='degC', mask_land=True, output_file='mean_air_temperature_map.png'):
+    """
+    Plots an extreme wind speed map based on the specified return level and dataset.
+
+    Parameters:
+    - product: str, optional, default='NORA3'
+        The dataset to use for the wind speed data. Currently only 'NORA3' is supported.
+    - title: str, optional, default='empty title'
+        The title to display on the map.
+    - set_extent: list, optional, default=[0, 30, 52, 73]
+        The map extent specified as [lon_min, lon_max, lat_min, lat_max].
+    - unit: str, optional, default='degC' (Celsius degrees), option 'K' for Kelvin
+    - mask_land. bool, optional, default=True for masked land
+    - output_file: str, optional, default='extreme_wind_map.png'
+        The filename to save the plot.
+
+    Returns:
+    - fig: matplotlib.figure.Figure
+        The figure object containing the plot.
+    """    
+    if product == 'NORA3':
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Overall_Mean_AirTemperature2m_1991_2020.nc')
+        #standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'x', 'y', projection_type='lambert_conformal')
+        hs_flat = ds['air_temperature_2m'].isel(time=0).values.flatten()
+        lon_flat = ds['longitude'].values.flatten()
+        lat_flat = ds['latitude'].values.flatten()
+    else:
+        print(product, 'is not available')
+        return
+
+    #mask = ~np.isnan(hs_flat)
+    #hs_flat = hs_flat[mask]
+    #lon_flat = standard_lon.flatten()[mask]
+    #lat_flat = standard_lat.flatten()[mask]
+    if unit=='degC':
+        vmin=-14
+        vmax=14
+    elif unit=='K':
+        hs_flat=hs_flat+273.15
+        vmin=260
+        vmax=290
+    else:
+        print('Chosen unit not correct, should be K or degC')
+        return
+
+    cmap = ListedColormap(plt.cm.get_cmap('RdYlBu_r', int((vmax-vmin)/1))(np.linspace(0, 1, int((vmax-vmin)/1))))
+
+    fig = plt.figure(figsize=(9, 10))
+    ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=set_extent[0]+(set_extent[1]-set_extent[0])/2))
+    ax.coastlines(resolution='10m', zorder=3)
+    if mask_land:
+        ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
+
+    hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=vmin, vmax=vmax, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+    ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
+
+    ax.set_extent(set_extent, crs=ccrs.PlateCarree())
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
+    gl.right_labels = False
+    gl.top_labels = False
+    gl.rotate_labels=False
+
+    cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
+    cb.set_label(ds['air_temperature_2m'].attrs.get('standard_name', 'air_temperature') + ' [' + unit + ']', fontsize=14)
     plt.tight_layout()
 
     if title:
