@@ -1,4 +1,3 @@
-from metocean_api import ts
 from metocean_stats import plots, tables, stats
 from metocean_stats.stats.aux_funcs import *
 from metocean_stats.stats import ml
