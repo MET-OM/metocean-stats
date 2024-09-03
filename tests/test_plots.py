@@ -293,3 +293,16 @@ def test_plot_nb_hours_below_threshold(ds=ds):
         pass
     else:
         raise ValueError("FigValue is not correct")
+    
+
+def test_plot_multi_diagnostic_with_uncertainty(ds=ds):
+    output_file = 'test_plot_multi_diagnostic.png'
+    fig=plots.plot_multi_diagnostic_return_levels_uncertainty(ds, var='HS', dist_list=['GP'], yaxis='rp', threshold=5.4, uncertainty=0.95, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if fig.dpi == 100.0:
+        pass
+    else:
+        raise ValueError("FigValue is not correct")
+    
+    
