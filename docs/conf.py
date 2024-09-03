@@ -46,6 +46,11 @@ exclude_patterns = []
 #import sphinx_rtd_theme
 html_theme = 'sphinx_rtd_theme'
 
+html_theme_options = {
+    'collapse_navigation': False,  # Set to False to keep the navigation expanded
+    'sticky_navigation': True,     # Set to True to keep the sidebar fixed during scrolling
+}
+
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
