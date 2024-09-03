@@ -8,7 +8,7 @@ from metocean_stats.stats.aux_funcs import *
 import warnings
 warnings.filterwarnings('ignore')
 
-ds = xr.open_dataset('/home/konstantinosc/github/dnora/examples/output/ww3_spec_NORA3_Sula_20180101T0000-20191231T2300.nc')
+ds = xr.open_dataset('.../ww3_spec_NORA3_Sula_20180101T0000-20191231T2300.nc')
 
 # Define training and validation period:
 start_training = '2018-01-01'
@@ -27,7 +27,6 @@ df_spec_origin = convert_spec_to_dataframe(ds=ds.isel(station=station_origin), s
 df_spec_train= convert_spec_to_dataframe(ds=ds.isel(station=station_train), spec_name = 'efth', dir_name='direction', freq_name='frequency' )
 df_spec_ml  = create_empty_dataframe_like(df_spec_train)
 
-breakpoint()
 
 # Run ML model:
 #ds_ml = xr.full_like(ds[var_origin[0]][:,station_train,:,:], fill_value=np.nan)

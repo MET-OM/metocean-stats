@@ -3,6 +3,15 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
 
+
+def add_suffix(var_origin, suffix='_x', exclude=['time']):
+    if isinstance(var_origin, list) or isinstance(var_origin, pd.Index):
+        return [var + suffix if var not in exclude else var for var in var_origin]
+    elif isinstance(var_origin, str):
+        return var_origin + suffix if var_origin not in exclude else var_origin
+    else:
+        return "Unsupported data type"
+
 def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
     """
     Input:
@@ -17,13 +26,16 @@ def predict_ts(ts_origin,var_origin, ts_train,var_train, model='GBR'):
     Y_pred = pd.DataFrame(columns=[var_train], index=ts_origin.index)
     
     # Add extension _x, _y
-    ts_origin.columns = [col + '_x' for col in ts_origin.columns]
-    ts_train.columns  = [col + '_y' for col in ts_train.columns]
-    
-    var_origin = [var + '_x' for var in var_origin]
-    var_train = [var + '_y' for var in var_train]
+    ts_origin.columns = add_suffix(ts_origin.columns, suffix='_x') 
+    ts_train.columns  = add_suffix(ts_train.columns, suffix='_y') 
+
+    var_origin = add_suffix(var_origin, suffix='_x')  
+    var_train =  add_suffix(var_train, suffix='_y')  
 
     # Merge or join the dataframes based on time
+    ts_origin.set_index('time', inplace=True)
+    ts_train.set_index('time', inplace=True)
+
     merged_data = pd.merge(ts_origin[var_origin], ts_train[var_train], how='inner', left_on='time', right_on='time')
 
     # Handling missing values if any
