@@ -344,40 +344,6 @@ def threshold_sensitivity(data, var, thresholds,
 
 
 
-def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]) -> Sequence[Dict]:
-    """Compute a joint contour for the given return periods. 
-    Input:
-        data: pd.DataFrame
-        var1: e.g., 'hs'
-        var2: e.g., 'tp'
-        return_periods: A list of return periods in years, default [50,100]
-    Output:
-         contours : list of joint contours, 
-         i.e.,  number of contours based on given return_periods 
-    """
-    from virocon import get_OMAE2020_Hs_Tz, get_DNVGL_Hs_U,get_OMAE2020_Hs_Tz,get_OMAE2020_V_Hs, GlobalHierarchicalModel,IFORMContour, ISORMContour     
-    # Define 2D joint distribution model
-    dist_descriptions, fit_descriptions, _ = get_OMAE2020_Hs_Tz()
-    model = GlobalHierarchicalModel(dist_descriptions)
-    dt = (data.index[1]-data.index[0]).total_seconds()/3600  # duration in hours
-    data_2D =  np.transpose(np.array([data[var1],data[var2]]))
-    model.fit(data_2D, fit_descriptions=fit_descriptions)
-    contours = []
-    for rp in periods:
-        alpha = 1 / (rp * 365.25 * 24 / dt)
-        contour = IFORMContour(model, alpha)
-        coords = contour.coordinates
-        x = coords[:, 1].tolist()
-        y = coords[:, 0].tolist()
-        contours.append({
-            'return_period': rp,
-            'x': x,
-            'y': y
-        })
-    return contours, data_2D
-
-
-
     
 def return_levels_weibull_2p(data, var,
                              periods=[50, 100, 1000], 
