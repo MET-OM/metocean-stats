@@ -504,24 +504,3 @@ def degminsec_to_decimals(degrees,minutes,seconds):
     else:
         loc_decimals=degrees+(minutes/60)+(seconds/3600)
     return loc_decimals
-
-def convert_spec_to_dataframe(ds , spec_name = 'efth', dir_name='direction', freq_name='frequency'):
-    
-    # Reshape the data so that each combination of direction and frequency has its own column
-    df_spec = (
-        ds[spec_name].stack(combination=[dir_name, freq_name])  # Flatten direction and frequency dimensions
-        .to_pandas()  # Convert to a pandas DataFrame
-    )
-    # Rename columns to reflect direction and frequency combinations
-    df_spec.columns = [f"{spec_name}_{dir_name}{dir_idx}_{freq_name}{freq_idx}" 
-                         for dir_idx, freq_idx in zip(*df_spec.columns.codes)]
-
-    # Add time as an index
-    df_spec = df_spec.reset_index()
-    
-    return df_spec
-
-def create_empty_dataframe_like(df):
-    empty_df = pd.DataFrame(columns=df.columns, index=df.time)
-    
-    return empty_df

@@ -13,10 +13,6 @@ dependencies:
   - windrose
   - seaborn>=0.12.2
   - pyextremes
-  - virocon
-  - scikit-learn
-  - keras
-  - tensorflow
   - cartopy
   - python-docx
 
