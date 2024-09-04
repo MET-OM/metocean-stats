@@ -13,7 +13,7 @@ setuptools.setup(
     url         = 'https://github.com/MET-OM/metocean-stats',
     download_url = 'https://github.com/MET-OM/metocean-stats',
     version = __version__,
-    license = 'GPLv3',
+    license = 'LGPLv3',
     install_requires = [
         'numpy>=1.17',
         'xarray',
