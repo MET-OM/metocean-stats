@@ -15,4 +15,6 @@ dependencies:
   - pyextremes
   - cartopy
   - python-docx
+  - netcdf4
+  - pydap
 
