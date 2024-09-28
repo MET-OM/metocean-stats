@@ -26,6 +26,8 @@ setuptools.setup(
         'pyextremes',
         'cartopy',
         'python-docx',
+        'netcdf4',
+        'pydap',
     ],
     packages = setuptools.find_packages(),
     include_package_data = True,
