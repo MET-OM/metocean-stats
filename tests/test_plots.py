@@ -1,4 +1,3 @@
-from metocean_api import ts
 from metocean_stats import plots, tables, stats, maps
 from metocean_stats.stats.aux_funcs import *
 import pandas as pd

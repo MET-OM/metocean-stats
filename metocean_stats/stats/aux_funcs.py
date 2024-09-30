@@ -504,4 +504,3 @@ def degminsec_to_decimals(degrees,minutes,seconds):
     else:
         loc_decimals=degrees+(minutes/60)+(seconds/3600)
     return loc_decimals
-

@@ -12,12 +12,9 @@ dependencies:
   - pytest
   - windrose
   - seaborn>=0.12.2
-  - metocean-api
   - pyextremes
-  - virocon
-  - scikit-learn
-  - keras
-  - tensorflow
   - cartopy
   - python-docx
+  - netcdf4
+  - pydap
 
