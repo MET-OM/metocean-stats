@@ -477,7 +477,7 @@ def old_return_levels_GP(data, var, threshold=None,
     # Total number of selected values
     ns=len(sel_val)
     # Number of selected values in each year
-    ns_yr=sel_val.resample("YS").count() # Should give an array of 30 values if 30 years are considered
+    ns_yr=sel_val.resample("YS").count() # Should give an array of 30+ values if 30 years are considered
     # Expected rate of occurrence (mean number of occurrences per year)
     lambd=np.mean(ns_yr.values,axis=0)
     # Fit the Generalized Pareto distribution to the selected values
@@ -1009,4 +1009,288 @@ def estimate_Hmax(Hs, Tp, twindow=3, k=0.9):
     N = (twindow*3600)/ Tz
     Hmax =  Hs * ( np.sqrt(np.log(N)/2) + 0.2886/np.sqrt(2*np.log(N))  ) # Expected largest Hmax based on Max Wave Distribution
     return Hmax
+
+
+
+
+def return_levels_annual_max_uncertainty(data, var='hs', dist='GEV', 
+                             periods=[50, 100, 1000],
+                             uncertainty=None): 
+    """
+    Calulates return value estimates for different periods, fitting a 
+    Generalized Extreme Value ('GEV') or a Gumbel ('GUM') distribution to given 
+    data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable 
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    method (str): Distribution to fit to the data. Either 'GEV' for Generalized
+    Extreme Value or 'GUM' for Gumbel.
+    uncertainty (float): confidence interval between 0 and 1 (recommended 0.95)
+
+    return (pandas DataFrame): return levels estimates and corresponding
+                               probability of non-exceedance indexed by 
+                               corresponding periods. 
+                               Also contains attrs for the method, 
+                               and the distribution. 
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
+    Modified by clio-met 
+    """
+    it_selected_max = data.groupby(data.index.year)[var].idxmax().values
+    # get annual maximum with actual dates that maximum occured
+    data_am = data[var].loc[it_selected_max]
+    periods = np.array(periods, dtype=float)
+    if dist == 'GEV':
+        from scipy.stats import genextreme
+        # fit data
+        shape, loc, scale = genextreme.fit(data_am) 
+        # Compute the return levels for several return periods
+        return_levels = genextreme.isf(1/periods, shape, loc, scale)
+        prob_non_exc = genextreme.cdf(return_levels, shape, loc, scale)
+    elif dist == 'GUM': 
+        from scipy.stats import gumbel_r 
+        loc, scale = gumbel_r.fit(data_am) # fit data
+        # Compute the return levels for several return periods.
+        return_levels = gumbel_r.isf(1/periods, loc, scale)
+        prob_non_exc = gumbel_r.cdf(return_levels, loc, scale)
+
+    else:
+        print ('please check method/distribution, must be either GEV or GUM')
+
+    df = pd.DataFrame({'return_levels':return_levels,
+                       'periods': periods})
+    df = df.set_index('periods')
+    df['prob_non_exceedance'] = prob_non_exc
+    df.attrs['method'] = 'AM'
+    df.attrs['dist'] = dist
+    df.attrs['var'] = var
+
+    if uncertainty!=None:
+        rl=np.zeros((len(periods),1000))
+        for i in range(1000):
+            extremes1=np.random.choice(data_am.to_numpy(), size=len(data_am), replace=True)
+            extremes1=pd.Series(extremes1,index=data_am.index,name=var)
+            if dist == 'GEV':
+                from scipy.stats import genextreme
+                # fit data
+                shape, loc, scale = genextreme.fit(extremes1) 
+                # Compute the return levels for several return periods       
+                return_levels = genextreme.isf(1/periods, shape, loc, scale)
+            elif dist == 'GUM':
+                from scipy.stats import gumbel_r 
+                loc, scale = gumbel_r.fit(extremes1) # fit data
+                # Compute the return levels for several return periods.
+                return_levels = gumbel_r.isf(1/periods, loc, scale)
+            else:
+                print ('please check method/distribution, must be either GEV or GUM')
+            rl[:,i]=return_levels
+            del return_levels
+        ci_low_rl,ci_high_rl=np.quantile(rl,q=[(1-uncertainty)/2,(1+uncertainty)/2],axis=1)
+        del rl
+        df['ci_lower_rl'] = ci_low_rl.tolist()
+        df['ci_upper_rl'] = ci_high_rl.tolist()
+
+    return df
+
+
+def return_levels_pot_uncertainty(data, var, dist='Weibull_2P', 
+                      periods=[50, 100, 1000], 
+                      threshold=None, r="48h",
+                      uncertainty=None):
+    """
+    Calulates return value estimates for different periods, fitting a 
+    given distribution to threshold excess values of the data.  
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    dist (str): POT distribution to choose from 'GP' for Generalized Pareto,
+                'Weibull_2P' for Weibull 2-paremeters or 'EXP' for exponential
+    periods (1D-array or list): List of periods to for which to return return
+                                value estimates
+    threshold (float): Threshold used to define the extremes
+    r (str): Minimum period of time between two peaks. Default 48h.
+    uncertainty (float): confidence interval between 0 and 1 (recommended 0.95)
+    
+    return (pandas DataFrame): return levels estimates and corresponding
+                               probability of non-exceedance indexed by 
+                               corresponding periods. Also contains attrs for 
+                               the method, the distribution, the threshold, 
+                               and the period considered between independent 
+                               extremes (r).  
+    
+    Function written by dung-manh-nguyen and KonstantinChri.
+    Modified by clio-met
+    """
+    import scipy.stats as stats
+    from pyextremes import get_extremes
+
+    if threshold == None:
+        threshold = get_threshold_os(data=data, var=var)
+    else:
+        pass
+    
+    extremes = get_extremes(data[var], method="POT", threshold=threshold, r=r)
+    
+    years = data.index.year
+
+    return_periods = np.array(periods)
+    # Calculate the mean number of events per year (ns_yr)
+    yrs_ev=extremes.index.year.to_numpy()
+    nbev=[]
+    for i in range(years[0],years[-1]+1,1):
+        nbev.append(len(np.where(yrs_ev==i)[0]))
+
+    ns_yr=np.mean(np.array(nbev))
+    del nbev
+    if dist == 'Weibull_2P':
+        shape, loc, scale = stats.weibull_min.fit(extremes-threshold, floc=0)
+        return_levels = stats.weibull_min.isf(1/(ns_yr*return_periods), 
+                                              shape, loc, scale)\
+                                              + threshold
+        prob_non_exc = stats.weibull_min.cdf(return_levels-threshold, shape, loc, scale)
+    elif dist == 'EXP':
+        loc, scale = stats.expon.fit(extremes-threshold)
+        return_levels = stats.expon.isf(1/(ns_yr*return_periods), loc, scale)\
+                                        + threshold
+        prob_non_exc = stats.expon.cdf(return_levels-threshold, loc, scale)
+    elif dist == 'GP':
+        shape, loc, scale = stats.genpareto.fit(extremes-threshold)
+        return_levels = stats.genpareto.isf(1/(ns_yr*return_periods), 
+                                            shape, loc, scale)\
+                                            + threshold
+        prob_non_exc = stats.genpareto.cdf(return_levels-threshold, shape, loc, scale)
+    else:
+        print ('please check method/distribution, must be one of: EXP, \
+                GP or Weibull_2P')
+    df = pd.DataFrame({'return_levels':return_levels,
+                       'periods': np.array(return_periods)})
+    df = df.set_index('periods')
+    df['prob_non_exceedance'] = prob_non_exc
+
+    df.attrs['method'] = 'pot'
+    df.attrs['dist'] = dist
+    df.attrs['r'] = '48h'
+    df.attrs['threshold'] = threshold
+    df.attrs['var'] = var
+    if uncertainty!=None:
+        rl=np.zeros((len(return_periods),1000))
+        for i in range(1000):
+            extremes1=np.random.choice(extremes.to_numpy(), size=len(extremes), replace=True)
+            extremes1=pd.Series(extremes1,index=extremes.index,name=var)
+            # Calculate the mean number of events per year (ns_yr)
+            yrs_ev=extremes.index.year.to_numpy()
+            nbev=[]
+            for j in range(years[0],years[-1]+1,1):
+                nbev.append(len(np.where(yrs_ev==j)[0]))
+            ns_yr=np.mean(np.array(nbev))
+            del nbev,yrs_ev
+            if dist == 'Weibull_2P':
+                shape, loc, scale = stats.weibull_min.fit(extremes1-threshold, floc=0)
+                return_levels = stats.weibull_min.isf(1/(ns_yr*return_periods), 
+                                                    shape, loc, scale)\
+                                                    + threshold
+            elif dist == 'EXP':
+                loc, scale = stats.expon.fit(extremes1-threshold)
+                return_levels = stats.expon.isf(1/(ns_yr*return_periods), loc, scale)\
+                                                + threshold # Delta_t    # Delta T /return_periods
+            elif dist == 'GP':
+                shape, loc, scale = stats.genpareto.fit(extremes1-threshold)
+                return_levels = stats.genpareto.isf(1/(ns_yr*return_periods), 
+                                                    shape, loc, scale)\
+                                                    + threshold
+            else:
+                print ('please check method/distribution, must be one of: EXP, \
+                        GP or Weibull_2P')
+            rl[:,i]=return_levels
+            del return_levels
+        ci_low_rl,ci_high_rl=np.nanquantile(rl,q=[(1-uncertainty)/2,(1+uncertainty)/2],axis=1)
+        del rl
+        df['ci_lower_rl'] = ci_low_rl.tolist()
+        df['ci_upper_rl'] = ci_high_rl.tolist()
+
+    return df
+
+
+def get_empirical_return_levels_new(data, var, method="POT",
+                                block_size="365.2425D",
+                                threshold=None):
+    """
+    Returns an estimation of observed return periods and return levels.
+    
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    method (str): Method of definition for the extremes, 
+                  'BM' for Block Maxima or 'POT' for Peak over threshold
+    block_size (str): Size of the block for block maxima
+    threshold (float): Threshold to be used for peak-over-threshold, default
+                       None.
+    
+    return (pandas DataFrame): df, dataframe containing empirical return levels
+                               and return periods. df.attrs contains meta-data
+                               about the method used, threshold or block size 
+                               used, and variable of interest.   
+    Modified by clio-met
+    """
+    from pyextremes import get_extremes, get_return_periods
+    
+    if method == 'BM':
+        extremes = get_extremes(ts=data[var],
+                                method=method,
+                                block_size=block_size)
+        # The method above gives at least one more date.
+        # Therefore we have to remove the unwanted row(s).
+        years_ex=extremes.index.year.to_numpy()
+        if (len(years_ex)>(np.max(years_ex)-np.min(years_ex)+1)):
+            yr_unique=np.unique(years_ex)
+            for yr in range(yr_unique[0],yr_unique[-1]+1):
+                ix=np.where(years_ex==yr)[0]
+                if len(ix)>1:
+                    imin=ix[np.argmin(extremes[extremes.index.year==yr].to_numpy())]
+                    extremes=extremes.drop(index=extremes.index[imin])
+        rp = get_return_periods(ts=data[var],
+                                extremes=extremes,
+                                extremes_method=method,
+                                extremes_type="high",
+                                return_period_size=block_size)
+        df = pd.DataFrame(rp).rename(columns = {
+                                 'return period':'return_periods',
+                                 var: 'return_levels'
+                                 })\
+                             .loc[:,['return_levels', 'return_periods']]
+        # Add a column with the probability of non exceedance
+        df['prob_non_exceedance'] = 1-rp['exceedance probability']
+        df.attrs['method'] = 'BM'
+        df.attrs['block_size'] = block_size
+        df.attrs['var'] = var
+        
+    elif method == 'POT':
+    
+        if threshold is None:
+             threshold = get_threshold_os(data=data, var=var)   
+             
+        extremes = get_extremes(ts=data[var],
+                                method=method,
+                                threshold=threshold)
+
+        rp = get_return_periods(ts=data[var],
+                                extremes=extremes,
+                                extremes_method=method,
+                                extremes_type="high")
+        df = pd.DataFrame(rp).rename(columns = {
+                                 'return period':'return_periods',
+                                 var: 'return_levels',
+                                 })\
+                             .loc[:,['return_levels', 'return_periods']]
+        # Add a column with the probability of non exceedance
+        df['prob_non_exceedance'] = 1-rp['exceedance probability']
+        print(df['prob_non_exceedance'])
+        df.attrs['method'] = 'POT'
+        df.attrs['threshold'] = threshold
+        df.attrs['var'] = var
+
+    return df
+
+
 

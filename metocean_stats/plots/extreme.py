@@ -283,6 +283,166 @@ def plot_multi_diagnostic_return_levels(data, var,
 
     return fig
 
+def plot_multi_diagnostic_return_levels_uncertainty(data, var, 
+                                        dist_list=['GP','EXP',
+                                                   'Weibull_2P'],
+                                        periods=np.arange(0.1, 10000.1, 0.1).tolist(),
+                                        threshold=None,
+                                        yaxis='prob',
+                                        uncertainty=None,
+                                        output_file=None):
+    """
+    Plots empirical value plot along fitted distributions.
+
+    data (pd.DataFrame): dataframe containing the time series
+    var (str): name of the variable
+    dist_list (list of str): list of the names of the models to fit the
+                                data and display
+    periods (list): Range of periods to compute
+    threshold (float): Threshold used for POT methods
+    yaxis (str): Either 'prob' (default) or 'rp', displays probability of
+    non-exceedance or return period on yaxis respectively.
+    uncertainty (float): confidence interval between 0 and 1 (recommended 0.95)
+    output_file (str): path of the output file to save the plot, else None.
+
+    return: plots the return value plot
+    !!!!! Do not plot GEV or GUM with GP or EXP or Weibull_2P (do not mix POT and annual max)
+    Modified by clio-met
+    """
+    if (('GP' in dist_list) or ('EXP' in dist_list) or ('Weibull_2P' in dist_list)):
+        # Get empirical return levels and periods
+        if threshold is None:
+             threshold = get_threshold_os(data=data, var=var)
+
+        # Get empirical return levels and periods 
+        df_emp_rl = get_empirical_return_levels_new(data=data, 
+                                                var=var, 
+                                                method='POT', 
+                                                threshold=threshold)
+    elif (('GEV' in dist_list) or ('GUM' in dist_list)):
+    
+        # Get empirical return levels and periods 
+        df_emp_rl = get_empirical_return_levels_new(data=data, 
+                                                var=var, 
+                                                method='BM')
+    elif ('Weibull_3P' in dist_list):
+
+        interval = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+        interval_day = 1/(24/interval)
+
+        df_emp_rl = get_empirical_return_levels_new(data=data, 
+                                                var=var, 
+                                                method='BM',
+                                                block_size= str(interval_day) + "D")
+        df_emp_rl.loc[:,'return_periods'] = df_emp_rl.loc[:,'return_periods']/(365.24/interval_day)
+        df_emp_rl = df_emp_rl.loc[df_emp_rl.loc[:,'return_periods'] >= 1.0,:]
+    # Initialize plot and fill in empirical return levels
+    fig, ax = plt.subplots()
+    # Plot points (return level, return period) corresponding to
+    # empirical values
+    if yaxis == 'prob':
+        ax.scatter(df_emp_rl['return_levels'],
+                   df_emp_rl['prob_non_exceedance'],
+                   marker="o", s=20, lw=1,
+                   facecolor="k", edgecolor="w", zorder=20)
+    elif yaxis == 'rp':
+        ax.scatter(df_emp_rl['return_periods'],
+                    df_emp_rl['return_levels'],
+                    marker="o", s=10, lw=1,
+                    facecolor="k", edgecolor=None, zorder=20)
+
+    for dist in dist_list:
+
+        if dist in ['GP','Weibull_2P','EXP']:
+            df_model_rl_tmp = return_levels_pot_uncertainty(data, var,
+                                                dist=dist,
+                                                threshold=threshold,
+                                                periods=periods,
+                                                uncertainty=uncertainty)
+        elif dist in ['GEV','GUM']:
+            df_model_rl_tmp = return_levels_annual_max_uncertainty(data, var,
+                                                       dist=dist,
+                                                       periods=periods,
+                                                       uncertainty=uncertainty)
+        elif dist in ['Weibull_3P']:
+            df_model_rl_tmp = return_levels_idm(data, var, 
+                                               dist=dist, 
+                                               periods=periods)
+        df_model_rl_tmp=df_model_rl_tmp.dropna()
+        # Plot (return levels, return periods) lines corresponding
+        if yaxis == 'prob':
+            pl=ax.plot(df_model_rl_tmp['return_levels'],
+                       df_model_rl_tmp['prob_non_exceedance'],
+                       label=dist,zorder=10)
+            if uncertainty!=None:
+                ax.fill_betweenx(df_model_rl_tmp['prob_non_exceedance'],
+                                df_model_rl_tmp['ci_lower_rl'],
+                                df_model_rl_tmp['ci_upper_rl'],
+                                color=pl[0].get_color(),
+                                alpha=0.3)
+                ax.plot(df_model_rl_tmp['ci_lower_rl'],
+                    df_model_rl_tmp['prob_non_exceedance'],
+                    color=pl[0].get_color(),
+                    linestyle='dashed',
+                    linewidth=1)
+                ax.plot(df_model_rl_tmp['ci_upper_rl'],
+                    df_model_rl_tmp['prob_non_exceedance'],
+                    color=pl[0].get_color(),
+                    linestyle='dashed',
+                    linewidth=1)
+        elif yaxis == 'rp':
+            pl=ax.plot(df_model_rl_tmp.index,
+                       df_model_rl_tmp['return_levels'],
+                       label=dist,zorder=10)
+            if uncertainty!=None:
+                ax.fill_between(df_model_rl_tmp.index,
+                                df_model_rl_tmp['ci_lower_rl'],
+                                df_model_rl_tmp['ci_upper_rl'],
+                                color=pl[0].get_color(),
+                                alpha=0.2)
+                ax.plot(df_model_rl_tmp.index,
+                    df_model_rl_tmp['ci_lower_rl'],
+                    color=pl[0].get_color(),
+                    linestyle='dashed',
+                    linewidth=0.5)
+                ax.plot(df_model_rl_tmp.index,
+                    df_model_rl_tmp['ci_upper_rl'],
+                    color=pl[0].get_color(),
+                    linestyle='dashed',
+                    linewidth=0.5)
+
+    ax.grid(True, which="both")
+
+    # Change label and ticklabels of y-axis, to display either probabilities
+    # of non-exceedance or return period
+    if yaxis == 'prob':
+        ax.set_ylabel("Probability of non-exceedance")
+        ax.set_xlabel("Return levels "+var)
+        #min_y=df_model_rl_tmp_cut['prob_non_exceedance'].min()
+        #ax.set_ylim(min_y,1.01)
+        #list_yticks = [1/0.9, 2, 10]\
+        #            + [10**i for i in range(2, 5) if max(periods) > 10**i]
+        #if max(periods) > max(list_yticks):
+        #    list_yticks = list_yticks + [max(periods)]
+        #ax.set_yticks(list_yticks)
+        #ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
+        ax.set_ylim(0.1,1)
+        plt.legend(loc='lower right')
+    elif yaxis == 'rp':
+        ax.set_xscale('log')
+        ax.set_xlabel("Return period [yr]")
+        ax.set_ylabel("Return levels "+var)
+        plt.legend(loc='upper left')
+
+    plt.tight_layout()
+
+    # Save the plot if a path is given
+    if output_file is not None:
+        plt.savefig(output_file,dpi=250)
+
+    return fig
+
+
 def plot_threshold_sensitivity(df, output_file):
     """
     Plots theoretical return level for given return period and distribution,
