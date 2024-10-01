@@ -11,7 +11,7 @@ on:
 
 jobs:
   tests:
-    name: pytests (${{ matrix.os }}, Mambaforge)
+    name: pytests (${{ matrix.os }}, Miniforge3)
     runs-on: ${{ matrix.os }}-latest
     defaults:
       run:
@@ -21,12 +21,12 @@ jobs:
         os: ["ubuntu", "windows"]
         python-version: [ '3.8', '3.9', '3.10', '3.11' ]
     steps:
-      - uses: actions/checkout@v2
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: environment.yml
           miniforge-version: latest
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
       - name: Run tests
         run: |
           conda activate test
@@ -55,15 +55,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wheels
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: '3.10'
           miniforge-version: latest
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
       - name: Publish to PyPi
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
+          pip install typing-extensions
           pip install --upgrade twine
           twine upload --skip-existing *
