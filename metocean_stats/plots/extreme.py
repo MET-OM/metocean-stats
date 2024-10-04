@@ -430,8 +430,9 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
         plt.legend(loc='lower right')
     elif yaxis == 'rp':
         ax.set_xscale('log')
-        ax.set_xlabel("Return period [yr]")
-        ax.set_ylabel("Return levels "+var)
+        ax.set_xlabel("Return period [yr]", fontsize=22)
+        ax.set_ylabel("Return levels "+var, fontsize=22)
+        ax.tick_params(axis='both', which='major', labelsize=20)
         plt.legend(loc='upper left')
 
     plt.tight_layout()
