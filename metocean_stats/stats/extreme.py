@@ -617,17 +617,18 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     alpha = mu
     sigma = std
     
-    h = np.linspace(start=0.01, stop=30, num=1500)
+    #h = np.linspace(start=0.01, stop=30, num=1500)
+    h = np.linspace(start=0.01, stop=np.ceil(max(df[var_hs].values)*np.sqrt(np.pi)), num=1500)
     pdf_Hs1 = h*0
     pdf_Hs2 = h*0
     
     if 0 < mu < 5 : 
     	#pdf_Hs1 = 1/(np.sqrt(2*np.pi)*alpha*h)*np.exp(-(np.log(h)-sigma)**2/(2*alpha**2)) #the first one implemented
-    	pdf_Hs1 = 1/(np.sqrt(2*np.pi)*sigma*h)*np.exp(-(np.log(h)-alpha)**2/(2*sigma**2))
+        pdf_Hs1 = 1/(np.sqrt(2*np.pi)*sigma*h)*np.exp(-(np.log(h)-alpha)**2/(2*sigma**2))
     else:
-    	param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
-    	pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
-    	pdf_Hs1 = pdf_lognorm
+        param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
+        pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
+        pdf_Hs1 = pdf_lognorm
     
     param = Weibull_method_of_moment(df.hs.values) #stats.weibull_min.fit(df.hs.values) # shape, loc, scale
     pdf_Hs2 = stats.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
@@ -719,6 +720,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     t = np.linspace(start=0.01, stop=40, num=2000)
     
     f_Hs_Tp = np.zeros((len(h), len(t)))
+    f_Hs_Tp2 = np.zeros((len(h), len(t)))
     pdf_Hs_Tp=f_Hs_Tp*0
     
     for i in range(len(h)):
@@ -730,7 +732,6 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
         pdf_Hs_Tp[i,:] = pdf_Hs[i]*f_Hs_Tp[i,:]
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
-
     t3 = []
     h3 = []
     X = []

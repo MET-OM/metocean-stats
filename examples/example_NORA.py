@@ -58,6 +58,7 @@ plots.plot_hs_for_given_wind(df, 'HS', 'W10',output_file=folder / 'hs_for_given_
 tables.table_hs_for_rv_wind(df, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file=folder / 'hs_for_rv_wind.csv')
 tables.table_Hmax_crest_return_periods(df,var_hs='HS', var_tp='TP', depth=200, periods=[1, 10, 100,10000],sea_state='long-crested',output_file=folder / 'table_Hmax_crest_rp.csv')
 tables.table_directional_Hmax_return_periods(df,var_hs='HS', var_tp = 'TP',var_dir='DIRM', periods=[10, 100,10000],adjustment='NORSOK', output_file=folder / 'table_dir_Hmax_return_values.csv')
+plots.plot_multi_joint_distribution_Hs_Tp_var3(df,var_hs='HS',var_tp='TP',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file=folder / 'testing_wind' / 'Hs.Tp.joint.distribution.multi.binned.var3.png')
 
 
 # Air Temperature:
