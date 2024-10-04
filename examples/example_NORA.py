@@ -1,6 +1,8 @@
 from metocean_stats import plots, tables, maps
 from metocean_stats.stats.aux_funcs import *
 from pathlib import Path
+import warnings
+warnings.filterwarnings("ignore")
 
 df = readNora10File('../tests/data/NORA_test.txt') 
 

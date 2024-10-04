@@ -1,6 +1,7 @@
 from pathlib import Path
 from metocean_stats import maps
-
+import warnings
+warnings.filterwarnings("ignore")
 
 folder = Path(__file__).parent / 'output' / 'maps'
 if not folder.exists():

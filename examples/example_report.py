@@ -3,6 +3,8 @@ from metocean_stats.stats.aux_funcs import *
 from pathlib import Path
 from docx import Document
 from docx.shared import Inches
+import warnings
+warnings.filterwarnings("ignore")
 
 df = readNora10File('../tests/data/NORA_test.txt') 
 
