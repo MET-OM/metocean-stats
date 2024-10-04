@@ -307,7 +307,7 @@ def test_plot_multi_diagnostic_with_uncertainty(ds=ds):
 
 def test_plot_multi_joint_distribution_Hs_Tp_var3(ds=ds):
     output_file = 'test_mulit_joint_distribution_Hs_Tp_var3.png'
-    fig = plots.plot_multi_joint_distribution_Hs_Tp_var3(ds,var_hs='HS',var_tp='TP',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file=output_file)
+    fig = plots.plot_multi_joint_distribution_Hs_Tp_var3(ds,var_hs='HS',var_tp='TP',var3='W10',var3_units='m/s',periods=[100],var3_bin=10,threshold_min=100,output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
 #    if int(fig.axes[0].lines[0].get_xdata()[0]) == 3:
