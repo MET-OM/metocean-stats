@@ -340,6 +340,27 @@ Directional Joint Distribution Hs-Tp Parameter Table
    :header-rows: 1
    :file: files/dir_Hs_Tp_joint_param.csv
 
+
+Joint Distribution Hs-Tp Mulit Plot with binned Var3
+------------------------------
+
+.. code-block:: python
+
+   plots.plots.plot_multi_joint_distribution_Hs_Tp_var3(
+      df,
+      var_hs='HS',
+      var_tp='TP',
+      var3='W10',
+      var3_units='m/s',
+      periods=[100],
+      var3_bin=5,
+      threshold_min=100,
+      output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'
+      )
+
+.. image:: files/Hs.Tp.joint.distribution.multi.binned.var3.png
+   :width: 500
+
 Monthly Weather Window Plot
 ---------------------------
 
