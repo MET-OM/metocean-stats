@@ -710,7 +710,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     start = 1
     x = mean_hs[start:]
     y = variance_lnTp[start:]
-    parameters, covariance = curve_fit(Gauss4, x, y)
+    parameters, covariance = curve_fit(Gauss4, x, y,maxfev=10000)
     b1 = 0.005
     b2 = parameters[0]
     b3 = parameters[1]
@@ -720,7 +720,6 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     t = np.linspace(start=0.01, stop=40, num=2000)
     
     f_Hs_Tp = np.zeros((len(h), len(t)))
-    f_Hs_Tp2 = np.zeros((len(h), len(t)))
     pdf_Hs_Tp=f_Hs_Tp*0
     
     for i in range(len(h)):
