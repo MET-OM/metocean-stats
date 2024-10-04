@@ -605,10 +605,18 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
 
 ################
 
-def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5, threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
+def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
     import matplotlib.pyplot as plt
     from cycler import cycler
 
+    """
+    Plot joint distribution of Hs-Tp for a given return period for eached binned var3 data
+    Input:
+        var3: e.g., 'W10' 
+        var3_units: e.g., 'm/s'
+        var3_bin: sets the bin size, e.g., 5 
+        threshold_min: provide is the minimum number of datapoints in the dataset, e.g., 100
+    """
     var3_name = var3 
     df = data.dropna()
     max_var3 = max(df[var3])
