@@ -7,27 +7,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-#from openai import OpenAI
-#client = OpenAI()
-
-#completion = client.chat.completions.create(
-#  model="gpt-3.5-turbo",
-#  messages=[
-#    {"role": "system", "content": "You are a helpful assistant."},
-#    {"role": "user", "content": "Hello!"}
-#  ]
-#)
-
-#print(completion.choices[0].message)
-
-#breakpoint()
 import google.generativeai as genai
 import os
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-response = model.generate_content("Where is Stavanger?")
+response = model.generate_content("What is a metocean report?")
 print(response.text)
 
 breakpoint()
