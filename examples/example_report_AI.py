@@ -5,18 +5,10 @@ from docx import Document
 from docx.shared import Inches
 import warnings
 warnings.filterwarnings("ignore")
-
-
 import google.generativeai as genai
 import os
-
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
 model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-response = model.generate_content("What is a metocean report?")
-print(response.text)
-
-breakpoint()
 
 df = readNora10File('../tests/data/NORA_test.txt') 
 
@@ -61,9 +53,12 @@ doc.add_picture(output_file, width=Inches(5))
 
 # Add the first table
 df = tables.table_monthly_non_exceedance(ds,var= 'W10',step_var=2,output_file=None)
-doc.add_heading('Table 1: Monthly non-exceedance', level=2)
+response = model.generate_content("Write one sentence caption to the table:"+str(df))
+#doc.add_heading('Table 1: Monthly non-exceedance', level=2)
+doc.add_heading('Table 1:'+response.text, level=2)
 table1 = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
 table1.style = 'Table Grid'
+
 
 # Add the header row for the first table
 hdr_cells = table1.rows[0].cells
