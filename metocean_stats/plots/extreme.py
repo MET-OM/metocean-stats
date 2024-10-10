@@ -430,8 +430,9 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
         plt.legend(loc='lower right')
     elif yaxis == 'rp':
         ax.set_xscale('log')
-        ax.set_xlabel("Return period [yr]")
-        ax.set_ylabel("Return levels "+var)
+        ax.set_xlabel("Return period [yr]", fontsize=22)
+        ax.set_ylabel("Return levels "+var, fontsize=22)
+        ax.tick_params(axis='both', which='major', labelsize=20)
         plt.legend(loc='upper left')
 
     plt.tight_layout()
@@ -603,6 +604,64 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
        
     return 
 
+################
+
+def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
+    import matplotlib.pyplot as plt
+    from cycler import cycler
+
+    """
+    Plot joint distribution of Hs-Tp for a given return period for eached binned var3 data
+    Input:
+        var3: e.g., 'W10' 
+        var3_units: e.g., 'm/s'
+        var3_bin: sets the bin size, e.g., 5 
+        threshold_min: provide is the minimum number of datapoints in the dataset, e.g., 100
+    """
+    var3_name = var3 
+    df = data.dropna()
+    max_var3 = max(df[var3])
+    window = np.arange(0, max_var3 + var3_bin, var3_bin)
+    t3_ = []; h3_= []
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
+    ax.set_prop_cycle(custom_cycler)
+
+    for i in range(len(window)-1):
+        var_3 = df[var3].where((df[var3] > window[i]) & (df[var3] <= window[i+1])).dropna() #w10 = (wind1,wind2]
+        if len(var_3)< threshold_min:
+            continue
+        hs = df[var_hs].where(var_3.notnull()).dropna()
+        tp = df[var_tp].where(var_3.notnull()).dropna()
+        dff = pd.DataFrame({'HS': hs, 'TP': tp, var3_name: var_3})
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
+        t3_.append(t3)
+        h3_.append(h3)
+        linestyle = '-' if i % 2 == 0 else '--'
+        labels = str(np.round(window[i],2))+'-'+str(np.round(window[i+1],2))
+        plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
+
+    #include the whole dataset also:
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=df,var_hs=var_hs,var_tp=var_tp,periods=periods)
+    labels = str(np.round(window[0],2))+'-'+str(np.round(window[-1],2))
+    plt.plot(t3[0],h3[0],label=var3_name+'$_{all}$'+'$\\in$ ' + labels+ ' ['+var3_units+']') 
+    plt.xlabel('Tp - Peak Period [s]')
+    plt.suptitle('Return period = '+ str(periods[0])+'-year')
+    plt.ylabel('Hs - Significant Wave Height [m]')
+    plt.grid()
+    plt.legend()
+    #plt.xlim([0,np.ceil(max(max(t3_[0])))]) #When the dataset is split 
+    #plt.ylim([0,np.ceil(max(max(h3_[-1])))]) #When the dataset is split
+    plt.xlim([0,np.ceil(max(max(t3)))]) #When the whole dataset is included 
+    plt.ylim([0,np.ceil(max(max(h3)))]) #When the whole dataset is included    
+    #plt.show()
+    plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
+
+    return fig
+
+##################
+
 def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     df = data
@@ -640,8 +699,8 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
 
     for i in range(len(periods)):
         plt.plot(t3[i],h3[i],label=str(X[i])+'-year')  
-        
-   
+
+
     plt.plot(t_steepness,h_steepness,'k--',label='steepness')
     
     plt.plot(percentile50[0],percentile50[1],'g',label='Tp-mean',linewidth=5)
