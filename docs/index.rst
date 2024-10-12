@@ -341,7 +341,7 @@ Directional Joint Distribution Hs-Tp Parameter Table
    :file: files/dir_Hs_Tp_joint_param.csv
 
 
-Joint Distribution Hs-Tp Mulit Plot with binned Var3
+Joint Distribution Hs-Tp Multi Plot with binned Var3
 ------------------------------
 
 .. code-block:: python
