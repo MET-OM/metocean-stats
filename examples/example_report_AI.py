@@ -54,8 +54,7 @@ doc.add_picture(output_file, width=Inches(5))
 
 # Add the first table
 df = tables.table_monthly_non_exceedance(ds,var= 'W10',step_var=2,output_file=None)
-print(df)
-response = model.generate_content("Write caption for the following table:"+str(df))
+response = model.generate_content("The following tables shows monthly non exceedance values of wind speed at 10 m. Write a short description of the table:"+str(df))
 #doc.add_heading('Table 1: Monthly non-exceedance', level=2)
 doc.add_heading('Table 1:'+response.text, level=2)
 table1 = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
