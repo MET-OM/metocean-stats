@@ -124,13 +124,17 @@ def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,interval,X=100):
     
     # Find index of Hs=value
     epsilon = abs(h - rve_X)
-    param = find_peaks(1/epsilon) # to find the index of bottom
-    index = param[0][0]     # the  index of Hs=value
+    param, prov = find_peaks(1/epsilon) # to find the index of bottom
+    if len(param) == 0:
+        param = [np.argmax(1/epsilon)] 
+    index = param[0]     # the  index of Hs=value
     
     # Find peak of pdf at Hs=RVE of X year 
     pdf_Hs_Tp_X = pdf_Hs_Tp[index,:] # Find pdf at RVE of X year 
-    param = find_peaks(pdf_Hs_Tp_X) # find the peak
-    index = param[0][0]
+    param, prov = find_peaks(pdf_Hs_Tp_X) # find the peak
+    if len(param) == 0:
+        param = [np.argmax(pdf_Hs_Tp_X)] 
+    index = param[0]
     f_Hs_Tp_100=pdf_Hs_Tp_X[index]
 
     
