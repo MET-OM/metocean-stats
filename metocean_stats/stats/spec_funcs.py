@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+import scipy.integrate
+import scipy.interpolate
+import xarray as xr
+import scipy
 
 def jonswap(f,hs,tp,gamma='fit', sigma_low=.07, sigma_high=.09):
     """
@@ -154,3 +158,201 @@ def waveno(t, h):
         k = [compute_k(depth) for depth in h]
 
     return k, nier
+
+def _interpolate_linear(fp,n):
+    '''
+    Linear interpolation.
+    '''
+    l = len(fp)
+    x = np.linspace(0,l-1,n)
+    xp = np.arange(l)
+    return np.interp(x,xp,fp)
+    
+def _interpolate_cubic(fp,n):
+    '''
+    Cubic spline interpolation.
+    '''
+    l = len(fp)
+    x = np.linspace(0,l-1,n)
+    xp = np.arange(l)
+    spl = scipy.interpolate.CubicSpline(xp,fp)
+    return spl(x)
+
+def interpolate_2D_spec(spec  : np.ndarray,
+                        freq0 : np.ndarray,
+                        dir0  : np.ndarray,
+                        freq1 : np.ndarray,
+                        dir1  : np.ndarray,
+                        method: str="linear"):
+    '''
+    Interpolate 2D wave spectra from fre0 and dir0 to freq1 and dir1.
+    
+    Arguments
+    ---------
+    spec : np.ndarray
+        N-D array of spectra, must have dimensions [..., frequencies, directions].
+    freq0 : np.ndarray
+        Array of frequencies.
+    dir0 : np.ndarray
+        Array of directions.
+    freq1 : np.ndarray
+        Array of new frequencies.
+    dir1 : np.ndarray
+        Array of new directions.
+    method : str
+        The interpolation method used by scipy.interpolate.RegularGridInterpolator(),
+        e.g. "nearest", "linear", "cubic", "quintic".
+        
+    Returns
+    -------
+    spec : np.ndarray
+        The interpolated spectra.
+    '''
+    # Sort on directions, required for interpolation.
+    sorted_indices = np.argsort(dir0)
+    dir0 = dir0[sorted_indices]
+    spec = spec[...,sorted_indices]
+    
+    # Create current and new interpolation points.
+    points = tuple(np.arange(s) for s in spec.shape[:-2]) + (freq0,dir0)
+    coords = tuple(np.arange(s) for s in spec.shape[:-2]) + (freq1,dir1)
+    reorder = tuple(np.arange(1,len(coords)+1))+(0,)
+    coords = np.transpose(np.meshgrid(*coords,indexing="ij"),reorder)
+
+    # Define interpolator and interpolate.
+    grid_interp = scipy.interpolate.RegularGridInterpolator(points=points,values=spec)
+    return grid_interp(coords,method=method)
+
+def interpolate_dataarray_spec( spec: xr.DataArray,
+                                new_frequencies: np.ndarray | int = 20,
+                                new_directions: np.ndarray | int = 20,
+                                method="linear"):
+    '''
+    Interpolate 2D wave spectra to a new shape.
+    The last two dimensions of spec must represent frequencies and directions.
+    
+    Arguments
+    ---------
+    spec : xr.DataArray
+        Array of spectra. Must have dimensions [..., frequencies, directions].
+    new_frequencies : xr.DataArray or np.ndarray or int
+        Either an array of new frequences, or an integer for the number of new frequencies.
+        If integer, new frequencies will be created with cubic interpolation.
+    new_directions : xr.DataArray or np.ndarray or int
+        Either an array of new directions, or an integer for the number of new directions.
+        If integer, new directions will be created with linear interpolation.
+    method : str
+        The interpolation method used by scipy.interpolate.RegularGridInterpolator(),
+        e.g. "nearest", "linear", "cubic", "quintic".
+    
+    Returns
+    -------
+    spec : xr.DataArray
+        The 2D-interpolated spectra.
+    '''
+
+    # Extract dimension labels and coordinate arrays from spec.
+    spec_coords = spec.coords
+    spec_dims = list(spec.dims)
+    freq_var = spec_dims[-2]
+    dir_var = spec_dims[-1]
+    free_dims = spec_dims[:-2]
+
+    frequencies = spec_coords[freq_var]
+    directions = spec_coords[dir_var]
+
+    # Create freqs and dirs through interpolation if not supplied directly
+    if hasattr(new_frequencies, "__len__"):
+        new_frequencies = np.array(new_frequencies)
+    else:
+        new_frequencies = _interpolate_cubic(frequencies,new_frequencies)
+    if hasattr(new_directions,"__len__"):
+        new_directions = np.array(new_directions)
+    else:
+        new_directions = _interpolate_linear(directions,new_directions)
+
+    new_spec = interpolate_2D_spec(spec.data,frequencies,directions,
+                                   new_frequencies,new_directions,method)
+    
+    new_coordinates = {k:spec_coords[k] for k in free_dims}
+    new_coordinates[freq_var] = new_frequencies
+    new_coordinates[dir_var] = new_directions
+    return xr.DataArray(new_spec,new_coordinates)
+
+def integrated_parameters(
+    spec:       np.ndarray|xr.DataArray, 
+    frequencies:np.ndarray|xr.DataArray, 
+    directions: np.ndarray|xr.DataArray) -> dict:
+    """
+    Calculate the integrated parameters of a 2D wave spectrum, 
+    or some array/list of spectra. Uses simpsons integration rule.
+
+    Implemented: Hs, peak dir, peak freq.
+    
+    Arguments
+    ---------
+    spec : np.ndarray or xr.DataArray
+        An array of spectra. The shape must be either 
+        [..., frequencies, directions] or [..., frequencies*directions].
+    frequencies : np.ndarray or xr.DataArray
+        Array of spectra frequencies.
+    directions: np.ndarray or xr.DataArray
+        Array of spectra directions.
+        
+    Returns
+    -------
+    spec_parameters : dict[str, np.ndarray]
+        A dict with keys Hs, peak_freq, peak_dir, and values are arrays
+        of the integrated parameter.
+    """
+    
+    # Make sure all arrays are numpy.
+    if isinstance(spec, xr.DataArray):
+        spec = spec.data
+    if isinstance(frequencies, xr.DataArray):
+        frequencies = frequencies.data
+    if isinstance(directions, xr.DataArray):
+        directions = directions.data
+
+    # Check if spec values and shape are OK
+    if np.any(spec < 0):
+        print("Warning: negative spectra values set to 0")
+        spec = np.clip(spec, a_min=0, a_max=None)
+
+    flat_check = (len(spec.shape)<2)
+    freq_check = (len(frequencies) != spec.shape[-2])
+    dir_check = (len(directions) != spec.shape[-1])
+    if flat_check or freq_check or dir_check:
+        try:
+            spec = spec.reshape(spec.shape[:-1]+(len(frequencies),len(directions)))
+        except:
+            raise IndexError("Spec shape does not match frequencies and directions.")
+
+    # Use argmax to find indices of largest value of each spectrum.
+    peak_dir_freq = np.array([np.unravel_index(s.argmax(),s.shape) 
+        for s in spec.reshape(-1,len(frequencies),len(directions))])
+    peak_dir_freq = peak_dir_freq.reshape(spec.shape[:-2]+(2,))
+    peak_freq = frequencies[peak_dir_freq[...,0]]
+    peak_dir = directions[peak_dir_freq[...,1]]
+    
+    # Integration requires radians
+    if np.max(directions) > 2*np.pi: 
+        directions = np.deg2rad(directions)
+    
+    # Sort on direction before integration
+    sorted_indices = np.argsort(directions)
+    directions = directions[sorted_indices]
+    spec = spec[...,sorted_indices]
+    
+    # Integration with simpson's rule
+    S_f = scipy.integrate.simpson(spec, x=directions)
+    m0 = scipy.integrate.simpson(S_f, x=frequencies)
+    Hs = 4 * np.sqrt(m0)
+
+    spec_parameters = {
+        "Hs":Hs,
+        "peak_freq":peak_freq,
+        "peak_dir":peak_dir
+    }
+
+    return spec_parameters
