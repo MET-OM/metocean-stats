@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import scipy.integrate
-import scipy.interpolate
 import xarray as xr
 import scipy
 
