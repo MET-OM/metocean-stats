@@ -17,4 +17,5 @@ dependencies:
   - python-docx
   - netcdf4
   - pydap
+  - setuptools
 
