@@ -434,8 +434,8 @@ def table_directional_Hmax_return_periods(ds, var_hs='HS', var_tp='TP', var_dir=
     return df
 
 def table_hs_for_rv_wind(data, var_wind='W10', var_hs='HS',periods=[1,10,100,10000],output_file='hs_for_rv_wind.csv'):
-    df = table_hs_for_given_wind(data, var_hs='HS',var_wind='W10', bin_width=2, max_wind=40, output_file=None)
-    shape, loc, scale, value = RVE_ALL(data,var='W10',periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
+    df = table_hs_for_given_wind(data, var_hs=var_hs,var_wind=var_wind, bin_width=2, max_wind=40, output_file=None)
+    shape, loc, scale, value = RVE_ALL(data,var=var_wind,periods=periods,distribution='Weibull3P_MOM',method='default',threshold='default')
     result_df = pd.DataFrame(value, columns=['U[m/s]'])
     result_df['Return period [years]'] = periods
     a_mean, b_mean, c_mean, d_mean = fit_hs_wind_model(df.dropna()['U[m/s]'].values,df.dropna()['Hs(Mean-obs) [m]'].values) 
