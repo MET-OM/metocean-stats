@@ -54,10 +54,33 @@ def plot_points_on_map(lon:list[float]|float,
                        lat:list[float]|float, 
                        label:list[str]|str, 
                        bathymetry:str='NORA3', 
-                       output_file:str='map.png', 
+                       output_file:str='map.png',
                        lon_lim:tuple|list=(),
                        lat_lim:tuple|list=()):
+    '''
+    Plot a set of longitude and latitude on a map, with bathymetry and land features. 
     
+    Arguments
+    ---------
+    lon : float or list
+        longitude(s) to plot
+    lat : float or list
+        latitude(s) to plot
+    label : str or list of str
+        names corresponding to points
+    bathymetry : str
+        Bathymetry source data. Currently, only NORA3 is supported.
+    output_file : str
+        Output image file name.
+    lon_lim : list
+        Longitude boundaries. Default: input data longitude +- 5.
+    lat_lim : list
+        Latitude boundaries. Default: input data latitude +- 3.
+    
+    Returns
+    -------
+    fig : matplotlib figure object
+    '''
     
     lon_list = lon if isinstance(lon, (list, tuple)) else [lon]
     lat_list = lat if isinstance(lat, (list, tuple)) else [lat]
@@ -110,7 +133,8 @@ def plot_points_on_map(lon:list[float]|float,
     ax.legend(loc='upper left')
 
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "":
+        plt.savefig(output_file)
     plt.close()
     return fig
 
