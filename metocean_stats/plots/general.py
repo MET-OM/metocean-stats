@@ -160,36 +160,110 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     return fig
 
 
-def plot_monthly_stats(data: pd.DataFrame, var: str, show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+def plot_monthly_stats(data: pd.DataFrame,
+                       var:str,
+                      show=["min","25%","max"],
+                      fill_between:list[str]=[],
+                      fill_color_like:str="",
+                      title:str="",
+                      cmap = plt.get_cmap("viridis"),
+                      output_file:str="monthly_stats.png"):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
     Parameters:
         data (pd.DataFrame): The DataFrame containing the data.
         var (str): The name of the variable to plot.
-        step_var (float): The step size for computing cumulative statistics.
+        show (list[str]): List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max". 
+        fill_between (list[str]): Two percentiles to create a shaded area between. Same options as show.
+        fill_color_like (str,optional): Use this to set color shade equal to a stat/percentile from show.
         title (str, optional): Title of the plot. Default is 'Variable [units] location'.
         output_file (str, optional): File path to save the plot. Default is 'monthly_stats.png'.
 
     Returns:
         matplotlib.figure.Figure: The Figure object of the generated plot.
 
-    Notes:
-        This function computes monthly statistics (Maximum, P99, Mean) of a variable and plots them.
-        It uses the 'table_monthly_non_exceedance' function to compute cumulative statistics.
-
     Example:
-        plot_monthly_stats(data, 'temperature', 0.1, title='Monthly Temperature Statistics', output_file='temp_stats.png')
+        plot_monthly_stats(df, 'temperature', show=["min","mean","99%"], fill_between = ["25%","75%"], 
+        fill_color_like = "mean", title = "Monthly Temperature Statistics", output_file = "temp_stats.png")
     """
-    fig, ax = plt.subplots()
-    cumulative_percentage = table_monthly_non_exceedance(data,var,step_var=0.5)
-    for i in show:
-        cumulative_percentage.loc[i][:-1].plot(marker = 'o')
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.month).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.month.max())
+    
+    colors = cmap(np.linspace(0,1,len(show)))
+    
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i],marker='o')
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
     plt.title(title,fontsize=16)
     plt.xlabel('Month',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
+    return fig
+
+def plot_daily_stats(data:pd.DataFrame,
+                     var:str,
+                     show=["min","25%","max"],
+                     fill_between:list[str]=[],
+                     fill_color_like = "",
+                     title = "",
+                     cmap = plt.get_cmap("viridis"),
+                     output_file:str="daily_stats.png"):
+    '''
+    Plot daily statistics of a DataFrame variable.
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        The dataframe.
+    var : str
+        A column of the dataframe.
+    show : list[str]
+        List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max".
+    fill_between : [str,str]
+        Optional: Set a shaded area between two percentiles (any options from the "show" argument).
+    fill_color_like : str
+        Optional: Color the shaded area like any item from "show" argument, e.g. fill_color_like = "mean".
+    title : str
+        Title of the plot.
+    output_file : str
+        File path for saved figure.    
+    
+    Returns
+    --------
+    fig : Figure
+        Matplotlib figure object.
+    '''
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.dayofyear.max())
+    
+    colors = cmap(np.linspace(0,1,len(show)))
+    
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i])
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+    plt.title(title,fontsize=14)
+    plt.xlabel('Month',fontsize=12)
+    plt.legend()
+    plt.grid()
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
