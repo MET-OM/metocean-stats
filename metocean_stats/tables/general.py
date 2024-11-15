@@ -225,7 +225,7 @@ def table_daily_percentile(data,
                            percentiles = ["5%","mean","99%","max"],
                            divide_months = False):
     '''
-    Calculate daily stats/percentiles using pandas .describe() method.
+    Calculate daily stats/percentiles via pandas .describe().
     
     Arguments
     ---------
@@ -474,6 +474,94 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
 
     return cumulative_percentage
 
+
+def monthly_directional_percentiles(
+        data: pd.DataFrame, 
+        var_magnitude: str,
+        var_direction: str,
+        percentiles: list[str] = ["25%","mean","75%","max"],
+        nsectors: int = 4,
+        compass_point_names = True,
+        output_file: str = ""):
+    
+    """
+    Calculate monthly directional percentile tables for a given variable.
+
+    Parameters
+    ----------
+    data : DataFrame
+        the data
+    var_magnitude : str
+        Name of variable magnitude column
+    var_direction : str
+        Name of variable direction column
+    percentiles : list[str]
+        A list of strings such as count, mean, std, min, max 
+        or any percentile from 0% to 100%. [] will return everything.
+    nsectors : int
+        Number of directional sectors, typically 4, 8 or 16.
+    compass_point_names : bool
+        Replace degree range of sector (from, to) 
+        with a compass point system label such as N, NE, etc.
+        Only implemented for nsectors 4, 8 or 16.
+        
+    Returns
+    -------
+    tables : dict
+        A dictionary of 12 monthly non-exceedance tables.
+    """
+
+    # Define sector bins
+    bins = np.linspace(0, 360, nsectors+1)
+    dir_offset = (bins[1]-bins[0])/2
+
+    # Compass point labels if appropriate
+    if nsectors == 4:
+        labels = ['N', 'E', 'S', 'W']
+    elif nsectors == 8:
+        labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+    elif nsectors == 16:
+        labels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    elif nsectors == 32:
+        labels = ['N', 'NbE', 'NNE', 'NEbN', 'NE', 'NEbE', 'ENE', 'EbN', 
+                  'E', 'EbS', 'ESE', 'SEbE', 'SE', 'SEbS', 'SSE', 'SbE', 
+                  'S', 'SbW', 'SSW', 'SWbS', 'SW', 'SWbW', 'WSW', 'WbS', 
+                  'W', 'WbN', 'WNW', 'NWbW', 'NW', 'NWbN', 'NNW', 'NbW']
+    else:
+        labels = ["["+str(bins[i]-dir_offset)+", "+str(bins[i+1]-dir_offset) for i in range(nsectors)+"]"]
+    
+    all_percentiles = np.arange(0,1,0.01)
+
+    # Define directional bins
+    data["_dir_bin"] = pd.cut((data[var_direction]+dir_offset)%360, bins=bins, labels=labels, right=False)
+
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    monthly_tables = {}
+    for i,m in enumerate(month_labels):
+        # Select month, group by direction, and calculate statistics for selected variable
+        monthly = data[data.index.month == i+1]
+        month_dir_stats = monthly.groupby("_dir_bin",observed=True)
+        month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var_magnitude]
+
+        # Calculate relative frequency
+        n_total = np.sum(month_dir_stats["count"])
+        month_dir_stats["count"] = [100*c/n_total for c in month_dir_stats["count"]]
+        month_dir_stats.loc["Omni"] = monthly["current_magnitude"].describe(percentiles=all_percentiles)
+
+        # Select input percentiles
+        if percentiles != []:
+            month_dir_stats = month_dir_stats[["count"]+percentiles]
+            month_dir_stats.loc["Omni","count"] = 100
+            month_dir_stats = month_dir_stats.rename(columns={"count":"%"})
+
+        # To make it look nicer - put PX instead of X%
+        month_dir_stats.columns = ["P"+c.replace("%","") if "%" in c else c for c in month_dir_stats.columns]
+        month_dir_stats.index.name = None
+        monthly_tables[m] = month_dir_stats
+    
+    return monthly_tables
+    
 
 def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
     results = []
