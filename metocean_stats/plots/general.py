@@ -382,7 +382,15 @@ def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80
     return fig
 
 
-def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], method='mean', title='Sea Temperature [°C]', reverse_yaxis=True, output_file='table_profile_monthly_stats.png'):
+def plot_profile_monthly_stats(
+        data: pd.DataFrame, 
+        var: str, z=[10, 20, 30], 
+        months:list[str]=[],
+        method='mean',
+        title='Sea Temperature [°C]', 
+        reverse_yaxis=True, 
+        output_file='table_profile_monthly_stats.png',
+        include_year=True):
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     from cycler import cycler
@@ -391,7 +399,7 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
     
     # Get the data
-    df = table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None)
+    df = table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None, rounding=None)
     # Create a plot
     fig, ax = plt.subplots()
     # Set the custom color cycle
@@ -402,8 +410,14 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     # Set major y-ticks at intervals of max(z)/4
     ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))
     
+    # Only plot specified variables.
+    if months == []:
+        months = df.columns
+    if include_year:
+        months = list(months) + ["Year"]
+    
     # Plot each column with alternating line styles
-    for idx, column in enumerate(df.columns):
+    for idx, column in enumerate(months):
         linestyle = '-' if idx % 2 == 0 else '--'
         plt.plot(df[column], z, marker='.', linestyle=linestyle, label=column)
     
@@ -419,8 +433,7 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     plt.legend(loc='best')
     plt.tight_layout()
     # Save the figure
-    plt.savefig(output_file)
-    
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
