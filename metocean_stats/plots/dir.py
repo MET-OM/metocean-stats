@@ -5,20 +5,20 @@ import windrose
 import matplotlib.cm as cm
 import os
 
-def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent):
+def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent, nsector=16,cmap=plt.get_cmap("viridis")):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="windrose")
-    ax.bar(wd, ws, bins=np.arange(0, max_ws, step_ws), cmap=cm.rainbow, normed=True, opening=0.9, edgecolor='white')
+    ax.bar(wd, ws, bins=np.arange(0, max_ws, step_ws), cmap=cmap, normed=True, opening=0.9, edgecolor='white', nsector=nsector)
     ax.set_yticks(np.arange(min_percent, max_percent, step_percent))
     ax.set_yticklabels(np.arange(min_percent, max_percent,step_percent))
     ax.legend(bbox_to_anchor=(0.90,-0.05),framealpha=0.5)
     return fig
 
 
-def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png'):
+def var_rose(data, var_dir,var_intesity, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
     
     direction = var_dir
-    intensity = var
+    intensity = var_intesity
 
     direction2 = data[direction]
     intensity2 = data[intensity]
@@ -31,7 +31,7 @@ def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, u
     if method == 'overall':
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot(111, projection="windrose")
-        ax.bar(direction2, intensity2, normed=True, bins=bins_range, opening=0.99,edgecolor="white",cmap=cm.nipy_spectral_r, nsector=12)
+        ax.bar(direction2, intensity2, normed=True, bins=bins_range, opening=0.99,edgecolor="white",cmap=cmap, nsector=nsector)
         ax.set_yticks(np.arange(5, max_perc+10, step=10))
         ax.set_yticklabels(np.arange(5, max_perc+10, step=10))
         ax.set_legend(decimal_places=decimal_places,  title=units)
@@ -46,7 +46,7 @@ def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, u
     plt.close()
     return fig 
 
-def monthly_var_rose(data, direction,intensity,bins,max_perc=40,decimal_places=1, units='m/s',single_figure=True,output_file='rose.png') : 
+def monthly_var_rose(data, direction,intensity,bins,max_perc=40,decimal_places=1, units='m/s',single_figure=True,output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
 
     # this function make monthly wind/wave rose
     # direction, intensity: panda series 
@@ -77,7 +77,7 @@ def monthly_var_rose(data, direction,intensity,bins,max_perc=40,decimal_places=1
         for j in range(12):
             fig = plt.figure(figsize = (8,8))
             ax = fig.add_subplot(111, projection="windrose")
-            ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, bins=bins, opening=0.99,edgecolor="white",cmap=cm.nipy_spectral_r, nsector=12)
+            ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, bins=bins, opening=0.99,edgecolor="white",cmap=cmap, nsector=nsector)
             ax.set_yticks(np.arange(5, max_perc+10, step=10))
             ax.set_yticklabels(np.arange(5, max_perc+10, step=10))
             ax.set_legend(decimal_places=decimal_places,  title=units)
@@ -90,7 +90,7 @@ def monthly_var_rose(data, direction,intensity,bins,max_perc=40,decimal_places=1
         fig, axs = plt.subplots(3, 4, figsize=(20, 15), subplot_kw=dict(projection="windrose"))
 
         for j, ax in enumerate(axs.flatten()):
-            ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, bins=bins, opening=0.99,edgecolor="white",cmap=cm.nipy_spectral_r, nsector=12)
+            ax.bar(dic_direction[months[j]], dic_intensity[months[j]], normed=True, bins=bins, opening=0.99,edgecolor="white",cmap=cmap, nsector=nsector)
             ax.set_title(months[j],fontsize=16)
             ax.set_yticks(np.arange(5, max_perc+10, step=10))
             ax.set_yticklabels(np.arange(5, max_perc+10, step=10))
