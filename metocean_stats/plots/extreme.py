@@ -596,7 +596,7 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
         print ('Please check the distribution')    
         
     if method == 'default' :  
-    	output_file= distribution + '.png'
+        output_file= distribution + '.png'
     else:
         output_file= distribution + '(' + method + ')' + '.png'
         
