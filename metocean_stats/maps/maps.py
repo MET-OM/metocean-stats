@@ -50,7 +50,15 @@ def get_transformed_coordinates(ds, lon_var, lat_var, projection_type='rotated_p
     return transformed_lon, transformed_lat, proj
 
 # Function to plot points on the map
-def plot_points_on_map(lon, lat, label, bathymetry='NORA3', output_file='map.png'):
+def plot_points_on_map(lon:list[float]|float, 
+                       lat:list[float]|float, 
+                       label:list[str]|str, 
+                       bathymetry:str='NORA3', 
+                       output_file:str='map.png', 
+                       lon_lim:tuple|list=(),
+                       lat_lim:tuple|list=()):
+    
+    
     lon_list = lon if isinstance(lon, (list, tuple)) else [lon]
     lat_list = lat if isinstance(lat, (list, tuple)) else [lat]
     label_list = label if isinstance(label, (list, tuple)) else [label]
@@ -69,8 +77,15 @@ def plot_points_on_map(lon, lat, label, bathymetry='NORA3', output_file='map.png
     for lon, lat, label in zip(lon_list, lat_list, label_list):
         ax.plot(lon, lat, marker='o', markersize=8, linewidth=0, label=f'{label}', transform=ccrs.PlateCarree())
 
-    lat_min, lat_max = max(min(lat_list) - 3, -90), min(max(lat_list) + 3, 90)
-    lon_min, lon_max = max(min(lon_list) - 5, -180), min(max(lon_list) + 5, 180)
+    # Set limits based on plotted points only if no lon/lat limits specified
+    if lat_lim == ():
+        lat_min, lat_max = max(min(lat_list) - 3, -90), min(max(lat_list) + 3, 90)
+    else:
+        lat_min, lat_max = lat_lim
+    if lon_lim == ():
+        lon_min, lon_max = max(min(lon_list) - 5, -180), min(max(lon_list) + 5, 180)
+    else:
+        lon_min, lon_max = lon_lim
 
     ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
     coast = cfeature.NaturalEarthFeature(category='physical', name='coastline', scale='10m', edgecolor='lightgrey', facecolor='darkkhaki')
