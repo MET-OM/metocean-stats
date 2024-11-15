@@ -220,6 +220,53 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
     
     return   
 
+def table_daily_percentile(data, 
+                           var, 
+                           percentiles = ["5%","mean","99%","max"],
+                           divide_months = False):
+    '''
+    Calculate daily stats/percentiles using pandas .describe() method.
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        Dataframe containing the var column with dataframe index.
+    var : str
+        Column name.
+    percentiles : list[str]
+        A list of strings such as count, mean, std, min, max or any percentile from 0% to 100%. [] will return everything.
+    divide_months : bool
+        If true, divide the year into months and return a dict of monthly dataframes. If not, return one dataframe with 365/366 entries.
+
+    Returns
+    -------
+    data : DataFrame or list of DataFrames
+    '''
+    
+    # Uses pandas describe() method to create a dataframe of daily stats.
+    daily_table = data[var].groupby(data.index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
+    daily_table = daily_table[percentiles]
+
+    if divide_months:
+        # Cut 366th day if exists and re-create datetime index from integer days
+        daily_table = daily_table.loc[:365]
+        daily_table.index = pd.to_datetime(daily_table.index,origin="2024-12-31",unit="D")
+
+        # Get month keywords and group table by month
+        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        groups = daily_table.groupby(pd.Grouper(level="time",freq="MS"))
+        monthly_tables = {}
+        
+        for i,(_,g) in enumerate(groups):
+            mtab = g
+            mtab.index = mtab.index.day
+            mtab.index.names = ["Day"]
+            monthly_tables[monthlabels[i]] = mtab
+        return monthly_tables
+
+    else:
+        daily_table.index.names = ["Day"]
+        return daily_table
 
 def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') :  
     """
@@ -530,9 +577,6 @@ def table_profile_monthly_stats(data: pd.DataFrame,
             print('File format is not supported')
 
     return df
-
-import pandas as pd
-import numpy as np
 
 def table_tidal_levels(data: pd.DataFrame, var: str, output_file='tidal_levels.csv'):
     """
