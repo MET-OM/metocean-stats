@@ -474,30 +474,37 @@ def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=No
 
 
 
-def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], method = 'mean' , output_file='table_profile_monthly_stats.csv'):
+def table_profile_monthly_stats(data: pd.DataFrame, 
+                                var: str, z=[10, 20, 30], 
+                                method = 'mean' , 
+                                output_file='table_profile_monthly_stats.csv',
+                                rounding:int=2):
     params = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
     for month in range(1,len(months)):
         month_data = data[data.index.month == month]
         if method == 'mean':
-            params.append(np.round(month_data[var].mean().values,2))
+            params.append(month_data[var].mean().values)
         elif method == 'std.dev':
-            params.append(np.round(month_data[var].std().values,2))
+            params.append(month_data[var].std().values)
         elif method == 'minimum':
-            params.append(np.round(month_data[var].min().values,2))
+            params.append(month_data[var].min().values)
         elif method == 'maximum':
-            params.append(np.round(month_data[var].max().values,2))
+            params.append(month_data[var].max().values)
 
     #add annual
     if method == 'mean':
-        params.append(np.round(data[var].mean().values,2))
+        params.append(data[var].mean().values)
     elif method == 'std.dev':
-        params.append(np.round(data[var].std().values,2))
+        params.append(data[var].std().values)
     elif method == 'minimum':
-        params.append(np.round(data[var].min().values,2))
+        params.append(data[var].min().values)
     elif method == 'maximum':
-        params.append(np.round(data[var].max().values,2))
+        params.append(data[var].max().values)
+    
+    if rounding:
+        params = [np.round(p,rounding) for p in params]
 
     # Create DataFrame
     df = pd.DataFrame(np.transpose(params), columns=months,  index=z)
