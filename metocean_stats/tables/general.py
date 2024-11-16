@@ -479,7 +479,7 @@ def monthly_directional_percentiles(
         data: pd.DataFrame, 
         var_magnitude: str,
         var_direction: str,
-        percentiles: list[str] = ["25%","mean","75%","max"],
+        percentiles: list[str] = ["P25","mean","P75","P99","max"],
         nsectors: int = 4,
         compass_point_names = True,
         output_file: str = ""):
@@ -497,7 +497,8 @@ def monthly_directional_percentiles(
         Name of variable direction column
     percentiles : list[str]
         A list of strings such as count, mean, std, min, max 
-        or any percentile from 0% to 100%. [] will return everything.
+        or any (integer) percentile from P0 to P100. 
+        percentiles = [] will return all columns.
     nsectors : int
         Number of directional sectors, typically 4, 8 or 16.
     compass_point_names : bool
@@ -508,7 +509,7 @@ def monthly_directional_percentiles(
     Returns
     -------
     tables : dict
-        A dictionary of 12 monthly non-exceedance tables.
+        A dictionary of monthly percentile tables.
     """
 
     # Define sector bins
@@ -516,7 +517,10 @@ def monthly_directional_percentiles(
     dir_offset = (bins[1]-bins[0])/2
 
     # Compass point labels if appropriate
-    if nsectors == 4:
+    labels = []
+    if nsectors == 2:
+        labels = ['N', 'S']
+    elif nsectors == 4:
         labels = ['N', 'E', 'S', 'W']
     elif nsectors == 8:
         labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
@@ -528,8 +532,10 @@ def monthly_directional_percentiles(
                   'E', 'EbS', 'ESE', 'SEbE', 'SE', 'SEbS', 'SSE', 'SbE', 
                   'S', 'SbW', 'SSW', 'SWbS', 'SW', 'SWbW', 'WSW', 'WbS', 
                   'W', 'WbN', 'WNW', 'NWbW', 'NW', 'NWbN', 'NNW', 'NbW']
-    else:
-        labels = ["["+str(bins[i]-dir_offset)+", "+str(bins[i+1]-dir_offset) for i in range(nsectors)+"]"]
+    
+    # Otherwise, use labels [from, to)
+    if (not labels) or (not compass_point_names):
+        labels = ["["+str((bins[i]-dir_offset+360)%360)+", "+str(bins[i+1]-dir_offset)+")" for i in range(nsectors)]
     
     all_percentiles = np.arange(0,1,0.01)
 
@@ -543,21 +549,21 @@ def monthly_directional_percentiles(
         monthly = data[data.index.month == i+1]
         month_dir_stats = monthly.groupby("_dir_bin",observed=True)
         month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var_magnitude]
-
-        # Calculate relative frequency
-        n_total = np.sum(month_dir_stats["count"])
-        month_dir_stats["count"] = [100*c/n_total for c in month_dir_stats["count"]]
         month_dir_stats.loc["Omni"] = monthly["current_magnitude"].describe(percentiles=all_percentiles)
+        
+        # Rename to PX instead of X%
+        month_dir_stats.index.name = None
+        month_dir_stats.columns = ["P"+c.replace("%","") if "%" in c else c for c in month_dir_stats.columns]
+
+        # Calculate relative frequency (divide total by 2, since omni is included)
+        n_total = np.sum(month_dir_stats["count"])//2
+        month_dir_stats.insert(1, "%", [100*c/n_total for c in month_dir_stats["count"]])
+        month_dir_stats.loc["Omni","%"] = 100
 
         # Select input percentiles
         if percentiles != []:
-            month_dir_stats = month_dir_stats[["count"]+percentiles]
-            month_dir_stats.loc["Omni","count"] = 100
-            month_dir_stats = month_dir_stats.rename(columns={"count":"%"})
+            month_dir_stats = month_dir_stats[["%"]+percentiles]
 
-        # To make it look nicer - put PX instead of X%
-        month_dir_stats.columns = ["P"+c.replace("%","") if "%" in c else c for c in month_dir_stats.columns]
-        month_dir_stats.index.name = None
         monthly_tables[m] = month_dir_stats
     
     return monthly_tables
