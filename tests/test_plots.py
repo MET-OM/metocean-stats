@@ -307,4 +307,69 @@ def test_plot_multi_joint_distribution_Hs_Tp_var3(ds=ds):
     else:
         raise ValueError("FigValue is not correct")
 
+def test_plot_daily_stats_wind_speed():
+    # Test the function with wind speed data (W10)
+    fig = plots.plot_daily_stats(ds, var="W10", show=["min", "mean", "max"])
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+    # Ensure the figure has the correct title if provided
+    assert fig.axes[0].get_title() == "", "Unexpected title for the plot."
+
+def test_plot_daily_stats_wave_height_fill():
+    # Test the function with significant wave height data (HS) and fill_between option
+    fig = plots.plot_daily_stats(ds, var="HS", show=["25%", "75%", "mean"], fill_between=["25%", "75%"], fill_color_like="mean")
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+def test_plot_daily_stats_missing_column():
+    # Test with a missing column (should raise an error or handle it gracefully)
+    try:
+        fig = plots.plot_daily_stats(ds, var="non_existent_column")
+        assert False, "The function did not raise an error for a missing column."
+    except KeyError:
+        print("test_plot_daily_stats_missing_column passed (KeyError raised as expected).")
+
+
+def test_plot_monthly_stats_wind_speed():
+    # Test the function with wind speed data (W10)
+    fig = plots.plot_monthly_stats(ds, var="W10", show=["min", "mean", "max"])
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+    # Check the x-axis labels if `month_xticks=True`
+    ax = fig.axes[0]
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert len(labels) == 12, f"Expected 12 x-tick labels for months, but found {len(labels)}."
+
+    print("test_plot_monthly_stats_wind_speed passed.")
+
+def test_plot_monthly_stats_wave_height_fill():
+    # Test the function with significant wave height data (HS) and fill_between option
+    fig = plots.plot_monthly_stats(ds, var="HS", show=["25%", "75%", "mean"], fill_between=["25%", "75%"], fill_color_like="mean")
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+def test_plot_monthly_stats_missing_column():
+    # Test with a missing column (should raise an error or handle it gracefully)
+    try:
+        fig = plots.plot_monthly_stats(ds, var="non_existent_column")
+        assert False, "The function did not raise an error for a missing column."
+    except KeyError:
+        print("test_plot_monthly_stats_missing_column passed (KeyError raised as expected).")
+
+def test_plot_monthly_stats_month_xticks():
+    # Test the `month_xticks` option to ensure month labels are shown correctly
+    fig = plots.plot_monthly_stats(ds, var="W10", month_xticks=True)
+    
+    # Check that the x-axis labels are months
+    ax = fig.axes[0]
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert len(labels) == 12, f"Expected 12 x-tick labels for months, but found {len(labels)}."
+    assert labels[0] == "Jan", f"Expected 'Jan' for the first month, but found {labels[0]}."
+    print("test_plot_monthly_stats_month_xticks passed.")
     
