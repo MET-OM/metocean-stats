@@ -15,10 +15,10 @@ def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent, nsector=16
     return fig
 
 
-def var_rose(data, var_dir,var_intesity, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
+def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
     
     direction = var_dir
-    intensity = var_intesity
+    intensity = var
 
     direction2 = data[direction]
     intensity2 = data[intensity]
