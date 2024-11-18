@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.dates import MonthLocator, DateFormatter
 import calendar
 from math import floor,ceil
 from ..stats.general import *
@@ -167,7 +168,8 @@ def plot_monthly_stats(data: pd.DataFrame,
                       fill_color_like:str="",
                       title:str="",
                       cmap = plt.get_cmap("viridis"),
-                      output_file:str="monthly_stats.png"):
+                      output_file:str="monthly_stats.png",
+                      month_xticks=True):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
@@ -177,6 +179,7 @@ def plot_monthly_stats(data: pd.DataFrame,
         show (list[str]): List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max". 
         fill_between (list[str]): Two percentiles to create a shaded area between. Same options as show.
         fill_color_like (str,optional): Use this to set color shade equal to a stat/percentile from show.
+        month_xticks (bool): Set months as xticklabels.
         title (str, optional): Title of the plot. Default is 'Variable [units] location'.
         output_file (str, optional): File path to save the plot. Default is 'monthly_stats.png'.
 
@@ -203,6 +206,12 @@ def plot_monthly_stats(data: pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
         else:
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+
+    if month_xticks:
+        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        ax.set_xticks(np.arange(1,13))
+        ax.set_xticklabels(monthlabels)
+
     plt.title(title,fontsize=16)
     plt.xlabel('Month',fontsize=15)
     plt.legend()
@@ -217,7 +226,8 @@ def plot_daily_stats(data:pd.DataFrame,
                      fill_color_like = "",
                      title = "",
                      cmap = plt.get_cmap("viridis"),
-                     output_file:str="daily_stats.png"):
+                     output_file:str="daily_stats.png",
+                     month_xticks=True):
     '''
     Plot daily statistics of a DataFrame variable.
     
@@ -233,6 +243,8 @@ def plot_daily_stats(data:pd.DataFrame,
         Optional: Set a shaded area between two percentiles (any options from the "show" argument).
     fill_color_like : str
         Optional: Color the shaded area like any item from "show" argument, e.g. fill_color_like = "mean".
+    month_xticks : bool
+        Set months as xtick labels.
     title : str
         Title of the plot.
     output_file : str
@@ -259,6 +271,11 @@ def plot_daily_stats(data:pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
         else:
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+    
+    if month_xticks:
+        ax.xaxis.set_major_locator(MonthLocator(bymonthday=1,bymonth=range(1,13)))
+        ax.xaxis.set_major_formatter(DateFormatter('%b'))
+
     plt.title(title,fontsize=14)
     plt.xlabel('Month',fontsize=12)
     plt.legend()
