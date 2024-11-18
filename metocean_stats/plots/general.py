@@ -430,8 +430,8 @@ def plot_profile_monthly_stats(
     # Only plot specified variables.
     if months == []:
         months = df.columns
-    if include_year:
-        months = list(months) + ["Year"]
+    if not include_year:
+        months = [m for m in months if m!="Year"]
     
     # Plot each column with alternating line styles
     for idx, column in enumerate(months):
