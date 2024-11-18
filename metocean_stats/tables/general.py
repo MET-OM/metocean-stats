@@ -245,7 +245,10 @@ def table_daily_percentile(data,
     
     # Uses pandas describe() method to create a dataframe of daily stats.
     daily_table = data[var].groupby(data.index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
-    daily_table = daily_table[percentiles]
+
+    # Select input percentiles
+    if percentiles != []:
+        daily_table = daily_table[percentiles]
 
     if divide_months:
         # Cut 366th day if exists and re-create datetime index from integer days
@@ -536,6 +539,9 @@ def monthly_directional_percentiles(
     # Otherwise, use labels [from, to)
     if (not labels) or (not compass_point_names):
         labels = ["["+str((bins[i]-dir_offset+360)%360)+", "+str(bins[i+1]-dir_offset)+")" for i in range(nsectors)]
+        omni_label = "[0, 360)"
+    else:
+        omni_label = "Omni"
     
     all_percentiles = np.arange(0,1,0.01)
 
@@ -549,7 +555,7 @@ def monthly_directional_percentiles(
         monthly = data[data.index.month == i+1]
         month_dir_stats = monthly.groupby("_dir_bin",observed=True)
         month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var_magnitude]
-        month_dir_stats.loc["Omni"] = monthly["current_magnitude"].describe(percentiles=all_percentiles)
+        month_dir_stats.loc[omni_label] = monthly[var_magnitude].describe(percentiles=all_percentiles)
         
         # Rename to PX instead of X%
         month_dir_stats.index.name = None
@@ -558,7 +564,7 @@ def monthly_directional_percentiles(
         # Calculate relative frequency (divide total by 2, since omni is included)
         n_total = np.sum(month_dir_stats["count"])//2
         month_dir_stats.insert(1, "%", [100*c/n_total for c in month_dir_stats["count"]])
-        month_dir_stats.loc["Omni","%"] = 100
+        month_dir_stats.loc[omni_label,"%"] = 100
 
         # Select input percentiles
         if percentiles != []:
