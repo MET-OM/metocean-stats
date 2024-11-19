@@ -964,7 +964,7 @@ Hs Daily percentile table
 Current Speed Directional Monthly Statistics
 --------------------------------------------
 
-.. code-block::python
+.. code-block:: python
 
    tables.monthly_directional_percentiles(
         data=ds, 
