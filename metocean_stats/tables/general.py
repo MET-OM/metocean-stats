@@ -220,6 +220,27 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
     
     return   
 
+def _percentile_str_to_pd_format(percentiles):
+    '''
+    Utility to convert various types of percentile/stats strings to pandas compatible format.
+    '''
+
+    mapping = {"Maximum":"max",
+               "Max":"max",
+               "Minimum":"min",
+               "Min":"min",
+               "Mean":"mean"}
+
+    def strconv(name:str):
+        if name.startswith("P"):
+            return name.replace("P","")+"%"
+        if name in mapping:
+            return mapping[name]
+        else: return name
+
+    if type(percentiles)==str: return strconv(percentiles)
+    else: return [strconv(p) for p in percentiles]
+
 def table_daily_percentile(data, 
                            var, 
                            percentiles = ["5%","mean","99%","max"],
@@ -242,6 +263,8 @@ def table_daily_percentile(data,
     -------
     data : DataFrame or list of DataFrames
     '''
+    
+    percentiles = _percentile_str_to_pd_format(percentiles)
     
     # Uses pandas describe() method to create a dataframe of daily stats.
     daily_table = data[var].groupby(data.index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
@@ -480,8 +503,8 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
 
 def monthly_directional_percentiles(
         data: pd.DataFrame, 
-        var_magnitude: str,
-        var_direction: str,
+        var_dir: str,
+        var: str,
         percentiles: list[str] = ["P25","mean","P75","P99","max"],
         nsectors: int = 4,
         compass_point_names = True,
@@ -494,9 +517,9 @@ def monthly_directional_percentiles(
     ----------
     data : DataFrame
         the data
-    var_magnitude : str
+    var : str
         Name of variable magnitude column
-    var_direction : str
+    var_dir : str
         Name of variable direction column
     percentiles : list[str]
         A list of strings such as count, mean, std, min, max 
@@ -515,6 +538,8 @@ def monthly_directional_percentiles(
         A dictionary of monthly percentile tables.
     """
 
+    percentiles = _percentile_str_to_pd_format(percentiles)
+    
     # Define sector bins
     bins = np.linspace(0, 360, nsectors+1)
     dir_offset = (bins[1]-bins[0])/2
@@ -546,7 +571,7 @@ def monthly_directional_percentiles(
     all_percentiles = np.arange(0,1,0.01)
 
     # Define directional bins
-    data["_dir_bin"] = pd.cut((data[var_direction]+dir_offset)%360, bins=bins, labels=labels, right=False)
+    data["_dir_bin"] = pd.cut((data[var_dir]+dir_offset)%360, bins=bins, labels=labels, right=False)
 
     month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     monthly_tables = {}
@@ -554,13 +579,10 @@ def monthly_directional_percentiles(
         # Select month, group by direction, and calculate statistics for selected variable
         monthly = data[data.index.month == i+1]
         month_dir_stats = monthly.groupby("_dir_bin",observed=True)
-        month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var_magnitude]
-        month_dir_stats.loc[omni_label] = monthly[var_magnitude].describe(percentiles=all_percentiles)
-        
-        # Rename to PX instead of X%
+        month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var]
+        month_dir_stats.loc[omni_label] = monthly[var].describe(percentiles=all_percentiles)
         month_dir_stats.index.name = None
-        month_dir_stats.columns = ["P"+c.replace("%","") if "%" in c else c for c in month_dir_stats.columns]
-
+        
         # Calculate relative frequency (divide total by 2, since omni is included)
         n_total = np.sum(month_dir_stats["count"])//2
         month_dir_stats.insert(1, "%", [100*c/n_total for c in month_dir_stats["count"]])
