@@ -972,8 +972,7 @@ Current Speed Directional Monthly Statistics
         var_dir="D10", 
         percentiles=["5%", "25%", "mean", "75%", "99%", "max"], 
         nsectors=16,
-        compass_point_names=True
-    )
+        compass_point_names=True)
 
 
 Current Speed Directional Statistics Plot
