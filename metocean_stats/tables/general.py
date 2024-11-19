@@ -220,6 +220,56 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
     
     return   
 
+def table_daily_percentile(data, 
+                           var, 
+                           percentiles = ["5%","mean","99%","max"],
+                           divide_months = False):
+    '''
+    Calculate daily stats/percentiles via pandas .describe().
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        Dataframe containing the var column with dataframe index.
+    var : str
+        Column name.
+    percentiles : list[str]
+        A list of strings such as count, mean, std, min, max or any percentile from 0% to 100%. [] will return everything.
+    divide_months : bool
+        If true, divide the year into months and return a dict of monthly dataframes. If not, return one dataframe with 365/366 entries.
+
+    Returns
+    -------
+    data : DataFrame or list of DataFrames
+    '''
+    
+    # Uses pandas describe() method to create a dataframe of daily stats.
+    daily_table = data[var].groupby(data.index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
+
+    # Select input percentiles
+    if percentiles != []:
+        daily_table = daily_table[percentiles]
+
+    if divide_months:
+        # Cut 366th day if exists and re-create datetime index from integer days
+        daily_table = daily_table.loc[:365]
+        daily_table.index = pd.to_datetime(daily_table.index,origin="2024-12-31",unit="D")
+
+        # Get month keywords and group table by month
+        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        groups = daily_table.groupby(pd.Grouper(level="time",freq="MS"))
+        monthly_tables = {}
+        
+        for i,(_,g) in enumerate(groups):
+            mtab = g
+            mtab.index = mtab.index.day
+            mtab.index.names = ["Day"]
+            monthly_tables[monthlabels[i]] = mtab
+        return monthly_tables
+
+    else:
+        daily_table.index.names = ["Day"]
+        return daily_table
 
 def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') :  
     """
@@ -331,8 +381,8 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var: str, step_var: float, 
     1: 'JAN',
     2: 'FEB',
     3: 'MAR',
-    4: 'MAY',
-    5: 'APR',
+    4: 'APR',
+    5: 'MAY',
     6: 'JUN',
     7: 'JUL',
     8: 'AUG',
@@ -428,6 +478,103 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
     return cumulative_percentage
 
 
+def monthly_directional_percentiles(
+        data: pd.DataFrame, 
+        var_magnitude: str,
+        var_direction: str,
+        percentiles: list[str] = ["P25","mean","P75","P99","max"],
+        nsectors: int = 4,
+        compass_point_names = True,
+        output_file: str = ""):
+    
+    """
+    Calculate monthly directional percentile tables for a given variable.
+
+    Parameters
+    ----------
+    data : DataFrame
+        the data
+    var_magnitude : str
+        Name of variable magnitude column
+    var_direction : str
+        Name of variable direction column
+    percentiles : list[str]
+        A list of strings such as count, mean, std, min, max 
+        or any (integer) percentile from P0 to P100. 
+        percentiles = [] will return all columns.
+    nsectors : int
+        Number of directional sectors, typically 4, 8 or 16.
+    compass_point_names : bool
+        Replace degree range of sector (from, to) 
+        with a compass point system label such as N, NE, etc.
+        Only implemented for nsectors 4, 8 or 16.
+        
+    Returns
+    -------
+    tables : dict
+        A dictionary of monthly percentile tables.
+    """
+
+    # Define sector bins
+    bins = np.linspace(0, 360, nsectors+1)
+    dir_offset = (bins[1]-bins[0])/2
+
+    # Compass point labels if appropriate
+    labels = []
+    if nsectors == 2:
+        labels = ['N', 'S']
+    elif nsectors == 4:
+        labels = ['N', 'E', 'S', 'W']
+    elif nsectors == 8:
+        labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+    elif nsectors == 16:
+        labels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    elif nsectors == 32:
+        labels = ['N', 'NbE', 'NNE', 'NEbN', 'NE', 'NEbE', 'ENE', 'EbN', 
+                  'E', 'EbS', 'ESE', 'SEbE', 'SE', 'SEbS', 'SSE', 'SbE', 
+                  'S', 'SbW', 'SSW', 'SWbS', 'SW', 'SWbW', 'WSW', 'WbS', 
+                  'W', 'WbN', 'WNW', 'NWbW', 'NW', 'NWbN', 'NNW', 'NbW']
+    
+    # Otherwise, use labels [from, to)
+    if (not labels) or (not compass_point_names):
+        labels = ["["+str((bins[i]-dir_offset+360)%360)+", "+str(bins[i+1]-dir_offset)+")" for i in range(nsectors)]
+        omni_label = "[0, 360)"
+    else:
+        omni_label = "Omni"
+    
+    all_percentiles = np.arange(0,1,0.01)
+
+    # Define directional bins
+    data["_dir_bin"] = pd.cut((data[var_direction]+dir_offset)%360, bins=bins, labels=labels, right=False)
+
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    monthly_tables = {}
+    for i,m in enumerate(month_labels):
+        # Select month, group by direction, and calculate statistics for selected variable
+        monthly = data[data.index.month == i+1]
+        month_dir_stats = monthly.groupby("_dir_bin",observed=True)
+        month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var_magnitude]
+        month_dir_stats.loc[omni_label] = monthly[var_magnitude].describe(percentiles=all_percentiles)
+        
+        # Rename to PX instead of X%
+        month_dir_stats.index.name = None
+        month_dir_stats.columns = ["P"+c.replace("%","") if "%" in c else c for c in month_dir_stats.columns]
+
+        # Calculate relative frequency (divide total by 2, since omni is included)
+        n_total = np.sum(month_dir_stats["count"])//2
+        month_dir_stats.insert(1, "%", [100*c/n_total for c in month_dir_stats["count"]])
+        month_dir_stats.loc[omni_label,"%"] = 100
+
+        # Select input percentiles
+        if percentiles != []:
+            month_dir_stats = month_dir_stats[["%"]+percentiles]
+
+        monthly_tables[m] = month_dir_stats
+    
+    return monthly_tables
+    
+
 def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
     results = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -474,30 +621,37 @@ def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=No
 
 
 
-def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], method = 'mean' , output_file='table_profile_monthly_stats.csv'):
+def table_profile_monthly_stats(data: pd.DataFrame, 
+                                var: str, z=[10, 20, 30], 
+                                method = 'mean' , 
+                                output_file='table_profile_monthly_stats.csv',
+                                rounding:int=2):
     params = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
     for month in range(1,len(months)):
         month_data = data[data.index.month == month]
         if method == 'mean':
-            params.append(np.round(month_data[var].mean().values,2))
+            params.append(month_data[var].mean().values)
         elif method == 'std.dev':
-            params.append(np.round(month_data[var].std().values,2))
+            params.append(month_data[var].std().values)
         elif method == 'minimum':
-            params.append(np.round(month_data[var].min().values,2))
+            params.append(month_data[var].min().values)
         elif method == 'maximum':
-            params.append(np.round(month_data[var].max().values,2))
+            params.append(month_data[var].max().values)
 
     #add annual
     if method == 'mean':
-        params.append(np.round(data[var].mean().values,2))
+        params.append(data[var].mean().values)
     elif method == 'std.dev':
-        params.append(np.round(data[var].std().values,2))
+        params.append(data[var].std().values)
     elif method == 'minimum':
-        params.append(np.round(data[var].min().values,2))
+        params.append(data[var].min().values)
     elif method == 'maximum':
-        params.append(np.round(data[var].max().values,2))
+        params.append(data[var].max().values)
+    
+    if rounding:
+        params = [np.round(p,rounding) for p in params]
 
     # Create DataFrame
     df = pd.DataFrame(np.transpose(params), columns=months,  index=z)
@@ -523,9 +677,6 @@ def table_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], me
             print('File format is not supported')
 
     return df
-
-import pandas as pd
-import numpy as np
 
 def table_tidal_levels(data: pd.DataFrame, var: str, output_file='tidal_levels.csv'):
     """

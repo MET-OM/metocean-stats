@@ -421,3 +421,156 @@ def test_table_weather_window_thresholds(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
+    
+def test_table_daily_percentile_basic():
+    # Test the basic functionality with wind speed data (W10)
+    result = tables.table_daily_percentile(ds, var="W10", percentiles=["5%", "mean", "99%", "max"])
+    
+    # Check if the output is a DataFrame
+    assert isinstance(result, pd.DataFrame), "The output is not a DataFrame."
+    
+    # Check if the index has 365 or 366 entries
+    assert len(result.index) in [365, 366], f"Unexpected number of days in the index: {len(result.index)}."
+    
+    # Check if the expected percentiles are included in the columns
+    for percentile in ["5%", "mean", "99%", "max"]:
+        assert percentile in result.columns, f"Missing expected percentile: {percentile}."
+    
+    print("test_table_daily_percentile_basic passed.")
+
+def test_table_daily_percentile_divide_months():
+    # Test the divide_months=True option
+    result = tables.table_daily_percentile(ds, var="HS", percentiles=["5%", "mean", "99%", "max"], divide_months=True)
+    
+    # Check if the output is a dictionary
+    assert isinstance(result, dict), "The output is not a dictionary."
+    
+    # Check if there are 12 entries (one for each month)
+    assert len(result) == 12, f"Expected 12 monthly tables, but found {len(result)}."
+    
+    # Check if each month's DataFrame has the expected columns
+    for month, df in result.items():
+        assert isinstance(df, pd.DataFrame), f"Monthly table for {month} is not a DataFrame."
+        for percentile in ["5%", "mean", "99%", "max"]:
+            assert percentile in df.columns, f"Missing expected percentile in {month}: {percentile}."
+    
+    print("test_table_daily_percentile_divide_months passed.")
+
+def test_table_daily_percentile_empty_percentiles():
+    # Test with percentiles=[] (should return full .describe() table)
+    result = tables.table_daily_percentile(ds, var="W10", percentiles=[])
+    
+    # Check if the output contains all statistics from .describe()
+    expected_columns = ["count", "mean", "std", "min"] + [f"{int(p*100)}%" for p in np.arange(0, 1, 0.01)] + ["max"]
+    for col in expected_columns:
+        assert col in result.columns, f"Missing expected column: {col}."
+    
+    print("test_table_daily_percentile_empty_percentiles passed.")
+
+def test_table_daily_percentile_leap_year():
+    # Create a leap year dataset for testing
+    leap_year_data = ds.copy()
+    leap_year_data.index = pd.date_range(start="2024-01-01", periods=len(leap_year_data), freq="h")
+    
+    result = tables.table_daily_percentile(leap_year_data, var="W10", percentiles=["mean"], divide_months=False)
+    
+    # Check if the index has 366 days for the leap year
+    assert len(result.index) == 366, f"Expected 366 days for leap year, but found {len(result.index)}."
+    
+    print("test_table_daily_percentile_leap_year passed.")
+
+def test_table_daily_percentile_invalid_column():
+    # Test with a missing or invalid column
+    try:
+        tables.table_daily_percentile(ds, var="non_existent_column", percentiles=["mean"])
+        assert False, "The function did not raise an error for a missing column."
+    except KeyError:
+        print("test_table_daily_percentile_invalid_column passed (KeyError raised as expected).")
+
+def test_monthly_directional_percentiles_basic():
+    # Test with basic inputs for wind speed (W10) and wind direction (D10)
+    result = tables.monthly_directional_percentiles(
+        data=ds, 
+        var_magnitude="W10", 
+        var_direction="D10", 
+        percentiles=["P25", "mean", "P75", "max"], 
+        nsectors=8,
+        compass_point_names=True
+    )
+    
+    # Check if the output is a dictionary with 12 months
+    assert isinstance(result, dict), "Output is not a dictionary."
+    assert len(result) == 12, f"Expected 12 tables, but got {len(result)}."
+
+    # Check structure of each table
+    for month, df in result.items():
+        assert isinstance(df, pd.DataFrame), f"Table for {month} is not a DataFrame."
+        for percentile in ["%", "P25", "mean", "P75", "max"]:
+            assert percentile in df.columns, f"Missing expected column '{percentile}' in {month} table."
+
+    print("test_monthly_directional_percentiles_basic passed.")
+
+def test_monthly_directional_percentiles_custom_sectors():
+    # Test with 4 directional sectors and custom percentiles
+    result = tables.monthly_directional_percentiles(
+        data=ds, 
+        var_magnitude="HS", 
+        var_direction="DIRP", 
+        percentiles=["P5", "mean", "P95", "max"], 
+        nsectors=4,
+        compass_point_names=False
+    )
+    
+    # Check if the labels are based on degree ranges instead of compass points
+    first_month = list(result.values())[0]
+    labels = list(first_month.index)
+    assert all("[" in label and ")" in label for label in labels), "Directional labels are not using degree ranges."
+
+    print("test_monthly_directional_percentiles_custom_sectors passed.")
+
+def test_monthly_directional_percentiles_empty_percentiles():
+    # Test with empty percentiles list (should return full .describe() table)
+    result = tables.monthly_directional_percentiles(
+        data=ds, 
+        var_magnitude="W10", 
+        var_direction="D10", 
+        percentiles=[], 
+        nsectors=16,
+        compass_point_names=True
+    )
+    
+    # Check if all statistics from .describe() are included
+    expected_columns = ["count", "mean", "std", "min", "P0"] + [f"P{int(p*100)}" for p in np.arange(0, 1, 0.01)] + ["max"]
+    for month, df in result.items():
+        for col in expected_columns:
+            assert col in df.columns, f"Missing expected column '{col}' in {month} table."
+
+    print("test_monthly_directional_percentiles_empty_percentiles passed.")
+
+def test_monthly_directional_percentiles_omni():
+    # Test to ensure that "Omni" row is correctly calculated
+    result = tables.monthly_directional_percentiles(
+        data=ds, 
+        var_magnitude="W50", 
+        var_direction="D100", 
+        percentiles=["mean"],
+        nsectors=8
+    )
+    
+    for month, df in result.items():
+        assert "Omni" in df.index, f"'Omni' statistics row is missing in {month} table."
+        assert df.loc["Omni", "mean"] > 0, f"'Omni' mean value is incorrect in {month} table."
+
+    print("test_monthly_directional_percentiles_omni passed.")
+
+def test_monthly_directional_percentiles_invalid_column():
+    # Test with an invalid column name
+    try:
+        tables.monthly_directional_percentiles(
+            data=ds, 
+            var_magnitude="invalid_column", 
+            var_direction="D10"
+        )
+        assert False, "The function did not raise an error for an invalid column."
+    except KeyError:
+        print("test_monthly_directional_percentiles_invalid_column passed (KeyError raised as expected).")

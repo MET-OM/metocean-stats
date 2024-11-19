@@ -623,8 +623,8 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     pdf_Hs2 = h*0
     
     if 0 < mu < 5 : 
-      #Based on Moan et al. (2005), "Uncertainty of wave-induced response of marine structures due to long-term variation of extratropical wave conditions":
-    	pdf_Hs1 = 1/(np.sqrt(2*np.pi)*sigma*h)*np.exp(-(np.log(h)-alpha)**2/(2*sigma**2))
+        #Based on Moan et al. (2005), "Uncertainty of wave-induced response of marine structures due to long-term variation of extratropical wave conditions":
+        pdf_Hs1 = 1/(np.sqrt(2*np.pi)*sigma*h)*np.exp(-(np.log(h)-alpha)**2/(2*sigma**2))
     else:
         param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
         pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
@@ -645,11 +645,11 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     epsilon=abs(pdf_Hs1[i1:i2]-pdf_Hs2[i1:i2])
     param = find_peaks(1/epsilon)
     try:
-    	index = param[0][1]
+        index = param[0][1]
     except:
-    	try:
-    	    index = param[0][0]
-    	except:
+        try:
+            index = param[0][0]
+        except:
             index = np.where(epsilon == epsilon.min())[0]
     index = index + i1
         

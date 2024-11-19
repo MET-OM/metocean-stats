@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.dates import MonthLocator, DateFormatter
 import calendar
 from math import floor,ceil
 from ..stats.general import *
@@ -160,36 +161,126 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     return fig
 
 
-def plot_monthly_stats(data: pd.DataFrame, var: str, show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'monthly_stats.png'):
+def plot_monthly_stats(data: pd.DataFrame,
+                       var:str,
+                      show=["min","25%","max"],
+                      fill_between:list[str]=[],
+                      fill_color_like:str="",
+                      title:str="",
+                      cmap = plt.get_cmap("viridis"),
+                      output_file:str="monthly_stats.png",
+                      month_xticks=True):
     """
     Plot monthly statistics of a variable from a DataFrame.
 
     Parameters:
         data (pd.DataFrame): The DataFrame containing the data.
         var (str): The name of the variable to plot.
-        step_var (float): The step size for computing cumulative statistics.
+        show (list[str]): List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max". 
+        fill_between (list[str]): Two percentiles to create a shaded area between. Same options as show.
+        fill_color_like (str,optional): Use this to set color shade equal to a stat/percentile from show.
+        month_xticks (bool): Set months as xticklabels.
         title (str, optional): Title of the plot. Default is 'Variable [units] location'.
         output_file (str, optional): File path to save the plot. Default is 'monthly_stats.png'.
 
     Returns:
         matplotlib.figure.Figure: The Figure object of the generated plot.
 
-    Notes:
-        This function computes monthly statistics (Maximum, P99, Mean) of a variable and plots them.
-        It uses the 'table_monthly_non_exceedance' function to compute cumulative statistics.
-
     Example:
-        plot_monthly_stats(data, 'temperature', 0.1, title='Monthly Temperature Statistics', output_file='temp_stats.png')
+        plot_monthly_stats(df, 'temperature', show=["min","mean","99%"], fill_between = ["25%","75%"], 
+        fill_color_like = "mean", title = "Monthly Temperature Statistics", output_file = "temp_stats.png")
     """
-    fig, ax = plt.subplots()
-    cumulative_percentage = table_monthly_non_exceedance(data,var,step_var=0.5)
-    for i in show:
-        cumulative_percentage.loc[i][:-1].plot(marker = 'o')
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.month).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.month.max())
+    
+    colors = cmap(np.linspace(0,1,len(show)))
+    
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i],marker='o')
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+
+    if month_xticks:
+        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        ax.set_xticks(np.arange(1,13))
+        ax.set_xticklabels(monthlabels)
+
     plt.title(title,fontsize=16)
     plt.xlabel('Month',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
+    return fig
+
+def plot_daily_stats(data:pd.DataFrame,
+                     var:str,
+                     show=["min","25%","max"],
+                     fill_between:list[str]=[],
+                     fill_color_like = "",
+                     title = "",
+                     cmap = plt.get_cmap("viridis"),
+                     output_file:str="daily_stats.png",
+                     month_xticks=True):
+    '''
+    Plot daily statistics of a DataFrame variable.
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        The dataframe.
+    var : str
+        A column of the dataframe.
+    show : list[str]
+        List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max".
+    fill_between : [str,str]
+        Optional: Set a shaded area between two percentiles (any options from the "show" argument).
+    fill_color_like : str
+        Optional: Color the shaded area like any item from "show" argument, e.g. fill_color_like = "mean".
+    month_xticks : bool
+        Set months as xtick labels.
+    title : str
+        Title of the plot.
+    output_file : str
+        File path for saved figure.    
+    
+    Returns
+    --------
+    fig : Figure
+        Matplotlib figure object.
+    '''
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.dayofyear.max())
+    
+    colors = cmap(np.linspace(0,1,len(show)))
+    
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i])
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+    
+    if month_xticks:
+        ax.xaxis.set_major_locator(MonthLocator(bymonthday=1,bymonth=range(1,13)))
+        ax.xaxis.set_major_formatter(DateFormatter('%b'))
+
+    plt.title(title,fontsize=14)
+    plt.xlabel('Month',fontsize=12)
+    plt.legend()
+    plt.grid()
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
@@ -308,7 +399,15 @@ def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80
     return fig
 
 
-def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], method='mean', title='Sea Temperature [°C]', reverse_yaxis=True, output_file='table_profile_monthly_stats.png'):
+def plot_profile_monthly_stats(
+        data: pd.DataFrame, 
+        var: str, z=[10, 20, 30], 
+        months:list[str]=[],
+        method='mean',
+        title='Sea Temperature [°C]', 
+        reverse_yaxis=True, 
+        output_file='table_profile_monthly_stats.png',
+        include_year=True):
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     from cycler import cycler
@@ -317,7 +416,7 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
     
     # Get the data
-    df = table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None)
+    df = table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None, rounding=None)
     # Create a plot
     fig, ax = plt.subplots()
     # Set the custom color cycle
@@ -328,8 +427,14 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     # Set major y-ticks at intervals of max(z)/4
     ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))
     
+    # Only plot specified variables.
+    if months == []:
+        months = df.columns
+    if not include_year:
+        months = [m for m in months if m!="Year"]
+    
     # Plot each column with alternating line styles
-    for idx, column in enumerate(df.columns):
+    for idx, column in enumerate(months):
         linestyle = '-' if idx % 2 == 0 else '--'
         plt.plot(df[column], z, marker='.', linestyle=linestyle, label=column)
     
@@ -345,8 +450,7 @@ def plot_profile_monthly_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], met
     plt.legend(loc='best')
     plt.tight_layout()
     # Save the figure
-    plt.savefig(output_file)
-    
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
