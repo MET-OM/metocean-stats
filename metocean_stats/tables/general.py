@@ -264,6 +264,7 @@ def table_daily_percentile(data,
     data : DataFrame or list of DataFrames
     '''
     
+    perc_cols = [p for p in percentiles] # copy original names before formatting
     percentiles = _percentile_str_to_pd_format(percentiles)
     
     # Uses pandas describe() method to create a dataframe of daily stats.
@@ -272,6 +273,7 @@ def table_daily_percentile(data,
     # Select input percentiles
     if percentiles != []:
         daily_table = daily_table[percentiles]
+        daily_table.columns = perc_cols
 
     if divide_months:
         # Cut 366th day if exists and re-create datetime index from integer days
@@ -537,7 +539,7 @@ def monthly_directional_percentiles(
     tables : dict
         A dictionary of monthly percentile tables.
     """
-
+    perc_cols = [p for p in percentiles] # copy original percentile format
     percentiles = _percentile_str_to_pd_format(percentiles)
     
     # Define sector bins
@@ -591,6 +593,7 @@ def monthly_directional_percentiles(
         # Select input percentiles
         if percentiles != []:
             month_dir_stats = month_dir_stats[["%"]+percentiles]
+            month_dir_stats.columns = ["%"]+perc_cols
 
         monthly_tables[m] = month_dir_stats
     
