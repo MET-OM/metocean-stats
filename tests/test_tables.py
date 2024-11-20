@@ -491,8 +491,8 @@ def test_monthly_directional_percentiles_basic():
     # Test with basic inputs for wind speed (W10) and wind direction (D10)
     result = tables.monthly_directional_percentiles(
         data=ds, 
-        var_magnitude="W10", 
-        var_direction="D10", 
+        var_dir="D10", 
+        var="W10", 
         percentiles=["P25", "mean", "P75", "max"], 
         nsectors=8,
         compass_point_names=True
@@ -514,8 +514,8 @@ def test_monthly_directional_percentiles_custom_sectors():
     # Test with 4 directional sectors and custom percentiles
     result = tables.monthly_directional_percentiles(
         data=ds, 
-        var_magnitude="HS", 
-        var_direction="DIRP", 
+        var_dir="DIRP", 
+        var="HS", 
         percentiles=["P5", "mean", "P95", "max"], 
         nsectors=4,
         compass_point_names=False
@@ -532,15 +532,15 @@ def test_monthly_directional_percentiles_empty_percentiles():
     # Test with empty percentiles list (should return full .describe() table)
     result = tables.monthly_directional_percentiles(
         data=ds, 
-        var_magnitude="W10", 
-        var_direction="D10", 
+        var="W10", 
+        var_dir="D10", 
         percentiles=[], 
         nsectors=16,
         compass_point_names=True
     )
     
     # Check if all statistics from .describe() are included
-    expected_columns = ["count", "mean", "std", "min", "P0"] + [f"P{int(p*100)}" for p in np.arange(0, 1, 0.01)] + ["max"]
+    expected_columns = ["count", "mean", "std", "min"] + [f"{int(p*100)}%" for p in np.arange(0, 1, 0.01)] + ["max"]
     for month, df in result.items():
         for col in expected_columns:
             assert col in df.columns, f"Missing expected column '{col}' in {month} table."
@@ -551,8 +551,8 @@ def test_monthly_directional_percentiles_omni():
     # Test to ensure that "Omni" row is correctly calculated
     result = tables.monthly_directional_percentiles(
         data=ds, 
-        var_magnitude="W50", 
-        var_direction="D100", 
+        var="W50", 
+        var_dir="D100", 
         percentiles=["mean"],
         nsectors=8
     )
@@ -568,8 +568,8 @@ def test_monthly_directional_percentiles_invalid_column():
     try:
         tables.monthly_directional_percentiles(
             data=ds, 
-            var_magnitude="invalid_column", 
-            var_direction="D10"
+            var="invalid_column", 
+            var_dir="D10"
         )
         assert False, "The function did not raise an error for an invalid column."
     except KeyError:

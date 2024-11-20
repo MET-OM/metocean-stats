@@ -160,6 +160,26 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
 
     return fig
 
+def _percentile_str_to_pd_format(percentiles):
+    '''
+    Utility to convert various types of percentile/stats strings to pandas compatible format.
+    '''
+
+    mapping = {"Maximum":"max",
+               "Max":"max",
+               "Minimum":"min",
+               "Min":"min",
+               "Mean":"mean"}
+
+    def strconv(name:str):
+        if name.startswith("P"):
+            return name.replace("P","")+"%"
+        if name in mapping:
+            return mapping[name]
+        else: return name
+
+    if type(percentiles)==str: return strconv(percentiles)
+    else: return [strconv(p) for p in percentiles]
 
 def plot_monthly_stats(data: pd.DataFrame,
                        var:str,
@@ -195,8 +215,13 @@ def plot_monthly_stats(data: pd.DataFrame,
     percentiles = data[var].groupby(data[var].index.month).describe(percentiles=np.arange(0,1,0.01))
     xaxis = np.arange(0,data[var].index.month.max())
     
-    colors = cmap(np.linspace(0,1,len(show)))
+    labels = [s for s in show]
+    if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
+    show = _percentile_str_to_pd_format(show)
+    fill_between = _percentile_str_to_pd_format(fill_between)
+    fill_color_like = _percentile_str_to_pd_format(fill_color_like)
     
+    colors = cmap(np.linspace(0,1,len(show)))
     for i,v in enumerate(show):
         percentiles[v].plot(color=colors[i],marker='o')
 
@@ -214,7 +239,7 @@ def plot_monthly_stats(data: pd.DataFrame,
 
     plt.title(title,fontsize=16)
     plt.xlabel('Month',fontsize=15)
-    plt.legend()
+    plt.legend(labels)
     plt.grid()
     if output_file != "": plt.savefig(output_file)
     return fig
@@ -260,8 +285,13 @@ def plot_daily_stats(data:pd.DataFrame,
     percentiles = data[var].groupby(data[var].index.dayofyear).describe(percentiles=np.arange(0,1,0.01))
     xaxis = np.arange(0,data[var].index.dayofyear.max())
     
+    labels = [s for s in show]
+    if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
+    show = _percentile_str_to_pd_format(show)
+    fill_between = _percentile_str_to_pd_format(fill_between)
+    fill_color_like = _percentile_str_to_pd_format(fill_color_like)
+
     colors = cmap(np.linspace(0,1,len(show)))
-    
     for i,v in enumerate(show):
         percentiles[v].plot(color=colors[i])
 
@@ -278,7 +308,7 @@ def plot_daily_stats(data:pd.DataFrame,
 
     plt.title(title,fontsize=14)
     plt.xlabel('Month',fontsize=12)
-    plt.legend()
+    plt.legend(labels)
     plt.grid()
     if output_file != "": plt.savefig(output_file)
     return fig

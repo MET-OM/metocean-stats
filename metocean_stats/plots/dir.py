@@ -5,17 +5,37 @@ import windrose
 import matplotlib.cm as cm
 import os
 
-def rose(wd,ws,max_ws,step_ws,min_percent, max_percent, step_percent, nsector=16,cmap=plt.get_cmap("viridis")):
+def rose(data,
+         var_dir,
+         var,
+         max_var,
+         step_var,
+         min_percent,
+         max_percent,
+         step_percent,
+         nsector=16,
+         cmap=plt.get_cmap("viridis")):
+
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="windrose")
-    ax.bar(wd, ws, bins=np.arange(0, max_ws, step_ws), cmap=cmap, normed=True, opening=0.9, edgecolor='white', nsector=nsector)
+    ax.bar(data[var_dir], data[var], bins=np.arange(0, max_var, step_var), cmap=cmap, normed=True, opening=0.9, edgecolor='white', nsector=nsector)
     ax.set_yticks(np.arange(min_percent, max_percent, step_percent))
     ax.set_yticklabels(np.arange(min_percent, max_percent,step_percent))
     ax.legend(bbox_to_anchor=(0.90,-0.05),framealpha=0.5)
     return fig
 
 
-def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, units='m/s',single_figure=True, output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
+def var_rose(data, 
+             var_dir,
+             var, 
+             method='overall',
+             max_perc=40,
+             decimal_places=1, 
+             units='m/s',
+             single_figure=True, 
+             output_file='rose.png', 
+             nsector=16, 
+             cmap=plt.get_cmap("viridis")):
     
     direction = var_dir
     intensity = var
@@ -40,19 +60,29 @@ def var_rose(data, var_dir,var, method='overall',max_perc=40,decimal_places=1, u
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
 
     elif method == 'monthly':
-        fig = monthly_var_rose(data=data,direction=direction,intensity=intensity,bins=bins_range,max_perc=max_perc,
+        fig = monthly_var_rose(data=data,var_dir=direction,var=intensity,bins=bins_range,max_perc=max_perc,
                                decimal_places=decimal_places,units=units,single_figure=single_figure,output_file=output_file)
     
     plt.close()
     return fig 
 
-def monthly_var_rose(data, direction,intensity,bins,max_perc=40,decimal_places=1, units='m/s',single_figure=True,output_file='rose.png', nsector=16, cmap=plt.get_cmap("viridis")):
+def monthly_var_rose(data, 
+                     var_dir,
+                     var,
+                     bins,
+                     max_perc=40,
+                     decimal_places=1, 
+                     units='m/s',
+                     single_figure=True,
+                     output_file='rose.png', 
+                     nsector=16, 
+                     cmap=plt.get_cmap("viridis")):
 
     # this function make monthly wind/wave rose
     # direction, intensity: panda series 
     # get month from panda series 
-    direction = data[direction]
-    intensity = data[intensity]
+    direction = data[var_dir]
+    intensity = data[var]
     M = intensity.index.month.values
     
     # get month names 

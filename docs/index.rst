@@ -918,6 +918,63 @@ Current Speed Monthly Statistics Plot
 .. image:: files/current_0m_monthly_stats.png
    :width: 500
 
+Hs Monthly Statistics with shaded band
+-------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_stats(
+      ds, 
+      var="HS", 
+      show=["10%", "mean", "90%"], 
+      fill_between=["25%", "75%"], 
+      fill_color_like="mean",
+      output_file="")
+    
+.. image:: files/monthly_stats_wave_height_fill.png
+   :width: 500
+
+Hs Daily Statistics with shaded band
+-------------------------------------
+
+.. code-block:: python
+
+   plots.plot_daily_stats(
+      ds, 
+      var="HS", 
+      show=["5%", "mean", "95%"], 
+      fill_between=["25%", "75%"], 
+      fill_color_like="mean")
+    
+.. image:: files/plot_daily_stats_wave_height_fill.png
+   :width: 500
+
+
+Hs Daily percentile table
+-------------------------------------
+
+.. code-block:: python
+
+   tables.table_daily_percentile(
+      ds, 
+      var="HS", 
+      percentiles=["5%", "10%", "15%", "20%","mean", "99%", "max"], 
+      divide_months=True)
+
+Current Speed Directional Monthly Statistics
+--------------------------------------------
+
+.. code-block:: python
+
+   tables.monthly_directional_percentiles(
+        data=ds, 
+        var="W10", 
+        var_dir="D10", 
+        percentiles=["5%", "25%", "mean", "75%", "99%", "max"], 
+        nsectors=16,
+        compass_point_names=True)
+
+
 Current Speed Directional Statistics Plot
 -----------------------------------------
 
