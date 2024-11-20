@@ -60,7 +60,7 @@ def var_rose(data,
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
 
     elif method == 'monthly':
-        fig = monthly_var_rose(data=data,direction=direction,intensity=intensity,bins=bins_range,max_perc=max_perc,
+        fig = monthly_var_rose(data=data,var_dir=direction,var=intensity,bins=bins_range,max_perc=max_perc,
                                decimal_places=decimal_places,units=units,single_figure=single_figure,output_file=output_file)
     
     plt.close()
