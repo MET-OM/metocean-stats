@@ -15,8 +15,12 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# Read test data
-ds = readNora10File("tests/data/NORA_test.txt") 
+# relative path from file to example data
+relative_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..","tests","data","NORA_test.txt")
+
+# Read data
+ds = readNora10File(relative_path)
+# ds = readNora10File("tests/data/NORA_test.txt") 
 
 # Create a new Document
 doc = Document()
@@ -627,6 +631,7 @@ add_table_to_doc(doc, df2, col_width=50, row_height=0.7, header_color='D3D3D3', 
 
 
 # Legge til figur 4.3 
+plots.plot_monthly_stats(ds,var="W10",show=["min","mean","max"],fill_between=["25%","75%"],fill_color_like="mean")
 add_image_with_caption(doc, 'monthly_stats.png', "Figure 4.3: Monthly distribution of mean, P99 and maximum wind speed 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
 
 # Legg til figur 4.4
