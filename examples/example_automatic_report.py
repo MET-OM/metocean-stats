@@ -26,12 +26,11 @@ doc = Document()
 LocationX = "North Sea"
 lon = 3 # endre manuelt fra område (lengegrad)
 lat = 60 # breddegrad
-label = ['NORA3'] # dataset
+label = ['NORA'] # dataset
 starttime = str(ds.index[0])
 endtime = str(ds.index[-1])
 chapter = ["wind", "waves"] # Hvilke del/kap som skal være med i rapporten
-label = ['NORA3']
-wave_depth = 9999
+wave_depth = 100
 # tables_in_report = [""] # putter in strings med tabellnavn i raporten
 # figures_in_report = [""] # putter in strings med figurnavn i raporten
 # ^ en alternativ ide til chapter
