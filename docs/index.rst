@@ -117,8 +117,8 @@ Wind Profile Return Values Table
 
    tables.table_profile_return_values(
        df,
-       var=['W10', 'W', 'W80', 'W100', 'W1'],
-       z=[10, , 80, 100, 1],
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50 , 80, 100, 150],
        periods=[1, 10, 100, 10000],
        output_file='RVE_wind_profile.csv'
    )
@@ -134,8 +134,8 @@ Wind Profile Return Values Plot
 
    plots.plot_profile_return_values(
        df,
-       var=['W10', 'W', 'W80', 'W100', 'W1'],
-       z=[10, , 80, 100, 1],
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50, 80, 100, 150],
        periods=[1, 10, 100, 10000],
        reverse_yaxis=False,
        title='Return Periods over z',
@@ -156,8 +156,8 @@ Wind Profile Statistics Plot
 
    plots.plot_profile_stats(
        df,
-       var=['W10', 'W', 'W80', 'W100', 'W1'],
-       z=[10, , 80, 100, 1],
+       var=['W10', 'W50', 'W80', 'W100', 'W150'],
+       z=[10, 50, 80, 100, 150],
        reverse_yaxis=False,
        output_file='wind_stats_profile.png'
    )
