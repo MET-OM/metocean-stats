@@ -543,31 +543,31 @@ doc.add_paragraph()
 #__________________________________________________________
 # Add the map figure, figure 3.1
 
-#output_file='output/map.png'
-#maps.plot_points_on_map(lon,lat,label,bathymetry='NORA3',output_file=output_file)
-#doc.add_picture(output_file, width=Inches(6))
-#doc.add_heading('Figure 3.1: The figure shows the NORA3 grid points selected for the analysis', level=3)
+output_file='output/map.png'
+maps.plot_points_on_map(lon,lat,label,bathymetry='NORA3',output_file=output_file)
+doc.add_picture(output_file, width=Inches(6))
+doc.add_heading('Figure 3.1: The figure shows the NORA3 grid points selected for the analysis', level=3)
 ## Add a blank paragraph to ensure there is no extra spacing
-#doc.add_paragraph()
+doc.add_paragraph()
 
-#doc.add_paragraph(
-#    "Figure 3.2 and Figure 3.3 show the 100-year return values for wind and wave height in the Nordics Seas based "
-#    "on NORA3 data."
-#)
+doc.add_paragraph(
+    "Figure 3.2 and Figure 3.3 show the 100-year return values for wind and wave height in the Nordics Seas based "
+    "on NORA3 data."
+)
 
-#doc.add_paragraph()
-#output_file='output/wind_100yrs.png'
-#maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file=output_file)
-#doc.add_picture(output_file, width=Inches(5))
-#doc.add_heading("Figure 3.2: 100-year return period for wind speed at 10 m in the Nordics based on NORA3 (period: 1991-2020) using Generalized "
-#"Pareto distribution (POT; threshold is the minimum of all annual maxima, method described by [5]).", level=3)
+doc.add_paragraph()
+output_file='output/wind_100yrs.png'
+maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file=output_file)
+doc.add_picture(output_file, width=Inches(5))
+doc.add_heading("Figure 3.2: 100-year return period for wind speed at 10 m in the Nordics based on NORA3 (period: 1991-2020) using Generalized "
+"Pareto distribution (POT; threshold is the minimum of all annual maxima, method described by [5]).", level=3)
 
-#doc.add_paragraph()
-#output_file='output/wave_100yrs.png'
-#maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file=output_file)
-#doc.add_picture(output_file, width=Inches(5))
-#doc.add_heading("Figure 3.3: 100-year return period for significant wave height in the Nordics based on NORA3 (period: 1991-2020) using Gumbel "
-#"distribution (Annual maxima).", level=3)
+doc.add_paragraph()
+output_file='output/wave_100yrs.png'
+maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file=output_file)
+doc.add_picture(output_file, width=Inches(5))
+doc.add_heading("Figure 3.3: 100-year return period for significant wave height in the Nordics based on NORA3 (period: 1991-2020) using Gumbel "
+"distribution (Annual maxima).", level=3)
 
 doc.add_paragraph()
 doc.add_page_break()
