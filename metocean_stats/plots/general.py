@@ -52,14 +52,15 @@ def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: 
     rows = rows[::-1]
     tbl = tbl[::-1,:]
     dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
-    hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
+    fig,ax = plt.subplots()
+    sns.heatmap(ax=ax,data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
     plt.ylabel(var1)
     plt.xlabel(var2)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
 
-    return hi
+    return fig
     
     
     
