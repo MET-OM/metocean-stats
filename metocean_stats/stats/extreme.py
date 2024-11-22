@@ -929,7 +929,7 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     #hs = np.arange(0.5,data[var].max()+step,step)
     y_obs = np.arange(1,int(data[var].max())+0.5,0.5)
     prob_non_exceedance_obs = percentileofscore(data[var], y_obs)
-    print(prob_non_exceedance_obs)
+    #print(prob_non_exceedance_obs)
     shape, location, scale =  Weibull_method_of_moment(data[var])
     weibull_dist = weibull_min(c=shape, scale=scale, loc=location)
     # Generate random samples
@@ -1286,7 +1286,7 @@ def get_empirical_return_levels_new(data, var, method="POT",
                              .loc[:,['return_levels', 'return_periods']]
         # Add a column with the probability of non exceedance
         df['prob_non_exceedance'] = 1-rp['exceedance probability']
-        print(df['prob_non_exceedance'])
+        #print(df['prob_non_exceedance'])
         df.attrs['method'] = 'POT'
         df.attrs['threshold'] = threshold
         df.attrs['var'] = var

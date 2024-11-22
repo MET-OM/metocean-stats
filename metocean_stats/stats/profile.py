@@ -70,7 +70,7 @@ def profile_shear(data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50
         fig, ax = plt.subplots(figsize=(8,4))
         N, bins, range = plt.hist(alfa,50)
         locs, _ = plt.yticks() 
-        print(locs)
+        #print(locs)
         plt.yticks(locs,np.round(100*(locs/len(alfa)),1))
         plt.fill_betweenx([0,np.max(N)],np.percentile(alfa,perc[0]),np.percentile(alfa,perc[1]),alpha=0.5,color='lightgray',label=f'{perc[0]}-{perc[1]}%')
         plt.plot(np.ones(2)*np.median(alfa),[0,np.max(N)],color='black',label='median')

@@ -14,6 +14,7 @@ from docx.enum.section import WD_ORIENTATION, WD_SECTION, WD_ORIENT
 import warnings
 
 warnings.filterwarnings("ignore")
+warnings.simplefilter('ignore', SyntaxWarning)
 
 # relative path from file to example data
 relative_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..","tests","data","NORA_test.txt")
@@ -124,7 +125,7 @@ total_pages_run._r.append(fldChar2)
 # URL til bildet
 logo_url = "https://github.com/MET-OM/metocean-stats/raw/main/docs/files/logo.png"
 # Last ned bildet og lagre det midlertidig lokalt
-logo_path = "local_logo.png"
+logo_path = "output/local_logo.png"
 response = requests.get(logo_url)
 with open(logo_path, "wb") as file:
     file.write(response.content)
@@ -542,31 +543,31 @@ doc.add_paragraph()
 #__________________________________________________________
 # Add the map figure, figure 3.1
 
-output_file='map.png'
-maps.plot_points_on_map(lon,lat,label,bathymetry='NORA3',output_file=output_file)
-doc.add_picture(output_file, width=Inches(6))
-doc.add_heading('Figure 3.1: The figure shows the NORA3 grid points selected for the analysis', level=3)
-# Add a blank paragraph to ensure there is no extra spacing
-doc.add_paragraph()
+#output_file='output/map.png'
+#maps.plot_points_on_map(lon,lat,label,bathymetry='NORA3',output_file=output_file)
+#doc.add_picture(output_file, width=Inches(6))
+#doc.add_heading('Figure 3.1: The figure shows the NORA3 grid points selected for the analysis', level=3)
+## Add a blank paragraph to ensure there is no extra spacing
+#doc.add_paragraph()
 
-doc.add_paragraph(
-    "Figure 3.2 and Figure 3.3 show the 100-year return values for wind and wave height in the Nordics Seas based "
-    "on NORA3 data."
-)
+#doc.add_paragraph(
+#    "Figure 3.2 and Figure 3.3 show the 100-year return values for wind and wave height in the Nordics Seas based "
+#    "on NORA3 data."
+#)
 
-doc.add_paragraph()
-output_file='wind_100yrs.png'
-maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file=output_file)
-doc.add_picture(output_file, width=Inches(5))
-doc.add_heading("Figure 3.2: 100-year return period for wind speed at 10 m in the Nordics based on NORA3 (period: 1991-2020) using Generalized "
-"Pareto distribution (POT; threshold is the minimum of all annual maxima, method described by [5]).", level=3)
+#doc.add_paragraph()
+#output_file='output/wind_100yrs.png'
+#maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file=output_file)
+#doc.add_picture(output_file, width=Inches(5))
+#doc.add_heading("Figure 3.2: 100-year return period for wind speed at 10 m in the Nordics based on NORA3 (period: 1991-2020) using Generalized "
+#"Pareto distribution (POT; threshold is the minimum of all annual maxima, method described by [5]).", level=3)
 
-doc.add_paragraph()
-output_file='wave_100yrs.png'
-maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file=output_file)
-doc.add_picture(output_file, width=Inches(5))
-doc.add_heading("Figure 3.3: 100-year return period for significant wave height in the Nordics based on NORA3 (period: 1991-2020) using Gumbel "
-"distribution (Annual maxima).", level=3)
+#doc.add_paragraph()
+#output_file='output/wave_100yrs.png'
+#maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file=output_file)
+#doc.add_picture(output_file, width=Inches(5))
+#doc.add_heading("Figure 3.3: 100-year return period for significant wave height in the Nordics based on NORA3 (period: 1991-2020) using Gumbel "
+#"distribution (Annual maxima).", level=3)
 
 doc.add_paragraph()
 doc.add_page_break()
@@ -604,13 +605,13 @@ f"level at the {LocationX} field. \n\n"
 doc.add_page_break()
 
 # Legg til Figur 4.1
-plots.var_rose(ds,var_dir='D10',var='W10',method='overall',max_perc=20,decimal_places=1, units='Wave height (m)',output_file="wind_omni.png")
-add_image_with_caption(doc, 'wind_omni.png', "Figure 4.1: All-year wind rose at 10 m above mean sea level for the " + LocationX + " field for the period " + starttime + "-" + endtime + ".", orientation="portrait")
+plots.var_rose(ds,var_dir='D10',var='W10',method='overall',max_perc=20,decimal_places=1, units='Wind speed (m/s)',output_file="output/wind_omni.png")
+add_image_with_caption(doc, 'output/wind_omni.png', "Figure 4.1: All-year wind rose at 10 m above mean sea level for the " + LocationX + " field for the period " + starttime + "-" + endtime + ".", orientation="portrait")
 
 doc.add_page_break()
 
 # Henter ut data til tabell 1
-df1 = tables.table_directional_non_exceedance(ds, var='W10',step_var=2,var_dir='D10',output_file='table_directional_non_exceedance.csv')
+df1 = tables.table_directional_non_exceedance(ds, var='W10',step_var=2,var_dir='D10',output_file=None)
 header_text = "Table 4.1: Annual directional sample distribution of non -exceedance [%] of 1-hour mean wind speed 10 m above sea level at the " + LocationX + "."
 # Legger til tabellen i word
 add_table_to_doc(doc, df1, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
@@ -619,8 +620,8 @@ add_table_to_doc(doc, df1, col_width=50, row_height=0.7, header_color='D3D3D3', 
 doc.add_heading ("W10 [m/s] at the " + LocationX + " field")
 
 # Legg til Figur 4.2
-plots.plot_directional_stats(ds,var='HS',step_var=0.5, var_dir='DIRM', title = '$H_s$[m]', output_file="directional_stats.png")
-add_image_with_caption(doc, 'directional_stats.png', "Figure 4.2: Directional distribution of mean, P99 and maximum wind speed at 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
+plots.plot_directional_stats(ds,var='HS',step_var=0.5, var_dir='DIRM', title = '$H_s$[m]', output_file="output/directional_stats.png")
+add_image_with_caption(doc, 'output/directional_stats.png', "Figure 4.2: Directional distribution of mean, P99 and maximum wind speed at 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
 
 doc.add_page_break()
 
@@ -631,12 +632,12 @@ add_table_to_doc(doc, df2, col_width=50, row_height=0.7, header_color='D3D3D3', 
 
 
 # Legge til figur 4.3 
-plots.plot_monthly_stats(ds,var="W10",show=["min","mean","max"],fill_between=["25%","75%"],fill_color_like="mean")
-add_image_with_caption(doc, 'monthly_stats.png', "Figure 4.3: Monthly distribution of mean, P99 and maximum wind speed 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
+plots.plot_monthly_stats(ds,var="W10",show=["min","mean","max"],fill_between=["25%","75%"],fill_color_like="mean",output_file='output/monthly_stats.png')
+add_image_with_caption(doc, 'output/monthly_stats.png', "Figure 4.3: Monthly distribution of mean, P99 and maximum wind speed 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
 
 # Legg til figur 4.4
-plots.var_rose(ds,var_dir='D10',var='W10',method='monthly',max_perc=15,decimal_places=1, units="Wave height (m)",output_file="wind_monthly.png")
-add_image_with_caption(doc, 'wind_monthly.png', "Figure 4.4: Monthly wind roses for the " + LocationX + "field for the period " + starttime + "to " + endtime, orientation="landscape")
+plots.var_rose(ds,var_dir='D10',var='W10',method='monthly',max_perc=15,decimal_places=1, units="Wind Speed (m/s)",output_file="output/wind_monthly.png")
+add_image_with_caption(doc, 'output/wind_monthly.png', "Figure 4.4: Monthly wind roses for the " + LocationX + "field for the period " + starttime + "to " + endtime, orientation="landscape")
 
 # 4.1.3 Long-term wind statistics
 doc.add_heading(f"4.1.3 Long-term wind statistics", level=3)
@@ -646,8 +647,8 @@ doc.add_paragraph(
 f"\n\nFigure 4.5 shows the hindcast and fitted distributions of wind speed at the {LocationX} field.")
 
 # Legg til figur 4.5
-plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var="W10",output_file="prob_non_exceedance_fitted_3p_weibull.png")
-add_image_with_caption(doc, 'prob_non_exceedance_fitted_3p_weibull.png', f"Figure 4.5: Hindcast (red) and fitted (blue line) distributions of 1 -hour mean wind speed 10 m [m/s] above sea level at the {LocationX}"
+plots.plot_prob_non_exceedance_fitted_3p_weibull(ds,var="W10",output_file="output/prob_non_exceedance_fitted_3p_weibull.png")
+add_image_with_caption(doc, 'output/prob_non_exceedance_fitted_3p_weibull.png', f"Figure 4.5: Hindcast (red) and fitted (blue line) distributions of 1 -hour mean wind speed 10 m [m/s] above sea level at the {LocationX}"
 "field.", orientation="portrait")
 doc.add_paragraph() 
 
@@ -656,14 +657,14 @@ f"wind speed at the {LocationX} field. The direction extremes are adjusted in ag
 "N-003:2017.")
 
 # Legg til figur 4.6
-plots.plot_directional_return_periods(ds,var="W10",var_dir="D10",periods = [1,10,100,10000],output_file="W10_dir_extremes_Weibull_norsok.png",distribution="Weibull3P")
-add_image_with_caption(doc, 'W10_dir_extremes_Weibull_norsok.png', f"Figure 4.6: Directional extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years, 10 m above sea "
+plots.plot_directional_return_periods(ds,var="W10",var_dir="D10",periods = [1,10,100,10000],output_file="output/W10_dir_extremes_Weibull_norsok.png",distribution="Weibull3P")
+add_image_with_caption(doc, 'output/W10_dir_extremes_Weibull_norsok.png', f"Figure 4.6: Directional extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years, 10 m above sea "
 f"level at the {LocationX} field. The direction extremes are adjusted in agreement with NORSOK Standard N - 003:2017", orientation="portrait")
 doc.add_paragraph()
 doc.add_page_break()
 
 # Hent DataFrame for tabell 4.3
-df3= tables.table_directional_return_periods(ds,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',distribution='Weibull3P_MOM', adjustment='NORSOK' ,output_file='directional_extremes_weibull.csv')
+df3= tables.table_directional_return_periods(ds,var='W10',periods=[1, 10, 100, 10000], units='m/s',var_dir = 'D10',distribution='Weibull3P_MOM', adjustment='NORSOK' ,output_file=None)
 header_text = "Table 4.3: Weibull parameters and corresponding adjusted directional extreme values for 1-hour mean wind speed 10 m above sea level at the " + LocationX + " field. Duration of the event is 1 hour. The direction extremes are adjusted in agreement with NORSOK STandard N-003:2017"
 add_table_to_doc(doc, df3, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 doc.add_paragraph()  
@@ -672,14 +673,14 @@ doc.add_paragraph("Figure 4.7 and Table 4.4 show monthly Weibull parameters and 
 doc.add_paragraph()  
 
 # Legg til figur 4.7
-plots.plot_monthly_return_periods(data=ds,var="W10",periods=[1,10,100,10000],output_file="W10_monthly_extremes.png")
-add_image_with_caption(doc, 'W10_monthly_extremes.png', f"Figure 4.7: Monthly extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years 10 m above sea "
+plots.plot_monthly_return_periods(data=ds,var="W10",periods=[1,10,100,10000],output_file="output/W10_monthly_extremes.png")
+add_image_with_caption(doc, 'output/W10_monthly_extremes.png', f"Figure 4.7: Monthly extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years 10 m above sea "
 f"level at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 doc.add_page_break()
 
 # Legger til tabell 4.4
-df4= tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_return_values.csv')
+df4= tables.table_monthly_joint_distribution_Hs_Tp_return_values(ds,var_hs='HS',var_tp='TP',periods=[1,10,100,10000],output_file=None)
 header_text = "Table 4.4: Monthly and annual Weibull parameters and corresponding extreme values for 1-hour mean wind speed 10 m above sea level at the " + LocationX + " field. Duration of the event is 1 hour."
 add_table_to_doc(doc, df4, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 
@@ -692,7 +693,7 @@ doc.add_paragraph()
 doc.add_page_break()
 
 # Tabell 4.5
-df5 = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file='RVE_wind_profile.csv')
+df5 = tables.table_profile_return_values(ds,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=None)
 header_text = "Table 4.5: Omni-directional extreme values for 1 - hour mean wind speed as function of height above mean sea level at " + LocationX + " field."
 add_table_to_doc(doc, df5, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 
@@ -721,42 +722,42 @@ doc.add_paragraph()
 
 # Legg til figur 4.8
 # Lager ny variabel slik at man kan endre verdiene i figuren som hentes ut
-fig1 =  'NORA10_monthly_weather_window4_12_plot.png'
+fig1 =  'output/NORA10_monthly_weather_window4_10_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=10, window_size=12,output_file=fig1)
 add_image_with_caption(doc, fig1, f"Figure 4.8: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 10 m/s for 12 hours at "
 f"the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 4.9 på samme måte som 4.8 med annderleses verdier
-fig2 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig2 = 'output/NORA10_monthly_weather_window4_15_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=15, window_size=12,output_file= fig2)
 add_image_with_caption(doc, fig2, f"Figure 4.9: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 15 m/s for 12 hours at "
 f"the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 4.10
-fig3 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig3 = 'output/NORA10_monthly_weather_window4_10_24_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=10, window_size=24,output_file= fig3)
 add_image_with_caption(doc, fig3, f"Figure 4.10: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 10 m/s for 24 hours at "
 f"the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 4.11
-fig4 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig4 = 'output/NORA10_monthly_weather_window4_15_24_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=15, window_size=24,output_file= fig4)
 add_image_with_caption(doc, fig4, f"Figure 4.11: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 15 m/s for 24 hours at "
 f"the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 4.12
-fig5 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig5 = 'output/NORA10_monthly_weather_window4_10_48_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=10, window_size=48,output_file= fig5)
 add_image_with_caption(doc, fig5, f"Figure 4.12: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 10 m/s for 48 hours at "
 f"the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 4.13
-fig6 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig6 = 'output/NORA10_monthly_weather_window4_15_48_plot.png'
 plots.plot_monthly_weather_window(ds,var='W10',threshold=15, window_size=48,output_file= fig6)
 add_image_with_caption(doc, fig6, f"Figure 4.13: Characteristic durations, including waiting time, to perform operations limited by a wind speed of 15 m/s for 48 hours at "
 f"the {LocationX} field.", orientation="portrait")
@@ -772,11 +773,10 @@ doc.add_paragraph(
 doc.add_paragraph() 
 
 # Legg til figur 4.14
-plots.plot_monthly_stats(ds,var="T2m",show=["Maximum","Mean","Minimum"],output_file="T2m_monthly_max_mean_min.png")
-add_image_with_caption(doc, 'T2m_monthly_max_mean_min.png', f"Figure 4.14: Monthly minimum, mean and maximum air temperature at the {LocationX} field.", orientation="portrait")
+plots.plot_monthly_stats(ds,var="T2m",show=["Maximum","Mean","Minimum"],output_file="output/T2m_monthly_max_mean_min.png")
+add_image_with_caption(doc, 'output/T2m_monthly_max_mean_min.png', f"Figure 4.14: Monthly minimum, mean and maximum air temperature at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
-# MANGLER EN TABELL___________
 
 doc.add_paragraph(
     f"The extreme air temperatures are estimated with the annual/monthly minimum values. The annual/monthly "
@@ -788,20 +788,17 @@ f"for the {LocationX} field. Table 4.8 and Table 4.9 shows the monthly and annua
 doc.add_paragraph()  
 
 # Legg til figur 4.15
-plots.plot_monthly_return_periods(ds,var="T2m",output_file = "T2m_monthly_extremes_neg.png",method="minimum",periods=[1,10,100])
-add_image_with_caption(doc, 'T2m_monthly_extremes_neg.png', f"Figure 4.15: Monthly distribution of extreme negative air temperature with return period 1, 10 and 100 years (annual probability of "
+plots.plot_monthly_return_periods(ds,var="T2m",output_file = "output/T2m_monthly_extremes_neg.png",method="minimum",periods=[1,10,100])
+add_image_with_caption(doc, 'output/T2m_monthly_extremes_neg.png', f"Figure 4.15: Monthly distribution of extreme negative air temperature with return period 1, 10 and 100 years (annual probability of "
 f"exceedance 0.63, 10 -1 and 10-2) for the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
-# MANGLER 1 TABELL___________
 
 # Legg til figur 4.16
-plots.plot_monthly_return_periods(ds,var="T2m",output_file="T2m_monthly_extremes_pos.png",method="maximum",periods=[1,10,100])
-add_image_with_caption(doc, 'T2m_monthly_extremes_pos.png', f"Figure 4.16: Monthly distribution of extreme positive air temperature with return period 1, 10 and 100 years (annual probability of "
+plots.plot_monthly_return_periods(ds,var="T2m",output_file="output/T2m_monthly_extremes_pos.png",method="maximum",periods=[1,10,100])
+add_image_with_caption(doc, 'output/T2m_monthly_extremes_pos.png', f"Figure 4.16: Monthly distribution of extreme positive air temperature with return period 1, 10 and 100 years (annual probability of "
 f"exceedance 0.63, 10 -1 and 10-2) for the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
-
-# MANGLER 1 TABELL___________
 
 doc.add_page_break()
 # ______________________
@@ -833,19 +830,19 @@ f"{LocationX} field. \n\n"
 doc.add_paragraph()  
 
 # Legg til figur 5.1
-fig7 = 'wind_omni.png'
+fig7 = 'output/wind_omni.png'
 plots.var_rose(ds,var_dir='D10',var='W10',method='overall',max_perc=20,decimal_places=1, units='Wave height (m)',output_file=fig7)
 add_image_with_caption(doc, fig7, f"Figure 5.1: All-year wave rose for the {LocationX} field for the period {starttime} – {endtime}", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.2
-add_image_with_caption(doc, 'directional_stats.png', f"Figure 5.2: Directional distribution of mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
+add_image_with_caption(doc, 'output/directional_stats.png', f"Figure 5.2: Directional distribution of mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # MANGLER EN TABELL_________________
 
 # Legg til figur 5.3
-fig8 = 'directional_stats.png'
+fig8 = 'output/directional_stats.png'
 plots.plot_directional_stats(ds,var='HS',step_var=0.5, var_dir='DIRM', title = '$H_s$[m]', output_file=fig8)
 add_image_with_caption(doc, fig8, f"Figure 5.3: Monthly data distribution (top), mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
@@ -853,7 +850,7 @@ doc.add_paragraph()
 # MANGLER EN TABELL_________________
 
 # Legg til figur 5.4
-fig9 = 'wind_monthly.png'
+fig9 = 'output/wind_monthly.png'
 plots.var_rose(ds,var_dir='D10',var='W10',method='monthly',max_perc=15,decimal_places=1, units="Wave height (m)",output_file=fig9)
 add_image_with_caption(doc, fig9, f"Figure 5.4: Monthly wave roses for the {LocationX} field for the period {starttime} to {endtime}.", orientation="landscape")
 
@@ -867,7 +864,7 @@ f"Figure 5.5 shows the hindcast and fitted distributions of significant wave hei
 doc.add_paragraph()
 
 # Legg til figur 5.5
-add_image_with_caption(doc, "prob_non_exceedance_fitted_3p_weibull.png", f"Figure 5.5: Hindcast (red dots) and fitted (black line) distributions of significant wave height at the {LocationX} field.", orientation="portrait")
+add_image_with_caption(doc, "output/prob_non_exceedance_fitted_3p_weibull.png", f"Figure 5.5: Hindcast (red dots) and fitted (black line) distributions of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 doc.add_paragraph(
@@ -879,16 +876,16 @@ f"height at the {LocationX} field. The direction extremes are adjusted in agreem
 doc.add_paragraph()
 
 # Legg til figur 5.6
-plots.plot_directional_return_periods(ds,var="hs",var_dir="DIRP",distribution="Weibull3P",output_file="dir_extremes_Weibull_norsok.png")
-add_image_with_caption(doc, 'dir_extremes_Weibull_norsok.png', f"Figure 5.6: Adjusted directional extreme values of significant wave height with return period 1, 10, 100 and 10 000 years at the "
+plots.plot_directional_return_periods(ds,var="hs",var_dir="DIRP",distribution="Weibull3P",output_file="output/dir_extremes_Weibull_norsok.png")
+add_image_with_caption(doc, 'output/dir_extremes_Weibull_norsok.png', f"Figure 5.6: Adjusted directional extreme values of significant wave height with return period 1, 10, 100 and 10 000 years at the "
 f"{LocationX} field. The direction extremes are adjusted in agreement with NORSOK Standard N -003:2017.", orientation="portrait")
 doc.add_paragraph()
 
 # MANGLER 1 TABELL___________
 
 # Legg til figur 5.7
-plots.plot_monthly_return_periods(ds,var="hs",periods=[1,10,100,10000],distribution="Weibull3P_MOM",output_file="HS_monthly_extremes.png")
-add_image_with_caption(doc, 'HS_monthly_extremes.png', f"Figure 5.7: Monthly extreme values of significant wave height with return period of 1, 10, 100, and 10 000 years.", orientation="portrait")
+plots.plot_monthly_return_periods(ds,var="hs",periods=[1,10,100,10000],distribution="Weibull3P_MOM",output_file="output/HS_monthly_extremes.png")
+add_image_with_caption(doc, 'output/HS_monthly_extremes.png', f"Figure 5.7: Monthly extreme values of significant wave height with return period of 1, 10, 100, and 10 000 years.", orientation="portrait")
 doc.add_paragraph()  
 
 # MANGLER 1 TABELL___________
@@ -909,11 +906,10 @@ doc.add_paragraph(
 "spectral peak periods.")
 doc.add_paragraph() 
 
-# MANGLER 2 TABELLER___________
 
 # Legg til figur 5.8
-plots.plot_scatter_diagram(ds,var1="hs",step_var1=0.5,var2="tp",step_var2=1,output_file="tp_for_given_hs.png")
-add_image_with_caption(doc, 'tp_for_given_hs.png', f"Figure 5.8: Spectral peak period (Tp) for given significant wave height (Hs) at the {LocationX} field. Heat colormap indicates the density "
+plots.plot_scatter_diagram(ds,var1="hs",step_var1=0.5,var2="tp",step_var2=1,output_file="output/tp_for_given_hs.png")
+add_image_with_caption(doc, 'output/tp_for_given_hs.png', f"Figure 5.8: Spectral peak period (Tp) for given significant wave height (Hs) at the {LocationX} field. Heat colormap indicates the density "
 "of observations", orientation="portrait")
 doc.add_paragraph() 
 
@@ -934,13 +930,11 @@ plots.plot_joint_distribution_Hs_Tp(
     var_tp='TP',
     periods=[1,10,100,1000],
     title='Hs-Tp joint distribution',
-    output_file='Hs.Tp.joint.distribution.png',
+    output_file='output/Hs.Tp.joint.distribution.png',
     density_plot=True)
-add_image_with_caption(doc, 'Hs.Tp.joint.distribution.png', f"Figure 5.10: Contour lines of HS - Tp including wave breaking criteria/steepness , with return period 1, 10, 100 and 10 000 years for "
+add_image_with_caption(doc, 'output/Hs.Tp.joint.distribution.png', f"Figure 5.10: Contour lines of HS - Tp including wave breaking criteria/steepness , with return period 1, 10, 100 and 10 000 years for "
 f"omni-directional waves at the {LocationX} field. Duration of sea state is 3 hours.", orientation="portrait")
 doc.add_paragraph() 
-
-# MANGLER EN TABELL___________
 
 # 5.1.5 Individual waves and crest heights
 doc.add_heading(f"5.1.5 Individual waves and crest heights", level=3)
@@ -953,7 +947,6 @@ doc.add_paragraph(
 "equal to Hmax/Hs for omni-directional seas and reflect the same relative severity as shown by that table.")
 doc.add_paragraph() 
 
-# MANGLER 2 TABELL___________
 
 # 5.1.6 Wave induced seabed currents
 doc.add_heading(f"5.1.6 Wave induced seabed currents", level=3)
@@ -964,8 +957,6 @@ doc.add_paragraph(
 "\nWhen the associated spectral peak period is larger than the mean period given in Table 5.14, the most "
 "unfavorable orbital velocity from the JONSWAP spectrum should be applied.")
 doc.add_paragraph() 
-
-# MANGLER EN TABELL___________
 
 # 5.1.7 Operational wave analysis
 doc.add_heading(f"5.1.7 Operational wave analysis", level=3)
@@ -983,98 +974,98 @@ doc.add_paragraph(
 doc.add_paragraph()  
 
 # Legg til figur 5.11
-fig10 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig10 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=2, window_size=6,output_file= fig10)
 add_image_with_caption(doc, fig10, f"Figure 5.11: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 2.0 m "
 f"for 6 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.12
-fig11 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig11 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=3, window_size=6,output_file= fig11)
 add_image_with_caption(doc, fig11, f"Figure 5.12: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 3.0 m "
 f"for 6 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.13
-fig12 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig12 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=6,output_file= fig12)
 add_image_with_caption(doc, fig12, f"Figure 5.13: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 4.0 m "
 f"for 6 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.14
-fig13 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig13 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=4.5, window_size=6,output_file= fig13)
 add_image_with_caption(doc, fig13, f"Figure 5.14: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 4.5 m "
 f"for 6 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.15
-fig14 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig14 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=5.5, window_size=6,output_file= fig14)
 add_image_with_caption(doc, fig14, f"Figure 5.15: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 5.5 m "
 f"for 6 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.16
-fig15 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig15 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=2, window_size=12,output_file= fig15)
 add_image_with_caption(doc, fig15, f"Figure 5.16: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 2.0 m "
 f"for 12 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.17
-fig16 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig16 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=3, window_size=12,output_file= fig16)
 add_image_with_caption(doc, fig16, f"Figure 5.17: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 3.0 m "
 f"for 12 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.18
-fig17 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig17 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=12,output_file= fig17)
 add_image_with_caption(doc, fig17, f"Figure 5.18: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 4.0 m "
 f"for 12 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.19
-fig18 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig18 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=2, window_size=24,output_file= fig18)
 add_image_with_caption(doc, fig18, f"Figure 5.19: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 2.0 m "
 f"for 24 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # Legg til figur 5.20
-fig19 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig19 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=3, window_size=24,output_file= fig19)
 add_image_with_caption(doc, fig19, f"Figure 5.20: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 3.0 m "
 f"for 24 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.21
-fig20 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig20 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=24,output_file= fig20)
 add_image_with_caption(doc, fig20, f"Figure 5.21: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 4.0 m "
 f"for 24 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.22
-fig21 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig21 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=2, window_size=48,output_file= fig21)
 add_image_with_caption(doc, fig21, f"Figure 5.22: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 2.0 m "
 f"for 48 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.23
-fig22 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig22 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=3, window_size=48,output_file= fig22)
 add_image_with_caption(doc, fig22, f"Figure 5.23: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 3.0 m "
 f"for 48 hours at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 # Legg til figur 5.24
-fig23 = 'NORA10_monthly_weather_window4_12_plot.png'
+fig23 = 'output/NORA10_monthly_weather_window4_12_plot.png'
 plots.plot_monthly_weather_window(ds,var='HS',threshold=4, window_size=48,output_file= fig23)
 add_image_with_caption(doc, fig23, f"Figure 5.24: Characteristic durations, including waiting time, to perform operations limited by a significant wave height (Hs) of 4.0 m "
 f"for 48 hours at the {LocationX} field.", orientation="portrait")
@@ -1124,8 +1115,8 @@ doc.add_paragraph()
 # MANGLER 1 TABELL___________
 
 # Legg til figur 5.25
-plots.plot_hs_for_given_wind(ds,var_hs="hs",var_wind="W10",output_file="hs_for_given_wind.png")
-add_image_with_caption(doc, 'hs_for_given_wind.png', f"Figure 5.25: Relationship between significant wave height H S for a given wind speed U at the Luna field; data and model "
+plots.plot_hs_for_given_wind(ds,var_hs="hs",var_wind="W10",output_file="output/hs_for_given_wind.png")
+add_image_with_caption(doc, 'output/hs_for_given_wind.png', f"Figure 5.25: Relationship between significant wave height H S for a given wind speed U at the Luna field; data and model "
 "extrapolation.", orientation="portrait")
 doc.add_paragraph() 
 
