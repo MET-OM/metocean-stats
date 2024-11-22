@@ -23,7 +23,7 @@ def jonswap(f,hs,tp,gamma='fit', sigma_low=.07, sigma_high=.09):
     else:
        pass
     
-    print('gamma-JONSWAP is',gamma)
+    #print('gamma-JONSWAP is',gamma)
     alpha  = 5.061*(hs**2/tp**4)*(1-0.287*np.log(gamma)) # see MET-report_03-2021.pdf
     E_pm = alpha*(g**2)*((2*np.pi)**-4)*f**-5*np.exp((-5/4)*((fp/f)**4))
     sigma = np.ones(f.shape)*sigma_low
