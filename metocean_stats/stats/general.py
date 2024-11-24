@@ -127,9 +127,9 @@ def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs
     
     with open(temp_file, 'w') as f:
         f.write('\\begin{tabular}{l p{1.5cm}|p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
-        f.write('& & \multicolumn{5}{c}{'+var+'} \\\\' + '\n')
-        f.write('Hs & Entries & Min & 5\% & Mean & 95\% & Max \\\\' + '\n')
-        f.write('\hline' + '\n')
+        f.write(r'& & \multicolumn{5}{c}{'+var+'} \\\\' + '\n')
+        f.write(r'Hs & Entries & Min & 5\% & Mean & 95\% & Max \\\\' + '\n')
+        f.write(r'\hline' + '\n')
     
         for j in range(len(binsHs)-1) : 
             Var_binsHs_temp = Var_binsHs[str(int(binsHs[j]))+'-'+str(int(binsHs[j+1]))]
@@ -154,8 +154,8 @@ def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs
         
         hs_bin_temp = str(int(binsHs[0]))+'-'+str(int(binsHs[-1]+1)) # +1 for one empty row 
         f.write(hs_bin_temp + ' & '+str(len(Var))+' & '+str(Var_min)+' & '+str(Var_P5)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_max)+' \\\\' + '\n')
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
     
     if output_file.split('.')[1] == 'csv':
         convert_latexTab_to_csv(temp_file, output_file)
@@ -196,10 +196,10 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
         
         
     with open(temp_file, 'w') as f:
-        f.write('\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
-        f.write('& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
-        f.write('Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
-        f.write('\hline' + '\n')
+        f.write(r'\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
+        f.write(r'& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
+        f.write(r'Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
+        f.write(r'\hline' + '\n')
     
         for j in range(len(months)) : 
             Var_P5 = round(np.percentile(monthlyVar[months[j]],5),1)
@@ -212,8 +212,8 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
         # annual row 
         f.write('Annual & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
     
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
     
     if output_file.split('.')[1] == 'csv':
         convert_latexTab_to_csv(temp_file, output_file)
@@ -245,9 +245,9 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
     maximum = monthly_max.groupby(monthly_max.index.month).max() # max, sort by month
     
     with open(temp_file, 'w') as f :
-        f.write('\\begin{tabular}{l | c c c }' + '\n')
-        f.write('Month & Minimum & Mean & Maximum \\\\' + '\n')
-        f.write('\hline' + '\n')
+        f.write(r'\\begin{tabular}{l | c c c }' + '\n')
+        f.write(r'Month & Minimum & Mean & Maximum \\\\' + '\n')
+        f.write(r'\hline' + '\n')
         for i in range(len(months)):
             f.write(months[i] + ' & ' + str(minimum.values[i]) + ' & ' + str(round(mean.values[i],1)) + ' & ' + str(maximum.values[i]) + ' \\\\' + '\n')
         
@@ -258,8 +258,8 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
         max_year = annual_max.max()
         f.write('Annual Max. & ' + str(min_year) + ' & ' + str(round(mean_year,1)) + ' & ' + str(max_year) + ' \\\\' + '\n')
             
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
 
 
     if output_file.split('.')[1] == 'csv':

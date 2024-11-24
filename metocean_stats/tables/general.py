@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
+from pathlib import Path
 
 from ..stats.aux_funcs import *
 from ..stats.general import *
@@ -66,15 +67,18 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
         pass
 
     dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
-    if output_file.split('.')[-1]=='csv':
-        dfout.to_csv(output_file,index_label=var1+'/'+var2)
-    elif output_file.split('.')[-1]=='png':
+    output_file = Path(output_file)
+    if output_file.suffix == '.csv':
+        dfout.to_csv(output_file, index_label=var1+'/'+var2)
+    elif output_file.suffix == '.png':
         hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
         plt.ylabel(var1)
         plt.xlabel(var2)
         plt.tight_layout()
         plt.savefig(output_file)
         plt.close()
+    else:
+        print(f"Unsupported file type: {output_file.suffix}")
 
     return dfout
 
@@ -193,10 +197,10 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
         
         
     with open(temp_file, 'w') as f:
-        f.write('\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
-        f.write('& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
-        f.write('Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
-        f.write('\hline' + '\n')
+        f.write(r'\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
+        f.write(r'& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
+        f.write(r'Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
+        f.write(r'\hline' + '\n')
     
         for j in range(len(months)) : 
             Var_P5 = round(np.percentile(monthlyVar[months[j]],5),1)
@@ -209,8 +213,8 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
         # annual row 
         f.write('Annual & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
     
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
     
     if output_file.split('.')[1] == 'csv':
         convert_latexTab_to_csv(temp_file, output_file)
@@ -319,7 +323,7 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
     with open(temp_file, 'w') as f :
         f.write('\\begin{tabular}{l | c c c }' + '\n')
         f.write('Month & Minimum & Mean & Maximum \\\\' + '\n')
-        f.write('\hline' + '\n')
+        f.write(r'\hline' + '\n')
         for i in range(len(months)):
             f.write(months[i] + ' & ' + str(minimum.values[i]) + ' & ' + str(round(mean.values[i],1)) + ' & ' + str(maximum.values[i]) + ' \\\\' + '\n')
         
@@ -330,8 +334,8 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
         max_year = annual_max.max()
         f.write('Annual Max. & ' + str(min_year) + ' & ' + str(round(mean_year,1)) + ' & ' + str(max_year) + ' \\\\' + '\n')
             
-        f.write('\hline' + '\n')
-        f.write('\end{tabular}' + '\n')
+        f.write(r'\hline' + '\n')
+        f.write(r'\end{tabular}' + '\n')
 
 
     if output_file.split('.')[1] == 'csv':

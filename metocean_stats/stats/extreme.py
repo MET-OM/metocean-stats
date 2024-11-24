@@ -834,6 +834,8 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir]
+        if sector_data.empty:
+            sector_data = data * 0 # fill with zeros, this will give 0 extremes for empety sectors
 
         if isinstance(threshold, str) and threshold.startswith('P'):
             threshold_value = sector_data[var].quantile(int(threshold.split('P')[1])/100)
@@ -894,7 +896,6 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     # Replace values in each column that exceed the thresholds
     for col in range(return_values.shape[1]):
         return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
-
     return params, return_values, sector_prob,  threshold_values, num_events_per_year
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
