@@ -4,6 +4,7 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 
+##############PROVIDE INFO BY THE USER#################
 # Impot data (e.g., use metocean-api to download metocean data)
 ## For NORA10 data use:
 df = readNora10File('../tests/data/NORA_test.txt') 
@@ -17,7 +18,8 @@ var_wind = 'W10' # for wind speed
 var_hs = 'HS' # for significant wave height
 var_wave_dir= 'DIRM' # Mean wave direction
 var_tp = 'TP'  # Peak Wave Period
-output_folder = 'output_report' # folder where output figures and tables will be saved 
+output_folder = 'output_wind_waves' # folder where output figures and tables will be saved 
+######################################################
 
 
 # Check if the output directory exists, if not, create it
@@ -26,10 +28,6 @@ if not folder.exists():
     folder.mkdir(parents=True)
 
 # The following code is used to generate various plots and tables for wind and wave data analysis.
-# Map:
-#maps.plot_points_on_map(lon=[3.35], lat=[60.40],label=['NORA'],bathymetry='NORA3',output_file=folder /  'map.png')
-#maps.plot_extreme_wave_map(return_period=100, product='NORA3', title='100-yr return values Hs (NORA3)', set_extent = [0,30,52,73],output_file=folder /  'wave_100yrs.png')
-#maps.plot_extreme_wind_map(return_period=100, product='NORA3',z=10, title='100-yr return values Wind at 100 m (NORA3)', set_extent = [0,30,52,73], output_file=folder /  'wind_100yrs.png')
 
 # Wind:
 plots.var_rose(df,var_dir=var_wind_dir,var=var_wind,method='overall',max_perc=40,decimal_places=1, units='m/s',output_file=folder /  'wind_omni.png')
