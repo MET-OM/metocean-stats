@@ -12,12 +12,12 @@ df = readNora10File('../tests/data/NORA_test.txt')
 #df = pd.read_csv('../path/to/NORA3.csv', comment="#", index_col=0, parse_dates=True)
 
 # Define names for each variable in the dataframe (df):
-var_wind_dir = 'D10'
-var_wind = 'W10'
-var_hs = 'HS'
-var_wave_dir='DIRM'
-var_tp = 'TP' 
-output_folder = 'output_wind_waves'
+var_wind_dir = 'D10' # for wind direction
+var_wind = 'W10' # for wind speed
+var_hs = 'HS' # for significant wave height
+var_wave_dir= 'DIRM' # Mean wave direction
+var_tp = 'TP'  # Peak Wave Period
+output_folder = 'output_report' # folder where output figures and tables will be saved 
 
 
 # Check if the output directory exists, if not, create it
@@ -34,7 +34,7 @@ if not folder.exists():
 # Wind:
 plots.var_rose(df,var_dir=var_wind_dir,var=var_wind,method='overall',max_perc=40,decimal_places=1, units='m/s',output_file=folder /  'wind_omni.png')
 plots.var_rose(df,var_dir=var_wind_dir,var=var_wind,method='monthly',max_perc=40,decimal_places=1, units='m/s',output_file=folder /  'wind_monthly.png')
-plots.plot_directional_stats(df,var=var_wind,step_var=0.1,var_dir='D10',title = '', output_file=folder /  'directional_wind_stats.png')
+plots.plot_directional_stats(df,var=var_wind,step_var=0.1,var_dir='D10',title = 'W10[m/s]', output_file=folder /  'directional_wind_stats.png')
 plots.table_directional_non_exceedance(df,var=var_wind,step_var=2,var_dir='D10',output_file=folder /  'table_wind_directional_non_exceedance.csv')
 plots.plot_monthly_stats(df,var=var_wind,title = 'Wind Speed at 10 m [m/s]', output_file=folder /  'monthly_wind_stats.png')
 tables.table_monthly_non_exceedance(df,var=var_wind,step_var=2,output_file=folder /  'table_monthly_non_exceedance.csv')
