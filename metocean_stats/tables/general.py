@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
 from math import floor,ceil
+from pathlib import Path
 
 from ..stats.aux_funcs import *
 from ..stats.general import *
@@ -66,15 +67,18 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
         pass
 
     dfout = pd.DataFrame(data=np.round(tbl,2), index=rows, columns=cols)
-    if output_file.suffix=='csv':
-        dfout.to_csv(output_file,index_label=var1+'/'+var2)
-    elif output_file.suffix=='png':
+    output_file = Path(output_file)
+    if output_file.suffix == '.csv':
+        dfout.to_csv(output_file, index_label=var1+'/'+var2)
+    elif output_file.suffix == '.png':
         hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
         plt.ylabel(var1)
         plt.xlabel(var2)
         plt.tight_layout()
         plt.savefig(output_file)
         plt.close()
+    else:
+        print(f"Unsupported file type: {output_file.suffix}")
 
     return dfout
 
