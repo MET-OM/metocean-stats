@@ -346,7 +346,9 @@ def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_w
     }
     df_coeff = pd.DataFrame(table_data)
     if output_file:
-        df_coeff.round(3).to_csv(output_file.split('.')[0]+'_coeff.csv',index=False)
+        output_file_str = str(output_file)
+        output_file_no_ext = output_file_str.split('.')[0]
+        df_coeff.round(3).to_csv(output_file_no_ext + '_coeff.csv', index=False)
 
     # Create a new dataframe with the results
     if output_file:

@@ -12,9 +12,7 @@ from io import BytesIO
 import lxml.etree as ET
 from docx.enum.section import WD_ORIENTATION, WD_SECTION, WD_ORIENT
 import warnings
-
 warnings.filterwarnings("ignore")
-warnings.simplefilter('ignore', SyntaxWarning)
 
 # relative path from file to example data
 relative_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..","tests","data","NORA_test.txt")
