@@ -253,12 +253,15 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     for i in range(index_X):
         pdf_Hs_Tp_X = pdf_Hs_Tp[i,:] # Find pdf at RVE of X year 
         sum_pdf = sum(pdf_Hs_Tp_X)
-        for j in range(len(pdf_Hs_Tp_X)):
-            if (sum(pdf_Hs_Tp_X[:j])/sum_pdf <= p/100) and (sum(pdf_Hs_Tp_X[:j+1])/sum_pdf >= p/100) : 
-                #print (i, h[i],j,t[j])
-                t1.append(t[j])
-                h1.append(h[i])
-                break 
+
+        # Create a normalized cumulative array of pdf_Hs_Tp_X 
+        cumulative_pdf = np.cumsum(pdf_Hs_Tp_X) / np.sum(pdf_Hs_Tp_X)
+
+        # Find the location where p/100 fits in the array
+        j = np.searchsorted(cumulative_pdf,p/100)
+
+        t1.append(t[j])
+        h1.append(h[i])
     h1=np.asarray(h1)
     t1=np.asarray(t1)
 
