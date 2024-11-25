@@ -656,14 +656,16 @@ add_image_with_caption(doc, fig7, f"Figure 5.1: All-year wave rose for the {Loca
 doc.add_paragraph()  
 
 # Legg til figur 5.2
-add_image_with_caption(doc, folder + '/' +'directional_stats.png', f"Figure 5.2: Directional distribution of mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
+fig7a = folder + '/' +'directional_stats.png'
+plots.plot_directional_stats(df,var=var_hs,step_var=0.5, var_dir=var_wave_dir, title = 'Hs[m]', output_file=fig7a)
+add_image_with_caption(doc, fig7a, f"Figure 5.2: Directional distribution of mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 
 # MANGLER EN TABELL_________________
 
 # Legg til figur 5.3
-fig8 = folder + '/' +'directional_stats.png'
-plots.plot_directional_stats(df,var=var_hs,step_var=0.5, var_dir=var_wave_dir, title = 'Hs[m]', output_file=fig8)
+fig8 = folder + '/' +'monthly_stats.png'
+plots.plot_monthly_stats(df,var=var_hs, title = 'Hs[m]', output_file=fig8)
 add_image_with_caption(doc, fig8, f"Figure 5.3: Monthly data distribution (top), mean, P99 and maximum of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
