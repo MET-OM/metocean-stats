@@ -687,7 +687,7 @@ doc.add_paragraph()
 
 # Legg til figur 5.5
 plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var="HS",output_file=folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png")
-add_image_with_caption(doc, folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png", f"Figure 5.5: Hindcast (red dots) and fitted (black line) distributions of significant wave height at the {LocationX} field.", orientation="portrait")
+add_image_with_caption(doc, folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png", f"Figure 5.5: Hindcast (red dots) and fitted (blue line) distributions of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
 doc.add_paragraph(
