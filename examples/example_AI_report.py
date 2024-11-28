@@ -10,6 +10,9 @@ from io import BytesIO
 from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
+import google.generativeai as genai
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
 ##############PROVIDE INFO BY THE USER#################
 # Impot data (e.g., use metocean-api to download metocean data)
@@ -25,7 +28,7 @@ var_wind = 'W10' # for wind speed
 var_hs = 'HS' # for significant wave height
 var_wave_dir= 'DIRM' # Mean wave direction
 var_tp = 'TP'  # Peak Wave Period
-output_folder = 'output_report' # folder where output report and figures will be saved 
+output_folder = 'output_AI_report' # folder where output report and figures will be saved 
 
 # Manually Define varibles for the text in the report
 LocationX = "North Sea" # Location name
@@ -44,8 +47,6 @@ if not folder.exists():
 folder = str(folder)
 # Create a new Document
 doc = Document()
-
-
 
 
 starttime = str(df.index[0])
@@ -357,11 +358,15 @@ doc.add_heading('3 DESCRIPTION', level=1)
 
 # 3.1 {LocationX} location
 doc.add_heading(f"3.1 {LocationX} location", level=2)
+response = model.generate_content("Write a short geographic description (2 sentences) of the location:"+f'Longitude: {lat}°N,  Latitude: {lon}°E')
+location_text = "About the location: "+response.text
+
 doc.add_paragraph(
     f"This report presents meteorological and oceanographic (metocean) data for the {LocationX} field. "
     "Figure 3.1 shows the bathymetry in the area and position of NORA10 [15] for wind, air temperature, and "
-    "waves, NORA3 [13,14] The water depth varies from approximately 95 m with reference to mean sea level "
+    "waves, NORA3 [13,14] The water depth varies from approximately {water_depth} m with reference to mean sea level "
     "(MSL)."
+    +location_text
 )
 
 doc.add_paragraph() 
@@ -434,22 +439,18 @@ doc.add_page_break()
 
 # Henter ut data til tabell 1
 df1 = tables.table_directional_non_exceedance(df, var=var_wind,step_var=2,var_dir=var_wind_dir,output_file=None)
-header_text = "Table 4.1: Annual directional sample distribution of non -exceedance [%] of 1-hour mean wind speed 10 m above sea level at the " + LocationX + "."
 # Legger til tabellen i word
-add_table_to_doc(doc, df1, col_width=50, row_height=0.7,header_text=header_text, header_color='D3D3D3', data_color='D2B48C')
+add_table_to_doc(doc, df1, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 
 
 # Legg til Figur 4.2
 plots.plot_directional_stats(df,var=var_wind,step_var=0.5, var_dir=var_wind_dir, title = 'W10[m/s]', output_file=folder + "/" +"directional_wind_stats.png")
 add_image_with_caption(doc, folder + '/' +'directional_wind_stats.png', "Figure 4.2: Directional distribution of mean, P99 and maximum wind speed at 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
-
 doc.add_page_break()
 
 # Hent DataFrame for andre tabell og legger til i word
 df2 = tables.table_monthly_non_exceedance(df, var=var_wind, step_var=2, output_file=None)
-header_text = "Table 4.2: Directional non-exceedance table with percentage of time each data level occurs in each direction."
-add_table_to_doc(doc, df2, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
-
+add_table_to_doc(doc, df2, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 
 # Legge til figur 4.3 
 plots.plot_monthly_stats(df,var="W10",show=["min","mean","max"],title='Monthly W10 [m/s]',fill_between=["25%","75%"],fill_color_like="mean",output_file=folder + '/' +'monthly_wind_stats.png')
@@ -485,8 +486,7 @@ doc.add_page_break()
 
 # Hent DataFrame for tabell 4.3
 df3= tables.table_directional_return_periods(df,var=var_wind,periods=[1, 10, 100, 10000], units='m/s',var_dir = var_wind_dir,distribution='Weibull3P_MOM', adjustment='NORSOK' ,output_file=None)
-header_text = "Table 4.3: Weibull parameters and corresponding adjusted directional extreme values for 1-hour mean wind speed 10 m above sea level at the " + LocationX + " field. Duration of the event is 1 hour. The direction extremes are adjusted in agreement with NORSOK STandard N-003:2017"
-add_table_to_doc(doc, df3, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
+add_table_to_doc(doc, df3, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
 doc.add_paragraph()  
 
 doc.add_paragraph("Figure 4.7 and Table 4.4 show monthly Weibull parameters and corresponding extremes.")
@@ -501,8 +501,14 @@ doc.add_page_break()
 
 # Legger til tabell 4.4
 df4= tables.table_monthly_joint_distribution_Hs_Tp_return_values(df,var_hs=var_hs,var_tp='TP',periods=[1,10,100,10000],output_file=None)
-header_text = "Table 4.4: Monthly and annual Weibull parameters and corresponding extreme values for 1-hour mean wind speed 10 m above sea level at the " + LocationX + " field. Duration of the event is 1 hour."
-add_table_to_doc(doc, df4, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
+response = model.generate_content("Write 2 sentences about which months have the highest Hs values at the tables:"+str(df4))
+Table4_4_text = "Table4.4: "+response.text
+add_table_to_doc(doc, df4, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
+
+doc.add_paragraph(
+    f"Table 4.4: "+ Table4_4_text)
+doc.add_paragraph()
+
 
 # 4.1.4 Wind profile
 doc.add_heading(f"4.1.4 Wind profile", level=3)
@@ -514,15 +520,16 @@ doc.add_page_break()
 
 # Tabell 4.5
 df5 = tables.table_profile_return_values(df,var=[var_wind,'W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=None)
-header_text = "Table 4.5: Omni-directional extreme values for 1 - hour mean wind speed as function of height above mean sea level at " + LocationX + " field."
-add_table_to_doc(doc, df5, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
+response = model.generate_content("Write short summary of the table:"+str(df5))
+add_table_to_doc(doc, df5, col_width=50, row_height=0.7, header_color='D3D3D3', data_color='D2B48C')
+
 
 # 4.1.5 Wind Gust
-#doc.add_heading(f"4.1.5 Wind Gust", level=3)
-#doc.add_paragraph(
-#    f"Table 4.6 shows directional and omni-directional, monthly, and annual extreme values for 10-minute average "
-#f"wind speed 10 m above mean sea level at the {LocationX} field.")
-#doc.add_paragraph()  
+doc.add_heading(f"4.1.5 Wind Gust", level=3)
+doc.add_paragraph(
+    f"Table 4.6 shows directional and omni-directional, monthly, and annual extreme values for 10-minute average "
+f"wind speed 10 m above mean sea level at the {LocationX} field.")
+doc.add_paragraph()  
 
 # MANGLER EN TABELL___________
 
@@ -588,7 +595,8 @@ doc.add_paragraph()
 doc.add_heading(f"4.2 Air temperature", level=2)
 doc.add_paragraph(
     f"Figure 4.14 shows the monthly minimum, mean and maximum air temperatures measured at the {LocationX}"
-"field.")
+"field."
+"\nTable 4.7 shows monthly and annual frequency of non-exceedance of air temperature.")
 doc.add_paragraph() 
 
 # Legg til figur 4.14
@@ -602,7 +610,8 @@ doc.add_paragraph(
 "minimum values are fitted to a Gumbel distribution with maximum likelihood estimation as described in the "
 "appendix (Gumbel Distribution)."
 "Figure 4.15 and Figure 4.16 shows the monthly distribution of extreme negative and positive air temperatures "
-f"for the {LocationX} field.")
+f"for the {LocationX} field. Table 4.8 and Table 4.9 shows the monthly and annual Gumbel parameters and return "
+"values for extreme negative air temperature and positive air temperature.")
 doc.add_paragraph()  
 
 # Legg til figur 4.15
