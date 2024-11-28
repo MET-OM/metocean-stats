@@ -36,7 +36,7 @@ def Tp_correction(Tp):
 
 
 def readNora10File(file):
-    df = pd.read_csv(file, sep='\s+', header=3)
+    df = pd.read_csv(file, sep=r'\s+', header=3)
     df.index= pd.to_datetime(df.YEAR*1000000+df.M*10000+df.D*100+df.H,format='%Y%m%d%H')
     df.index = pd.to_datetime(dict(year=df.YEAR, month=df.M, day=df.D, hour=df.H))
     # Drop redundant columns
