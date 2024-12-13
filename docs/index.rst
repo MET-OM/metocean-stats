@@ -1743,6 +1743,13 @@ Convert lat/lon coordinates from degrees/minutes/seconds to decimals:
    
 returns lat = 60.5
 
+Estimate total depth of wave influence in meters:
+
+.. code-block:: python
+
+   depth = depth_of_wave_influence(Hs=12, Tp=15, ref_depth=1000,spectrum='JONSWAP', theshold=0.01)
+   
+returns depth = 692.5
 
 .. toctree::
    :maxdepth: 1

@@ -511,3 +511,50 @@ def degminsec_to_decimals(degrees,minutes,seconds):
     else:
         loc_decimals=degrees+(minutes/60)+(seconds/3600)
     return loc_decimals
+
+
+def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
+    df = 0.01
+    f=np.arange(0,1,df)
+    S_u = np.zeros((len(H_s),len(f)))
+    for i in range(len(H_s)):
+        if spectrum=='JONSWAP':
+            E = jonswap(f=f,hs=H_s[i],tp=T_p[i])
+        elif spectrum=='TORSEHAUGEN':
+            E = torsethaugen(f=f,hs=H_s[i],tp=T_p[i]) 
+
+        S_u[i,:] = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
+    
+    M0 = np.trapz(S_u*df,axis=1)
+    M2 = np.trapz((f**2)*S_u*df,axis=1)
+    Us = 2*np.sqrt(M0)
+    Tu = np.sqrt(M0/M2)
+    return Us, Tu
+
+def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01):
+    """
+    Find the depth at which wave-induced current (Us) is zero.
+    
+    Parameters:
+    - frequency: array-like, frequencies at which wave spectra are given.
+    - wave_spectra: array-like, wave spectra values corresponding to the frequencies.
+    - ref_depth: float, reference depth.
+    - theshold: minimum value in m/s for the wave-induced current to considered important default (0.01 m/s) 
+    
+    Returns:
+    - depth: float, total depth of wave influence
+    """
+    df = 0.01
+    f=np.arange(0,1,df)
+    if spectrum=='JONSWAP':
+        E = jonswap(f=f,hs=Hs,tp=Tp)
+    elif spectrum=='TORSEHAUGEN':
+        E = torsethaugen(f=f,hs=Hs,tp=Tp) 
+
+    depth_list = np.arange(0,ref_depth+0.5,0.5)
+    for depth in depth_list[::-1]:
+        S_u = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
+        M0 = np.trapz(S_u, x = f)
+        Us = 2 * np.sqrt(M0)
+        if Us>theshold:
+            return depth
