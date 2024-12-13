@@ -1,10 +1,14 @@
 Welcome to metocean-stats's documentation!
 ==========================================
 
-**metocean-stats** is a Python package (under development) for metocean analysis of NORA3 (wind and wave) hindcast.
+**metocean-stats** is a Python tool for comprehensive statistics and visualization of metocean data (wind, waves, ocean currents, tide levels, air and water temperature, sea ice, and more). The input data is conveniently provided within the tool as a Pandas DataFrame (time series of metocean variables) from a single position. 
 
-The package contains functions that:
-  * generate statistics (tables, diagrams etc)
+The tool is designed with cross-platform compatibility in mind. It can smoothly operate on various operating systems, including Linux, Windows, and MacOS. It is also compatible with WEkEO Jupyter Lab, allowing seamless integration and use. For instructions on how to install metocean-stats in WEkEO, please refer `here <https://docs.google.com/document/d/1uEvG_YZ43eu3vE33Qv9t5Bzd0QAmspKjqjzFLHEkJys/edit?usp=sharing>`_
+
+The tool contains functions that generate:
+  * general (e.g., seasonal, annual) statistics,
+  * extreme statistics, 
+  * marine operation statistics.
 
 Installing **metocean-stats**
 =============================
@@ -39,9 +43,9 @@ Alternative 2: Using Mambaforge (alternative to Miniconda) and Git
    $ conda activate metocean-stats
    $ pip install --no-deps -e .
 
-This installs the metocean-stats as an editable package. Therefore, you can directly make changes to the repository or fetch the newest changes with :code:`git pull`. 
+This installs the metocean-stats as an editable package. Therefore, you can directly change the repository or fetch the newest changes with :code:`git pull`. 
 
-To update the local conda environment in case of new dependencies added to environment.yml:
+To update the local conda environment in case new dependencies are added to environment.yml:
 
 .. code-block:: bash
 
@@ -83,7 +87,7 @@ Scatter Diagram
 .. code-block:: python
    
    tables.scatter_diagram(
-       ds, 
+       df, 
        var1='HS', 
        step_var1=1, 
        var2='TP', 
@@ -98,7 +102,7 @@ Scatter Diagram
 .. code-block:: python
    
    tables.scatter_diagram(
-       ds, 
+       df, 
        var1='HS', 
        step_var1=1, 
        var2='TP', 
