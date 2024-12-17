@@ -98,7 +98,7 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
     shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
     scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
     location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
-    shape = ['-' if element == [] else element for element in shape]  
+    shape = ['-' if (isinstance(element, (list, np.ndarray)) and len(element) == 0) else element for element in shape]  
 
     # Create the table data dictionary
     table_data = {
