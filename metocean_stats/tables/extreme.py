@@ -65,7 +65,7 @@ def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dis
     shape = ['-'] + [round(shape, 3) if isinstance(shape, (int, float)) else shape for shape, _, _ in params]    
     scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
     location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
-    shape = ['-' if element == [] else element for element in shape]   
+    shape = ['-' if (isinstance(element, (list, np.ndarray)) and len(element) == 0) else element for element in shape]   
     
     table_data = {
         'Month': months,
