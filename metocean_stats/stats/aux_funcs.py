@@ -4,6 +4,7 @@ from scipy.interpolate import interp1d
 import pandas as pd
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 from ..stats.spec_funcs import *
 
 
