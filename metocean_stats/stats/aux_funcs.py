@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
 import pandas as pd
 import numpy as np
 import time
-import os
+import matplotlib.pyplot as plt
 from ..stats.spec_funcs import *
 
 
@@ -558,3 +558,60 @@ def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01)
         Us = 2 * np.sqrt(M0)
         if Us>theshold:
             return depth
+        
+
+
+def estimate_wind_speed(height1, wind_speed1, time1, height2, time2):
+    """
+    Estimate wind speed at a different height and time period based on DnV wind speed ratio table.
+    Source: https://rules.dnv.com/docs/pdf/dnvpm/cn/2000-03/99-V895_2000.pdf
+
+    Parameters:
+    - height1 (float): Initial height in meters
+    - wind_speed1 (float): Wind speed at height1 and time1
+    - time1 (float): Time period of wind_speed1 in seconds
+    - height2 (float): Target height in meters
+    - time2 (float): Target time period in seconds
+
+    Returns:
+    - float: Estimated wind speed (wind_speed2) at height2 and time2
+
+    example:
+    wind_speed2 = estimate_wind_speed(height1=10, wind_speed1=15, time1=60, height2=50, time2=3600)
+
+    """
+    # Wind speed ratio: Classification Notes No. 30.5: https://rules.dnv.com/docs/pdf/dnvpm/cn/2000-03/99-V895_2000.pdf
+    wind_speed_ratios = {
+        1: [0.934, 0.910, 0.858, 0.793, 0.685, 0.600],
+        5: [1.154, 1.130, 1.078, 1.013, 0.905, 0.821],
+        10: [1.249, 1.225, 1.173, 1.108, 1.000, 0.916],
+        20: [1.344, 1.320, 1.268, 1.203, 1.095, 1.011],
+        30: [1.399, 1.375, 1.324, 1.259, 1.151, 1.066],
+        40: [1.439, 1.415, 1.363, 1.298, 1.190, 1.106],
+        50: [1.469, 1.445, 1.394, 1.329, 1.220, 1.136],
+        100: [1.564, 1.540, 1.489, 1.424, 1.315, 1.231]
+    }
+
+    # Corresponding time periods (in seconds): 3 sec, 5 sec, 15 sec, 1 min, 10 min, 60 min
+    time_periods = [3, 5, 15, 60, 10 * 60, 60 * 60]  # in seconds
+
+    heights = np.array(sorted(wind_speed_ratios.keys()))  # Heights in ascending order
+
+    # Prepare interpolators for time1 and time2
+    ratios_at_time1 = []
+    ratios_at_time2 = []
+
+    for height in heights:
+        f = interp1d(time_periods, wind_speed_ratios[height], kind='linear', fill_value="extrapolate")
+        ratios_at_time1.append(f(time1))
+        ratios_at_time2.append(f(time2))
+    
+    # Interpolate across heights for time1 and time2
+    ratio_at_height1 = interp1d(heights, ratios_at_time1, kind='linear', fill_value="extrapolate")(height1)
+    ratio_at_height2 = interp1d(heights, ratios_at_time2, kind='linear', fill_value="extrapolate")(height2)
+    
+    # Estimate wind speed at target height and time
+    wind_speed2 = wind_speed1 * (ratio_at_height2 / ratio_at_height1)
+    return wind_speed2
+
+

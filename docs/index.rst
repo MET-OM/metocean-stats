@@ -1751,5 +1751,16 @@ Estimate total depth of wave influence in meters:
    
 returns depth = 692.5
 
+Estimate wind speed at a different height and time period:
+
+.. code-block:: python
+
+   wind_speed2 = estimate_wind_speed(height1=10, wind_speed1=10, time1=600, height2=10, time2=60)
+
+   
+returns wind_speed2 = 11.08 m/s
+
+
+
 .. toctree::
    :maxdepth: 1
