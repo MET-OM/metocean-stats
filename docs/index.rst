@@ -72,7 +72,7 @@ Scatter Plot
       var1_units='m/s',
       var2_units='m/s', 
       title='Scatter',
-      regression_line=True,
+      regression_line='effective-variance',
       qqplot=False,
       density=True,
       output_file='scatter_plot.png')

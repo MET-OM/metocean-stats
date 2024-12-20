@@ -590,3 +590,58 @@ def nb_hours_below_threshold(df,var,thr_arr):
     del i,j
     del years,years_unique,delta_t
     return nbhr_arr
+
+def linfitef(x, y, stdx: float=1.0, stdy: float=1.0) -> tuple[float, float]:
+    """
+    Perform a linear fit considering uncertainties in both variables.
+    Parameters:
+    x (array-like): Independent variable data points.
+    y (array-like): Dependent variable data points.
+    
+    stdx (float): Standard deviation of the error of x. 
+    stdy (float): Standard deviation of the error of y.
+
+    Default: stdx=stdy=1.0
+
+    NB! Only relative values matter, i.e. stdx=1, stdy=2 gives same results as stdx=2, stdy=4.
+
+    NB! For stdx=0, the method is identical to a normal least squares fit.
+    
+    Returns:
+    tuple: Coefficients of the linear fit (slope, intercept).
+    
+    References:
+    - Orear, J (1982). Least squares when both variables have uncertainties, J. Am Phys 50(10).
+    """
+    # Convert inputs to numpy arrays
+    x = np.asarray(x)
+    y = np.asarray(y)
+    
+    # Validate input lengths
+    if x.shape != y.shape:
+        raise ValueError("Input arrays must have the same shape.")
+   
+    # Calculate means of x and y
+    x0 = np.mean(x)
+    y0 = np.mean(y)
+    
+    # Calculate variances
+    sx2 = stdx**2
+    sy2 = stdy**2
+    
+    # Calculate sum of squares
+    Sx2 = np.sum((x - x0)**2)
+    Sy2 = np.sum((y - y0)**2)
+    Sxy = np.sum((x - x0) * (y - y0))
+    
+    # Check for special cases where uncertainties or covariance might be zero
+    if sx2 == 0 or Sxy == 0:
+        slope = Sxy / Sx2
+    else:
+        term = (sy2 * Sx2)**2 - 2 * Sx2 * sy2 * sx2 * Sy2 + (sx2 * Sy2)**2 + 4 * Sxy**2 * sx2 * sy2
+        slope = (sx2 * Sy2 - sy2 * Sx2 + np.sqrt(term)) / (2 * Sxy * sx2)
+    
+    # Calculate intercept
+    intercept = y0 - slope * x0
+    
+    return slope, intercept

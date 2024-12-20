@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 from matplotlib.dates import MonthLocator, DateFormatter
 import calendar
 from math import floor,ceil
@@ -109,8 +110,26 @@ def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, 
     return fig
 
 
-def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line=True,qqplot=True,density=True,output_file='scatter_plot.png'):
-    import scipy.stats as stats
+def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line='effective-variance',qqplot=True,density=True,output_file='scatter_plot.png'):
+    """
+    Plots a scatter plot with optional density, regression line, and QQ plot. 
+    Calculates and displays statistical metrics on the plot.
+    
+    Parameters:
+        df (DataFrame): Pandas DataFrame containing the data.
+        var1 (str): Column name for the x-axis variable.
+        var2 (str): Column name for the y-axis variable.
+        var1_units (str): Units for the x-axis variable. Default is 'm'.
+        var2_units (str): Units for the y-axis variable. Default is 'm'.
+        title (str): Title of the plot. Default is an empty string.
+        regression_line (str or bool): Type of regression line ('least-squares', 'mean-slope', 'effective-variance',None). Default is effective-variance.
+        qqplot (bool): Whether to include QQ plot. Default is True.
+        density (bool): Whether to include density plot. Default is True.
+        output_file (str): Filename for saving the plot. Default is 'scatter_plot.png'.
+    
+    Returns:
+        fig: The matplotlib figure object.
+    """
 
     x=df[var1].values
     y=df[var2].values
@@ -135,12 +154,31 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
         qn_y = np.nanpercentile(y, percs)    
         ax.scatter(qn_x,qn_y,marker='.',s=80,c='b')
 
-    if regression_line:  
-        m,b,r,p,se1=stats.linregress(x,y)
-        cm0="$"+('y=%2.2fx+%2.2f'%(m,b))+"$";   
-        plt.plot(x, m*x + b, 'k--', label=cm0)
+    if regression_line == 'least-squares':
+        slope=stats.linregress(x,y).slope
+        intercept=stats.linregress(x,y).intercept
+    elif regression_line == 'mean-slope':
+        slope = np.mean(y)/np.mean(x)
+        intercept = 0 
+    elif regression_line == 'effective-variance':
+        slope = linfitef(x,y)[0] 
+        intercept = linfitef(x,y)[1] 
+    else:
+        slope = None
+        intercept = None
+
+    if slope is not None and intercept is not None:
+        if intercept > 0:
+            cm0 = f"$y = {slope:.2f}x + {intercept:.2f}$"
+        elif intercept < 0:
+            cm0 = f"$y = {slope:.2f}x - {abs(intercept):.2f}$"
+        else:
+            cm0 = f"$y = {slope:.2f}x$"
+    
+        plt.plot(x, slope * x + intercept, 'k--', label=cm0)
         plt.legend(loc='best')
-        
+
+
     rmse = np.sqrt(((y - x) ** 2).mean())
     bias = np.mean(y-x)
     mae = np.mean(np.abs(y-x))
@@ -158,7 +196,6 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     plt.title("$"+(title +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
     plt.grid()
     plt.savefig(output_file)
-
     return fig
 
 def _percentile_str_to_pd_format(percentiles):
