@@ -635,7 +635,7 @@ def linfitef(x, y, stdx: float=1.0, stdy: float=1.0) -> tuple[float, float]:
     Sxy = np.sum((x - x0) * (y - y0))
     
     # Check for special cases where uncertainties or covariance might be zero
-    if np.sum(sx2) == 0 or Sxy == 0:
+    if sx2 == 0 or Sxy == 0:
         slope = Sxy / Sx2
     else:
         term = (sy2 * Sx2)**2 - 2 * Sx2 * sy2 * sx2 * Sy2 + (sx2 * Sy2)**2 + 4 * Sxy**2 * sx2 * sy2
