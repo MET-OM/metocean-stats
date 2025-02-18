@@ -623,6 +623,6 @@ def current_direction_calculation(u, v):
     return round(angle_degree, 2)
 
 def magnitude_calculation(u,v):
-    magnitude= np.sqrt(u_current**2 + v_current**2)
+    magnitude= np.sqrt(u**2 + v**2)
     return(magnitude)
     
