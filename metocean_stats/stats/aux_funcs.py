@@ -616,7 +616,7 @@ def estimate_wind_speed(height1, wind_speed1, time1, height2, time2):
     return wind_speed2
 
 
-def current_direction_calculation(u, v):
+def direction_calculation(u, v):
     angle_radian = np.arctan2(u, v)
     angle_degree = np.degrees(angle_radian)
     angle_degree = (angle_degree + 360) % 360
