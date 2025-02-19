@@ -57,7 +57,7 @@ def plot_return_levels(data, var, rl, output_file):
     plt.legend(loc='center left')
     plt.title(output_file.split('.')[0], fontsize=18)
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     plt.close()
 
 
@@ -470,7 +470,7 @@ def plot_threshold_sensitivity(df, output_file):
     plt.title('{} year return value estimate'.format(df.attrs['period']))
 
     # Save the plot if a path is given
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -603,8 +603,6 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
     plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
     return 
-
-################
 
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
     import matplotlib.pyplot as plt
@@ -800,7 +798,7 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
     plt.xlabel('Month',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -814,7 +812,7 @@ def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 1
     plt.xlabel('Direction',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -845,7 +843,7 @@ def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', period
     plt.grid(True)
     plt.tight_layout()
     
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -899,7 +897,7 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     ax.tick_params(axis='y', labelleft=False, labelright=True)
     plt.tight_layout()
     
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     plt.close()
 
     return fig
@@ -922,12 +920,12 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
 def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
-    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
+    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
@@ -945,7 +943,7 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -968,13 +966,13 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     plt.grid(True)
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
 
-def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,max_wind=40,output_file='curr_for_given_wind.png'):
-    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=max_wind, output_file=False)
+def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,output_file='curr_for_given_wind.png'):
+    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -992,7 +990,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -1016,7 +1014,7 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -1040,6 +1038,6 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig

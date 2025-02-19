@@ -132,6 +132,7 @@ def monthly_var_rose(data,
         plt.tight_layout()
 
         # Save the figure
-        plt.savefig(output_file, dpi=100, facecolor='white', bbox_inches='tight')
+        if output_file is not None:
+            plt.savefig(output_file, dpi=100, facecolor='white', bbox_inches='tight')
 
     return fig
