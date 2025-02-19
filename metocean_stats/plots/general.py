@@ -105,97 +105,8 @@ def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, 
     ax.grid()
     ax.set_xlabel('Wave height')
     ax.set_ylabel('Probability density')
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     
-    return fig
-
-
-def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line='effective-variance',qqplot=True,density=True,output_file='scatter_plot.png'):
-    """
-    Plots a scatter plot with optional density, regression line, and QQ plot. 
-    Calculates and displays statistical metrics on the plot.
-    
-    Parameters:
-        df (DataFrame): Pandas DataFrame containing the data.
-        var1 (str): Column name for the x-axis variable.
-        var2 (str): Column name for the y-axis variable.
-        var1_units (str): Units for the x-axis variable. Default is 'm'.
-        var2_units (str): Units for the y-axis variable. Default is 'm'.
-        title (str): Title of the plot. Default is an empty string.
-        regression_line (str or bool): Type of regression line ('least-squares', 'mean-slope', 'effective-variance',None). Default is effective-variance.
-        qqplot (bool): Whether to include QQ plot. Default is True.
-        density (bool): Whether to include density plot. Default is True.
-        output_file (str): Filename for saving the plot. Default is 'scatter_plot.png'.
-    
-    Returns:
-        fig: The matplotlib figure object.
-    """
-
-    x=df[var1].values
-    y=df[var2].values
-    fig, ax = plt.subplots()
-    if density == False:
-        ax.scatter(x,y,marker='.',s=10,c='g')
-    else:
-        from matplotlib.colors import LogNorm
-        plt.hist2d(x, y,bins=50, cmap='hot',cmin=1)
-        plt.colorbar()
-
-    dmin, dmax = np.min([x,y])*0.9, np.max([x,y])*1.05
-    diag = np.linspace(dmin, dmax, 1000)
-    plt.plot(diag, diag, color='r', linestyle='--')
-    plt.gca().set_aspect('equal')
-    plt.xlim([0,dmax])
-    plt.ylim([0,dmax])
-    
-    if qqplot :    
-        percs = np.linspace(0,100,101)
-        qn_x = np.nanpercentile(x, percs)
-        qn_y = np.nanpercentile(y, percs)    
-        ax.scatter(qn_x,qn_y,marker='.',s=80,c='b')
-
-    if regression_line == 'least-squares':
-        slope=stats.linregress(x,y).slope
-        intercept=stats.linregress(x,y).intercept
-    elif regression_line == 'mean-slope':
-        slope = np.mean(y)/np.mean(x)
-        intercept = 0 
-    elif regression_line == 'effective-variance':
-        slope = linfitef(x,y)[0] 
-        intercept = linfitef(x,y)[1] 
-    else:
-        slope = None
-        intercept = None
-
-    if slope is not None and intercept is not None:
-        if intercept > 0:
-            cm0 = f"$y = {slope:.2f}x + {intercept:.2f}$"
-        elif intercept < 0:
-            cm0 = f"$y = {slope:.2f}x - {abs(intercept):.2f}$"
-        else:
-            cm0 = f"$y = {slope:.2f}x$"
-    
-        plt.plot(x, slope * x + intercept, 'k--', label=cm0)
-        plt.legend(loc='best')
-
-
-    rmse = np.sqrt(((y - x) ** 2).mean())
-    bias = np.mean(y-x)
-    mae = np.mean(np.abs(y-x))
-    corr = np.corrcoef(y,x)[0][1]
-    si = np.std(x-y)/np.mean(x)
-
-    plt.annotate('rmse = '+str(np.round(rmse,3))
-                 +'\nbias = '+str(np.round(bias,3))
-                 +'\nmae = '+str(np.round(mae,3))
-                 +'\ncorr = '+str(np.round(corr,3))
-                 +'\nsi = '+str(np.round(si,3)), xy=(dmin+1,0.6*(dmin+dmax)))
-    plt.xlabel(var1+'['+var1_units+']', fontsize=15)
-    plt.ylabel(var2+'['+var2_units+']', fontsize=15)
-
-    plt.title("$"+(title +', N=%1.0f'%(np.count_nonzero(~np.isnan(x))))+"$",fontsize=15)
-    plt.grid()
-    plt.savefig(output_file)
     return fig
 
 def _percentile_str_to_pd_format(percentiles):
@@ -385,7 +296,7 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
     plt.xlabel('Direction[$⁰$]',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
@@ -420,7 +331,7 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
         for i in range(1,len(legend_colors)+1):
             cell_dict[(i, -1)].set_facecolor(legend_colors[i-1])
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig, table
 
@@ -462,7 +373,7 @@ def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80
     plt.grid(True)
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 

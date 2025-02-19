@@ -60,27 +60,6 @@ Import plots and tables from metocean-stats:
    
    from metocean_stats import plots, tables
 
-Scatter Plot
-------------
-
-.. code-block:: python
-   
-   plots.plot_scatter(
-      df,
-      var1='W10',
-      var2='W100',
-      var1_units='m/s',
-      var2_units='m/s', 
-      title='Scatter',
-      regression_line='effective-variance',
-      qqplot=False,
-      density=True,
-      output_file='scatter_plot.png')
-
-.. image:: files/scatter_plot.png
-   :width: 500
-
-
 Scatter Diagram
 ---------------
 
@@ -1081,7 +1060,6 @@ Current Speed for Given Wind Plot
        ds_all, 
        var_curr='current_speed_0m', 
        var_wind='W10', 
-       max_wind=40, 
        output_file='curr_for_given_wind.png'
    )
 
@@ -1727,6 +1705,42 @@ Plot mean 2-m air temperature based on NORA3 data:
 .. image:: files/mean_air_temperature_map.png
   :width: 500
 
+Verifycation Functions
+===================
+Scatter Plot
+------------
+
+.. code-block:: python
+   
+   plots.plot_scatter(
+      df,
+      var1='W10',
+      var2='W100',
+      var1_units='m/s',
+      var2_units='m/s', 
+      title='Scatter',
+      regression_line='effective-variance',
+      qqplot=False,
+      density=True,
+      output_file='scatter_plot.png')
+
+.. image:: files/scatter_plot.png
+   :width: 500
+
+Taylor diagram
+------------
+
+.. code-block:: python
+
+   plots.taylor_diagram(
+      df,
+      var_ref=['HS'],
+      var_comp= ['HS.1','HS.2'],
+      norm_std=True,
+      output_file='Taylor_diagram.png')
+
+.. image:: files/Taylor_diagram.png
+   :width: 500
 
 Auxiliary Functions
 ===================

@@ -57,7 +57,7 @@ def plot_return_levels(data, var, rl, output_file):
     plt.legend(loc='center left')
     plt.title(output_file.split('.')[0], fontsize=18)
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     plt.close()
 
 
@@ -470,7 +470,7 @@ def plot_threshold_sensitivity(df, output_file):
     plt.title('{} year return value estimate'.format(df.attrs['period']))
 
     # Save the plot if a path is given
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -603,275 +603,6 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
     plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
     return 
-
-################
-
-def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram.png'):
-
-    import matplotlib.pyplot as plt
-    import math
-    import matplotlib.lines as mlines
-    import matplotlib.ticker as ticker
-
-    """
-    Plot a Taylor diagram
-    df: dataframe with all timeseries
-    var_ref: list of string with the name of the timeseries of reference
-    var_comp: list of strings with the names of the timeseries to be compared with the reference
-    norm_std: option to define normalized or non-normalized standard deviation
-
-    Option 1: #[[A,3],[B,3],[C,3]]
-    var_ref   = ['hs_sulaA','hs_sulaB','hs_sulaC'] 
-    var_comp = ['hs_nora3']
-    norm_std = True #can only run with this option
-
-    Option 2 : #Originalen [[A,3],[A,4],[A,5]]
-    var_ref   = ['hs_sulaA']
-    var_comp = ['hs_nora3','hs_nora4','hs_nora5']
-    norm_std = True/False #can run with both options
-
-    Option 3 : #[[A,3],[B,4],[C,5]]
-    var_ref   = ['hs_sulaA','hs_sulaB','hs_sulaC']
-    var_comp = ['hs_nora3','hs_nora4','hs_nora5']
-    norm_std = True #can only run with this option
-
-    """
-
-    def run_taylor(var_ref,var_comp,maxx,index,show,fig, ax):
-        def correlation(var_ref,var_comp,max_std,radius):
-            # Calculate the coordinates of the points x and y
-            # Correlation coefficient between the reference and the other(s)
-            ccf=np.zeros((len(var_comp)+1))
-            ccf[0]=np.corrcoef(df[var_ref[0]].to_numpy(),df[var_ref[0]].to_numpy())[0,1] # Should be 1
-            for i in range(len(var_comp)):
-                ccf[i+1]=np.corrcoef(df[var_ref[0]].to_numpy(),df[var_comp[i]].to_numpy())[0,1]     
-
-            # Coordinates of the lines for the correlation
-            xbc1=np.arange(0.0,max_std+0.015,0.001)
-            corr=np.array([0.2,0.4,0.6,0.8,0.9,0.95,0.99])
-            ycr=np.zeros((len(corr),len(xbc1)))
-            for r in range(len(corr)):
-                for a in range(len(xbc1)):
-                    ycr[r,a]=math.tan(math.acos(corr[r]))*xbc1[a]
-                    d=np.sqrt(ycr[r,a]**2+xbc1[a]**2)
-                    if d>np.max(radius):
-                        ycr[r,a]=np.nan
-                    del d
-            return ccf,xbc1,ycr,corr
-
-        def set_axes_and_std(var_ref,var_comp,maxx):
-            std=np.zeros((len(var_comp)+1))
-            std[0]=np.std(df[var_ref].to_numpy())
-            for i in range(len(var_comp)):
-                std[i+1]=np.std(df[var_comp[i]].to_numpy())
-            if norm_std==True:
-                std=std/std[0]
-
-            # Coordinates of the big circles
-            min_std=0
-            max_std=maxx + 0.5 #to set the max of x-y
-
-            if max_std<=5:
-                step=0.5
-            elif ((max_std>5) & (max_std<=10)):
-                step=1
-            elif ((max_std>10) & (max_std<=20)):
-                step=3
-            else:
-                step=5
-
-            radius=np.arange(min_std+step,max_std,step)
-            radius=np.concatenate([radius,np.array([max_std])])
-            radius1=radius
-            xbc=np.arange(0.0,max_std+0.01,0.0001)
-            ybc=np.zeros((len(radius),len(xbc)))
-            ysc=np.zeros((len(radius),len(xbc)))
-            for r in range(len(radius)):
-                for a in range(len(xbc)):
-                    ybc[r,a]=np.sqrt(radius[r]**2-xbc[a]**2)
-                    ysc[r,a]=np.sqrt(radius1[r]**2-(xbc[a]-std[0])**2)
-                    d=np.sqrt(ysc[r,a]**2+xbc[a]**2)
-                    if d>np.max(radius):
-                        ysc[r,a]=np.nan
-                    del d
-
-            return std,max_std,radius,xbc,ybc,step
-
-        def plotting(var_ref,var_comp,maxx,index):
-            #Plot the data
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-
-            #Get the data
-            std,max_std,radius,xbc,ybc,step=set_axes_and_std(var_ref,var_comp,maxx)
-            ccf,xbc1,ycr,corr = correlation(var_ref,var_comp,max_std,radius)
-            # Coordinates of the correlation labels
-            corr1=np.array([0.0,0.2,0.4,0.6,0.8,0.9,0.95,0.99,1.0])
-            text=[]
-            xt=np.zeros((len(corr1)))
-            yt=np.zeros((len(corr1)))
-            #angle=np.zeros((len(corr1)))
-            angle=np.array([0,-10,-24,-37,-50,-62,-71,-82,-90])
-            for i in range(len(corr1)):
-                text.append(str(corr1[i]))
-                xt[i]=corr1[i]*(max_std+0.1)
-                yt[i]=math.sin(math.acos(corr1[i]))*(max_std+0.1)
-                #angle[i]=math.acos(corr1[i])*180.0/math.pi
-                angle[i]=angle[i]
-            #angle=0.0-angle[::-1]
-            
-            if show==True:
-                for r in range(len(radius)):
-                    ax.plot(xbc[:],ybc[r,:],'k',linewidth=1.0)
-                for r in range(len(corr)):
-                    ax.plot(xbc1[:],ycr[r,:],'k',linewidth=1.0,linestyle='dotted')
-
-            rmsdif=np.sqrt(std**2+std[0]**2-2*std*std[0]*ccf)
-            
-            # Coordinates
-            x=ccf*std
-            y=np.sqrt((rmsdif**2)-((std[0]-x)**2))
-            xa=np.linspace(0,max_std+1,1000)
-            xx,yy=np.meshgrid(xa,xa)
-            del xa
-            zz=np.sqrt((xx-std[0])**2+yy**2)
-            zz1=np.sqrt(xx**2+yy**2)
-            zz=np.where(zz1>max_std,np.nan,zz)
-            del zz1
-
-            levels_crms=np.arange(step,np.nanmax(zz)-step,step) if step<1 else np.arange(step,np.nanmax(zz),step)
-            CS = ax.contour(xx,yy,zz,colors='gray',linewidths=1.0,linestyles='--',levels=levels_crms)
-            fmt = ticker.ScalarFormatter()
-            fmt.create_dummy_axis()
-            list_tup=[(std[0],yv) for yv in levels_crms]
-            ax.clabel(CS, CS.levels, fmt=fmt, fontsize=14,inline=True,inline_spacing=-2,manual=list_tup)
-
-            # Plot reference point in black
-            ax.plot(std[0],0.0,'o',clip_on=False,color='k', markersize=14)
-            # Plot reference circle
-            ybc_r=np.sqrt(std[0]**2-xbc**2)
-            ax.plot(xbc,ybc_r,'k',linewidth=2.0)
-
-            # Plot the other points
-            # List of potential markers
-            list_mrk = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h']
-            # List of potential colors
-            list_col = ['red', 'green', 'blue', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
-            combinations = [[x, y] for x in list_mrk for y in list_col] # First index is the marker, second the color
-            combinations=combinations[0:index] if index>0 else combinations[0:len(var_comp)]
-
-            if (index==0) or (index==1):
-                legends.append(mlines.Line2D([], [], color='k', marker='o', linestyle='None',markersize=14, label=var_ref[0]))
-            else:
-                legends.append(mlines.Line2D([], [], color='k', marker='o', linestyle='None',markersize=14, label=var_ref[0]))
-        
-            if index==0:
-                index = index+1
-            for ri,rj in zip(range(1,len(var_comp)+1),range(index,len(var_comp)+index)): # Actual plotting of the data
-                ax.plot(x[ri],y[ri],clip_on=False,marker=combinations[rj-1][0],color=combinations[rj-1][1],markersize=14,markerfacecolor=combinations[rj-1][1])
-                legends.append(mlines.Line2D([],[],marker=combinations[rj-1][0],color=combinations[rj-1][1], linestyle='None',markersize=14, label=var_comp[ri-1]))
-
-            if show==True:
-                num_lines = len(legends)
-                ncol=1 if num_lines < 7 else 2 if num_lines < 13 else 3
-                Size='x-large' if ncol<3 else 'large' 
-                plt.legend(prop=dict(size=Size),handles=legends,ncol=ncol,loc="upper right", fontsize="20",bbox_to_anchor=(1.1, 1.))
-
-            ax.text(max_std*0.73, max_std*0.73, 'Correlation',ha="center", va="center", size=18, rotation=-45.)
-            
-            for i in range(len(corr1)):
-                ax.plot(xt[i],yt[i],clip_on=False,marker='o',color='None',markersize=6,markerfacecolor='None')
-                ax.text(xt[i],yt[i],text[i],ha="center", va="center", size=16, rotation=angle[i])
-            
-            if norm_std==True:
-                ax.set_xlabel('Normalized standard deviation',fontsize=18)
-            else:
-                ax.set_xlabel('Standard deviation',fontsize=18)
-            
-            if show==True:
-                plt.xlim(0,max_std+0.02)
-                plt.ylim(0,max_std+0.02)
-                plt.xticks(fontsize=16)
-                plt.yticks(fontsize=16)
-                plt.show()
-            return 
-
-        plotting(var_ref,var_comp,maxx,index)
-        return
-    
-    legends = []
-    if (len(var_ref)<len(var_comp)) and (len(var_ref)==1): #for option 2
-        fig, ax = plt.subplots(figsize=(10, 10))
-        model_ref = df[var_ref[0]] 
-        std_mod = df[model_ref.name].std()
-        var=[*var_ref,*var_comp] 
-        #to find the max of the variables to set the len of axis 
-        maxx=int(np.max(df[var].std())/std_mod if norm_std else np.max(df[var].std())) #max value on the x-y axis
-        show=True #Always true in this case
-        index=0        
-        var_ref = np.array(var_ref)
-        run_taylor(var_ref,var_comp,maxx,index,show,fig, ax)
-
-    elif (len(var_ref)>len(var_comp)) and (len(var_comp)==1): #for option 1
-        if norm_std != True:
-            print('This option can only be runned with normalized standard deviation as True.')
-            return
-        fig, ax = plt.subplots(figsize=(10, 10))
-        var=[*var_ref,*var_comp]
-        i_end = len(var_ref)
-        minn = np.nanmin(df[var_ref].std())
-        stdd_c = df[var_comp].std()
-        maxx = int(np.max(stdd_c/minn))
-        index = 0
-        #loop over len of var_ref
-        for i in range(len(var_ref)):
-            var_ref1 = var_ref[i]
-            var_comp1 = var_comp[0]
-            model_ref = df[var_ref1]
-            std_mod = df[model_ref.name].std()
-            if i==i_end-1:
-                show=True
-                index = index+1
-                run_taylor([var_ref1],[var_comp1],maxx,index,show,fig,ax)
-            else:
-                show=False
-                index = index + 1
-                run_taylor([var_ref1],[var_comp1],maxx,index,show,fig,ax)
-
-    elif len(var_ref)==len(var_comp): #for option 3
-        if norm_std != True:
-            print('This option can only be runned with normalized standard deviation as True.')
-            return
-        fig, ax = plt.subplots(figsize=(10, 10))
-        var=[*var_ref,*var_comp]
-        i_end = len(var_ref)
-        #to find the max value to set on the x-y axis
-        std_max = []
-        for i in range(len(var_ref)):
-            std_m = (df[var_comp[i]].std()/df[var_ref[i]].std())
-            std_max.append(std_m)
-        maxx = np.nanmax(std_max)
-        index = 0
-        #loop over len of var_ref
-        for i in range(len(var_ref)):
-            var_ref1 = var_ref[i]
-            var_comp1 = var_comp[i]
-            model_ref = df[var_ref1]
-            std_mod = df[model_ref.name].std()
-
-            if i==i_end-1:
-                index = index + 1
-                show=True
-                run_taylor([var_ref1],[var_comp1],maxx,index,show,fig,ax)
-            else:
-                index = index + 1 
-                show=False
-                run_taylor([var_ref1],[var_comp1],maxx,index,show,fig,ax)
-            
-    else:   
-        print('The option you have sent in is invalid.')
-    #plt.savefig(output_file,dpi=200,facecolor='white',bbox_inches='tight')
-    return
 
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
     import matplotlib.pyplot as plt
@@ -1067,7 +798,7 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
     plt.xlabel('Month',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -1081,7 +812,7 @@ def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 1
     plt.xlabel('Direction',fontsize=15)
     plt.legend()
     plt.grid()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -1112,7 +843,7 @@ def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', period
     plt.grid(True)
     plt.tight_layout()
     
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     return fig
 
 
@@ -1166,7 +897,7 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     ax.tick_params(axis='y', labelleft=False, labelright=True)
     plt.tight_layout()
     
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
     plt.close()
 
     return fig
@@ -1189,12 +920,12 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
 def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
-    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=40, output_file=False)
+    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
@@ -1212,7 +943,7 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -1235,13 +966,13 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     plt.grid(True)
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
 
-def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,max_wind=40,output_file='curr_for_given_wind.png'):
-    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=max_wind, output_file=False)
+def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,output_file='curr_for_given_wind.png'):
+    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -1259,7 +990,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -1283,7 +1014,7 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig
 
@@ -1307,6 +1038,6 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file)
 
     return fig

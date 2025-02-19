@@ -266,15 +266,6 @@ def test_plot_monthly_return_periods_cur_pot(ds=ds_ocean):
 #def test_profile_shear(ds=ds):
 #    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
 
-#def test_predict_ts_GBR(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='GBR')
-
-#def test_predict_ts_SVR(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='SVR_RBF')
-
-#def test_predict_ts_LSTM(ds=ds):
-#    ml_stats.predict_ts(ts_origin=ds.data,var_origin=['hs','tp','Pdir'],ts_train=ds.data.loc['2000-01-01':'2000-01-10'],var_train=['hs'], model='LSTM')
-
 def test_plot_nb_hours_below_threshold(ds=ds):
     output_file = 'test_plot_nb_hr_below_t.png'
     fig = plots.plot_nb_hours_below_threshold(ds,var='HS',thr_arr=(np.arange(0.05,20.05,0.05)).tolist(),output_file=output_file)
@@ -375,4 +366,9 @@ def test_plot_monthly_stats_month_xticks():
     assert len(labels) == 12, f"Expected 12 x-tick labels for months, but found {len(labels)}."
     assert labels[0] == "Jan", f"Expected 'Jan' for the first month, but found {labels[0]}."
     print("test_plot_monthly_stats_month_xticks passed.")
-    
+
+
+def test_plot_taylor_diagram():
+    fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
