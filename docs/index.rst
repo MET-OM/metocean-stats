@@ -1705,7 +1705,7 @@ Plot mean 2-m air temperature based on NORA3 data:
 .. image:: files/mean_air_temperature_map.png
   :width: 500
 
-Verifycation Functions
+Verification Functions
 ===================
 Scatter Plot
 ------------
