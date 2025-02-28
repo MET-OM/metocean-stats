@@ -107,8 +107,6 @@ def plot_scatter_diagram(
     for i in range(len(bins_var2)-1):
         cols.append(_tick_writer(bins_var2[i],bins_var2[i+1],sumcols[i+1]))
 
-    print(rows)
-
     rows = rows[::-1]
     tbl = tbl[::-1,:]
     dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
