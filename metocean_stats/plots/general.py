@@ -6,20 +6,74 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 from matplotlib.dates import MonthLocator, DateFormatter
+from matplotlib.colors import LogNorm
 import calendar
 from math import floor,ceil
 from ..stats.general import *
 from ..tables.general import *
 
 
-def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
+def plot_scatter_diagram(
+        data: pd.DataFrame, 
+        var1: str, step_var1: float, 
+        var2: str, step_var2: float, 
+        output_file='', 
+        log_color=False, 
+        annot=False, 
+        annot_decimals = 2,
+        range_including = True, 
+        marginal_percentage = True,
+        cmap = plt.get_cmap('Blues'),
+        use_cbar = True,
+        square = False,
+        linewidths:float = 0,
+        linecolor: str = 'black',
+        **kwargs
+        ):
     """
-    The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
-    step_var: size of bin e.g., 0.5m for hs and 1s for Tp
-    cmap: colormap, default is 'Blues'
-    outputfile: name of output file with extrensition e.g., png, eps or pdf 
-     """
+    
+    Parameters
+    -----------
+    data : pd.DataFrame
+        The data containing the variables as columns.
+    var1 : str
+        The first variable, plotted on y-axis
+    step_var1 : float
+        Interval of bins of the first variable.
+    var2 : str
+        The second variable, plotted on x-axis.
+    step_var2 : float
+        Interval of bins of the second variable.
+    output_file : str, default = ''
+        Output filename. Empty string will not save a file.
+    log_color : bool, default False
+        Use logarithmic colorscale.
+    annot : bool, default False
+        Write the numeric value of each cell in the figure.
+    annot_decimals : int, default 2
+        Accuracy of annotated cell values.
+    range_including : bool, default True
+        Include the end of the range in the tick labels, e.g. 0.0-0.5 instead of just 0.0
+    marginal_percentage : bool, default True
+        Include the marginal percentage on ticks, e.g. 0.0-0.5 | 5.8%
+    cmap : matplotlib colormap, default "Blues"
+        Any matplotlib colormap.
+    use_cbar : bool, default True
+        Whether to include the colorbar.
+    square : bool, default False
+        Make the figure a square.
+    **kwargs : other arguments
+        Any other keyword arguments accepted by seaborn heatmap.
+        
+    Returns
+    ----------
+    matplotlib figure
+
+    Notes
+    -------
+    The function is written by dung-manh-nguyen, KonstantinChri, and efvik.
+    """
 
     sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
 
@@ -32,35 +86,41 @@ def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: 
     sumcols = np.sum(tbl, axis=0)
     sumrows = np.sum(tbl, axis=1)
 
-    sumrows = np.around(sumrows, decimals=1)
-    sumcols = np.around(sumcols, decimals=1)
-
     bins_var1 = sd.index
     bins_var2 = sd.columns
     lower_bin_1 = bins_var1[0] - step_var1
     lower_bin_2 = bins_var2[0] - step_var2
 
+    def _tick_writer(range_start,range_end,percentage):
+        tick = f'{range_start:.1f}'
+        if range_including: tick = tick + f'-{range_end:.1f}'
+        if marginal_percentage: tick = tick + f' | {percentage:.{annot_decimals}f}%'
+        return tick
+
     rows = []
-    rows.append(f'{lower_bin_1:04.1f}-{bins_var1[0]:04.1f} | {sumrows[0]:04.1f}%')
+    rows.append(_tick_writer(lower_bin_1,bins_var1[0],sumrows[0]))
     for i in range(len(bins_var1)-1):
-        rows.append(f'{bins_var1[i]:04.1f}-{bins_var1[i+1]:04.1f} | {sumrows[i+1]:04.1f}%')
+        rows.append(_tick_writer(bins_var1[i],bins_var1[i+1],sumrows[i+1]))
 
     cols = []
-    cols.append(f'{int(lower_bin_2)}-{int(bins_var2[0])} | {sumcols[0]:04.1f}%')
+    cols.append(_tick_writer(lower_bin_2,bins_var2[0],sumcols[0]))
     for i in range(len(bins_var2)-1):
-        cols.append(f'{int(bins_var2[i])}-{int(bins_var2[i+1])} | {sumcols[i+1]:04.1f}%')
+        cols.append(_tick_writer(bins_var2[i],bins_var2[i+1],sumcols[i+1]))
+
+    print(rows)
 
     rows = rows[::-1]
     tbl = tbl[::-1,:]
     dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
     fig,ax = plt.subplots()
-    sns.heatmap(ax=ax,data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
+    norm = LogNorm() if log_color else None
+    mask = (dfout.round(annot_decimals)>0) if annot else (dfout>0)
+    sns.heatmap(ax=ax,data=dfout.where(mask), cbar=use_cbar, cmap=cmap, fmt=f".{annot_decimals}f",norm=norm,annot=annot, square=square, linewidths=linewidths,linecolor=linecolor,**kwargs)
+
     plt.ylabel(var1)
     plt.xlabel(var2)
     plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
+    if output_file != '': plt.savefig(output_file)
     return fig
     
     
