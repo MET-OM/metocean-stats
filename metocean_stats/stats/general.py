@@ -22,19 +22,30 @@ def calculate_scatter(data,var1, step_var1, var2, step_var2, from_origin=False, 
     step_var2 : float
         Bin size of the second variable.
     from_origin : bool, default False
-        This will start the scatter diagram at the origin, even if there are no values in the first bin(s).
+        This will include the origin, even if there are no values near zero.
     labels_lower : bool, default False
-        By default, upper edges of bins are used as index and column labels. 
-        Switch this to use lower bin edges instead.
+        By default, upper edges of bins are used as labels. Switch this to use lower bin edges instead.
     '''
-    xmin = 0 if from_origin else (data[var2].values.min()//step_var2)*step_var2
-    ymin = 0 if from_origin else (data[var1].values.min()//step_var1)*step_var1
 
-    x = np.arange(xmin,data[var2].values.max()+step_var2,step_var2)
-    y = np.arange(ymin,data[var1].values.max()+step_var1,step_var1)
+    # Initial min and max
+    xmin = data[var2].values.min()
+    ymin = data[var1].values.min()
+    xmax = data[var2].values.max()
+    ymax = data[var1].values.max()
 
+    # Change min (max) to zero only if all values are above (below) and from_origin=True
+    xmin = 0 if (from_origin and (xmin>0)) else (xmin//step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else (ymin//step_var1)*step_var1
+
+    xmax = 0 if (from_origin and (xmax<0)) else xmax
+    ymax = 0 if (from_origin and (ymax<0)) else ymax
+
+    # Define bins and get histogram
+    x = np.arange(xmin,xmax+step_var2,step_var2)
+    y = np.arange(ymin,ymax+step_var1,step_var1)
     a, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
 
+    # Choose upper or lower edges as labels
     x = x[:-1] if labels_lower else x[1:]
     y = y[:-1] if labels_lower else y[1:]
 
