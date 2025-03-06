@@ -536,9 +536,10 @@ def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01)
     Find the depth at which wave-induced current (Us) is zero.
     
     Parameters:
-    - frequency: array-like, frequencies at which wave spectra are given.
-    - wave_spectra: array-like, wave spectra values corresponding to the frequencies.
+    - Hs: float-type, value of significant wave height.
+    - Tp: float-type, value of peak wave period.
     - ref_depth: float, reference depth.
+    - spectrum: type of spectrum, 'JONSWAP' or 'TORSEHAUGEN'
     - theshold: minimum value in m/s for the wave-induced current to considered important default (0.01 m/s) 
     
     Returns:

@@ -60,27 +60,6 @@ Import plots and tables from metocean-stats:
    
    from metocean_stats import plots, tables
 
-Scatter Plot
-------------
-
-.. code-block:: python
-   
-   plots.plot_scatter(
-      df,
-      var1='W10',
-      var2='W100',
-      var1_units='m/s',
-      var2_units='m/s', 
-      title='Scatter',
-      regression_line='effective-variance',
-      qqplot=False,
-      density=True,
-      output_file='scatter_plot.png')
-
-.. image:: files/scatter_plot.png
-   :width: 500
-
-
 Scatter Diagram
 ---------------
 
@@ -855,7 +834,7 @@ Current Speed Monthly Return Periods Plot
 .. code-block:: python
 
    plots.plot_monthly_return_periods(
-       ds_ocean, 
+       df, 
        var='current_speed_0m', 
        periods=[1, 10, 100], 
        distribution='Weibull3P_MOM', 
@@ -874,7 +853,7 @@ Current Speed Monthly Rose Plot
 .. code-block:: python
 
    plots.var_rose(
-       ds_ocean, 
+       df, 
        'current_direction_0m', 
        'current_speed_0m', 
        max_perc=30, 
@@ -893,7 +872,7 @@ Current Speed Overall Rose Plot
 .. code-block:: python
 
    plots.var_rose(
-       ds_ocean, 
+       df, 
        'current_direction_0m', 
        'current_speed_0m', 
        max_perc=30, 
@@ -912,7 +891,7 @@ Current Speed Monthly Statistics Plot
 .. code-block:: python
 
    plots.plot_monthly_stats(
-       ds_ocean, 
+       df, 
        var='current_speed_0m', 
        show=['Mean', 'P99', 'Maximum'], 
        title='Current[m/s], depth:0m', 
@@ -985,7 +964,7 @@ Current Speed Directional Statistics Plot
 .. code-block:: python
 
    plots.plot_directional_stats(
-       ds_ocean, 
+       df, 
        var='current_speed_0m', 
        var_dir='current_direction_0m', 
        step_var=0.05, 
@@ -1003,7 +982,7 @@ Current Speed Directional Return Periods Table
 .. code-block:: python
 
    tables.table_directional_return_periods(
-       ds_ocean, 
+       df, 
        var='current_speed_0m', 
        periods=[1, 10, 100, 10000], 
        units='m/s', 
@@ -1023,7 +1002,7 @@ Current Speed Monthly Return Periods Table
 .. code-block:: python
 
    tables.table_monthly_return_periods(
-       ds_ocean, 
+       df, 
        var='current_speed_0m', 
        periods=[1, 10, 100, 10000], 
        units='m/s', 
@@ -1043,7 +1022,7 @@ Current Speed Profile Return Values Plot
 .. code-block:: python
 
    plots.plot_profile_return_values(
-       ds_ocean, 
+       df, 
        var=['current_speed_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        periods=[1, 10, 100, 10000], 
@@ -1081,7 +1060,6 @@ Current Speed for Given Wind Plot
        ds_all, 
        var_curr='current_speed_0m', 
        var_wind='W10', 
-       max_wind=40, 
        output_file='curr_for_given_wind.png'
    )
 
@@ -1165,7 +1143,7 @@ Extreme Current Profile Return Values Table
 .. code-block:: python
 
    tables.table_extreme_current_profile_rv(
-       ds_ocean, 
+       df, 
        var=['current_speed_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        periods=[1, 100, 1000], 
@@ -1188,7 +1166,7 @@ Profile Statistics Table
 .. code-block:: python
 
    tables.table_profile_stats(
-       ds_ocean, 
+       df, 
        var=['current_speed_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        var_dir=['current_direction_' + d for d in depth], 
@@ -1205,7 +1183,7 @@ Profile Statistics Plot
 .. code-block:: python
 
    plots.plot_profile_stats(
-       ds_ocean, 
+       df, 
        var=['current_speed_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        reverse_yaxis=True, 
@@ -1255,7 +1233,7 @@ Sea Temperature Profile Monthly Stats Table (Mean)
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='mean', 
@@ -1271,7 +1249,7 @@ Sea Temperature Profile Monthly Stats Table (Standard Deviation)
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='std.dev', 
@@ -1287,7 +1265,7 @@ Sea Temperature Profile Monthly Stats Table (Minimum)
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='minimum', 
@@ -1303,7 +1281,7 @@ Sea Temperature Profile Monthly Stats Table (Maximum)
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='maximum', 
@@ -1319,7 +1297,7 @@ Mean Sea Temperature Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='mean', 
@@ -1337,7 +1315,7 @@ Sea Temperature Profile Monthly Stats Plot (Minimum)
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='minimum', 
@@ -1354,7 +1332,7 @@ Sea Temperature Profile Monthly Stats Plot (Maximum)
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='maximum', 
@@ -1371,7 +1349,7 @@ Mean Sea Temperature Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='mean', 
@@ -1388,7 +1366,7 @@ Min. Sea Temperature Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='minimum', 
@@ -1405,7 +1383,7 @@ Max. Sea Temperature Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['temp_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='maximum', 
@@ -1422,7 +1400,7 @@ Mean Salinity Profile Monthly Stats Table
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='mean', 
@@ -1438,7 +1416,7 @@ Standard Deviation Salinity Profile Monthly Stats Table
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='std.dev', 
@@ -1454,7 +1432,7 @@ Min. Salinity Profile Monthly Stats Table
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='minimum', 
@@ -1470,7 +1448,7 @@ Max. Salinity Profile Monthly Stats Table
 .. code-block:: python
 
    tables.table_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='maximum', 
@@ -1486,7 +1464,7 @@ Mean Salinity Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='mean', 
@@ -1503,7 +1481,7 @@ Standard Deviation Salinity Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='std.dev', 
@@ -1520,7 +1498,7 @@ Min. Salinity Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='minimum', 
@@ -1537,7 +1515,7 @@ Max. Salinity Profile Monthly Stats Plot
 .. code-block:: python
 
    plots.plot_profile_monthly_stats(
-       ds_ocean, 
+       df, 
        var=['salt_' + d for d in depth], 
        z=[float(d[:-1]) for d in depth], 
        method='maximum', 
@@ -1727,6 +1705,42 @@ Plot mean 2-m air temperature based on NORA3 data:
 .. image:: files/mean_air_temperature_map.png
   :width: 500
 
+Verification Functions
+===================
+Scatter Plot
+------------
+
+.. code-block:: python
+   
+   plots.plot_scatter(
+      df,
+      var1='W10',
+      var2='W100',
+      var1_units='m/s',
+      var2_units='m/s', 
+      title='Scatter',
+      regression_line='effective-variance',
+      qqplot=False,
+      density=True,
+      output_file='scatter_plot.png')
+
+.. image:: files/scatter_plot.png
+   :width: 500
+
+Taylor diagram
+------------
+
+.. code-block:: python
+
+   plots.taylor_diagram(
+      df,
+      var_ref=['HS'],
+      var_comp= ['HS.1','HS.2'],
+      norm_std=True,
+      output_file='Taylor_diagram.png')
+
+.. image:: files/Taylor_diagram.png
+   :width: 500
 
 Auxiliary Functions
 ===================
