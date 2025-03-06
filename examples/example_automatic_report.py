@@ -452,7 +452,7 @@ add_table_to_doc(doc, df2, col_width=50, row_height=0.7, header_text=header_text
 
 
 # Legge til figur 4.3 
-plots.plot_monthly_stats(df,var="W10",show=["min","mean","max"],title='Monthly W10 [m/s]',fill_between=["25%","75%"],fill_color_like="mean",output_file=folder + '/' +'monthly_wind_stats.png')
+plots.plot_monthly_stats(df,var=var_wind,show=["min","mean","max"],title='Monthly W10 [m/s]',fill_between=["25%","75%"],fill_color_like="mean",output_file=folder + '/' +'monthly_wind_stats.png')
 add_image_with_caption(doc, folder + '/' +'monthly_wind_stats.png', "Figure 4.3: Monthly distribution of mean, P99 and maximum wind speed 10 m above mean sea level at the " + LocationX + " field.", orientation="portrait")
 
 # Legg til figur 4.4
@@ -467,7 +467,7 @@ doc.add_paragraph(
 f"Figure 4.5 shows the hindcast and fitted distributions of wind speed at the {LocationX} field.")
 
 # Legg til figur 4.5
-plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var="W10",output_file=folder + "/" +"prob_non_exceedance_wind_fitted_3p_weibull.png")
+plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var=var_wind,output_file=folder + "/" +"prob_non_exceedance_wind_fitted_3p_weibull.png")
 add_image_with_caption(doc, folder + '/' +'prob_non_exceedance_wind_fitted_3p_weibull.png', f"Figure 4.5: Hindcast (red) and fitted (blue line) distributions of 1 -hour mean wind speed 10 m [m/s] above sea level at the {LocationX}"
 "field.", orientation="portrait")
 doc.add_paragraph() 
@@ -477,7 +477,7 @@ f"wind speed at the {LocationX} field. The direction extremes are adjusted in ag
 "N-003:2017.")
 
 # Legg til figur 4.6
-plots.plot_directional_return_periods(df,var="W10",units = 'm/s', var_dir="D10",periods = [1,10,100,10000],output_file=folder + "/" +"W10_dir_extremes_Weibull_norsok.png",distribution="Weibull3P")
+plots.plot_directional_return_periods(df,var=var_wind,units = 'm/s', var_dir=var_wind_dir,periods = [1,10,100,10000],output_file=folder + "/" +"W10_dir_extremes_Weibull_norsok.png",distribution="Weibull3P")
 add_image_with_caption(doc, folder + '/' +'W10_dir_extremes_Weibull_norsok.png', f"Figure 4.6: Directional extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years, 10 m above sea "
 f"level at the {LocationX} field. The direction extremes are adjusted in agreement with NORSOK Standard N - 003:2017", orientation="portrait")
 doc.add_paragraph()
@@ -493,14 +493,14 @@ doc.add_paragraph("Figure 4.7 and Table 4.4 show monthly Weibull parameters and 
 doc.add_paragraph()  
 
 # Legg til figur 4.7
-plots.plot_monthly_return_periods(df,var="W10",units='m/s', periods=[1,10,100,10000],output_file=folder + "/" +"W10_monthly_extremes.png")
+plots.plot_monthly_return_periods(df,var=var_wind,units='m/s', periods=[1,10,100,10000],output_file=folder + "/" +"W10_monthly_extremes.png")
 add_image_with_caption(doc, folder + '/' +'W10_monthly_extremes.png', f"Figure 4.7: Monthly extreme values of 1 -hour mean wind speed with return period of 1, 10, 100 and 10 000 years 10 m above sea "
 f"level at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph()  
 doc.add_page_break()
 
 # Legger til tabell 4.4
-df4= tables.table_monthly_joint_distribution_Hs_Tp_return_values(df,var_hs=var_hs,var_tp='TP',periods=[1,10,100,10000],output_file=None)
+df4= tables.table_monthly_joint_distribution_Hs_Tp_return_values(df,var_hs=var_hs,var_tp=var_tp,periods=[1,10,100,10000],output_file=None)
 header_text = "Table 4.4: Monthly and annual Weibull parameters and corresponding extreme values for 1-hour mean wind speed 10 m above sea level at the " + LocationX + " field. Duration of the event is 1 hour."
 add_table_to_doc(doc, df4, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
 
@@ -513,9 +513,9 @@ doc.add_paragraph()
 doc.add_page_break()
 
 # Tabell 4.5
-df5 = tables.table_profile_return_values(df,var=[var_wind,'W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=None)
-header_text = "Table 4.5: Omni-directional extreme values for 1 - hour mean wind speed as function of height above mean sea level at " + LocationX + " field."
-add_table_to_doc(doc, df5, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
+#df5 = tables.table_profile_return_values(df,var=[var_wind,'W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000], output_file=None)
+#header_text = "Table 4.5: Omni-directional extreme values for 1 - hour mean wind speed as function of height above mean sea level at " + LocationX + " field."
+#add_table_to_doc(doc, df5, col_width=50, row_height=0.7, header_text=header_text,header_color='D3D3D3', data_color='D2B48C')
 
 # 4.1.5 Wind Gust
 #doc.add_heading(f"4.1.5 Wind Gust", level=3)
@@ -684,7 +684,7 @@ f"Figure 5.5 shows the hindcast and fitted distributions of significant wave hei
 doc.add_paragraph()
 
 # Legg til figur 5.5
-plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var="HS",output_file=folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png")
+plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var=var_hs,output_file=folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png")
 add_image_with_caption(doc, folder + "/" +"prob_non_exceedance_Hs_fitted_3p_weibull.png", f"Figure 5.5: Hindcast (red dots) and fitted (blue line) distributions of significant wave height at the {LocationX} field.", orientation="portrait")
 doc.add_paragraph() 
 
@@ -697,7 +697,7 @@ f"height at the {LocationX} field. The direction extremes are adjusted in agreem
 doc.add_paragraph()
 
 # Legg til figur 5.6
-plots.plot_directional_return_periods(df,var="HS",var_dir="DIRP",distribution="Weibull3P",output_file=folder + "/" +"dir_extremes_Weibull_norsok.png")
+plots.plot_directional_return_periods(df,var=var_hs,var_dir=var_wave_dir,distribution="Weibull3P",output_file=folder + "/" +"dir_extremes_Weibull_norsok.png")
 add_image_with_caption(doc, folder + '/' +'dir_extremes_Weibull_norsok.png', f"Figure 5.6: Adjusted directional extreme values of significant wave height with return period 1, 10, 100 and 10 000 years at the "
 f"{LocationX} field. The direction extremes are adjusted in agreement with NORSOK Standard N -003:2017.", orientation="portrait")
 doc.add_paragraph()
@@ -705,7 +705,7 @@ doc.add_paragraph()
 # MANGLER 1 TABELL___________
 
 # Legg til figur 5.7
-plots.plot_monthly_return_periods(df,var="HS",periods=[1,10,100,10000],distribution="Weibull3P_MOM",output_file=folder + "/" +"HS_monthly_extremes.png")
+plots.plot_monthly_return_periods(df,var=var_hs,periods=[1,10,100,10000],distribution="Weibull3P_MOM",output_file=folder + "/" +"HS_monthly_extremes.png")
 add_image_with_caption(doc, folder + '/' +'HS_monthly_extremes.png', f"Figure 5.7: Monthly extreme values of significant wave height with return period of 1, 10, 100, and 10 000 years.", orientation="portrait")
 doc.add_paragraph()  
 
@@ -729,7 +729,7 @@ doc.add_paragraph()
 
 
 # Legg til figur 5.8
-plots.plot_scatter_diagram(df,var1="hs",step_var1=0.5,var2="tp",step_var2=1,output_file=folder + "/" +"tp_for_given_hs.png")
+plots.plot_scatter_diagram(df,var1=var_hs,step_var1=0.5,var2=var_tp,step_var2=1,output_file=folder + "/" +"tp_for_given_hs.png")
 add_image_with_caption(doc, folder + '/' +'tp_for_given_hs.png', f"Figure 5.8: Spectral peak period (Tp) for given significant wave height (Hs) at the {LocationX} field. Heat colormap indicates the density "
 "of observations", orientation="portrait")
 doc.add_paragraph() 
@@ -748,7 +748,7 @@ doc.add_paragraph()
 plots.plot_joint_distribution_Hs_Tp(
     df,
     var_hs=var_hs,
-    var_tp='TP',
+    var_tp=var_tp,
     periods=[1,10,100,1000],
     title='Hs-Tp joint distribution',
     output_file=folder + '/' +'Hs.Tp.joint.distribution.png',
@@ -931,7 +931,7 @@ doc.add_paragraph()
 # MANGLER 1 TABELL___________
 
 # Legg til figur 5.25
-plots.plot_hs_for_given_wind(df,var_hs="hs",var_wind="W10",output_file=folder + "/" +"hs_for_given_wind.png")
+plots.plot_hs_for_given_wind(df,var_hs=var_hs,var_wind=var_wind,output_file=folder + "/" +"hs_for_given_wind.png")
 add_image_with_caption(doc, folder + '/' +'hs_for_given_wind.png', f"Figure 5.25: Relationship between significant wave height H S for a given wind speed U at the Luna field; data and model "
 "extrapolation.", orientation="portrait")
 doc.add_paragraph() 
