@@ -1041,3 +1041,50 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     if output_file != "": plt.savefig(output_file)
 
     return fig
+
+
+def plot_cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
+    """
+    This function plots the CCA profiles for a specific percentile or return period
+    data: dataframe
+    var: prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
+    month: gives the month of interest, default takes all months (e.g. January or Jan)
+    percentile: is the percentile associated with the worst case scenario
+    return_period: a return-period e.g., 10 for a 10-yr return period
+    distrbution, method, and threshold: only used if retrun_period is specified
+    unit_var: is a string with the unit of the variable var, default is m/s
+    unit_lev: is a string with the units of the vertical levels, default is m
+    output_file: name of the figure file
+    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    """
+    if ((percentile is None) and (return_period is None)):
+        print('Please specify either a percentile or a return period in years')
+        sys.exit()
+    if not(percentile is None):
+        lev,woca,cca=cca_profiles(data,var=var,month=month,percentile=percentile)
+    if not(return_period is None):
+        lev,woca,cca=cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold)
+    import matplotlib as mpl
+    n_lines = len(lev)
+    cmap = mpl.colormaps['jet_r']
+    colors = cmap(np.linspace(0, 1, n_lines))
+    fig, ax = plt.subplots(figsize=(9,7))
+    for d in range(len(lev)):
+        ax.plot(lev,cca[:,d],color=colors[d],label=str(int(lev[d]))+' m',linewidth=2)
+    ax.plot(lev,woca,label='Worst case',color='k',linewidth=3.5)
+    ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+    ax.set_ylabel(var+' ['+unit_var+']',fontsize=16)
+    ax.set_xlabel('Level ['+unit_lev+']',fontsize=16)
+    if not(percentile is None):
+        pp=f"{percentile:.4f}"
+        ax.set_title('CCA profile - P'+pp+' - Month '+month,fontsize=16)
+    if not(return_period is None):
+        rp=f"{return_period:.0f}"
+        ax.set_title('CCA profile - RP '+rp+' years'+' - Month '+month,fontsize=16)
+    ax.tick_params(axis='both', labelsize= 16)
+    ax.set_xlim(lev[0],lev[-1])
+    plt.grid(color='lightgray',linestyle=':')
+    plt.tight_layout()
+    plt.savefig(output_file)
+    return fig
+
