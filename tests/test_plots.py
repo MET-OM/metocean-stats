@@ -367,3 +367,10 @@ def test_plot_taylor_diagram():
     fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+
+
+def test_plot_cca_profile(ds=ds):
+    output_file = 'test_cca_profile.png'
+    fig = plots.plot_cca_profiles(ds,varname_rad='current_speed_',month='all',return_period=10)
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
