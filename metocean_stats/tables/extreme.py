@@ -731,3 +731,39 @@ def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_
     if output_file:
         df[['Return period [years]', 'Hs[m]','Crest heigh[m]','Tidal level(HAT)[m]','S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
     return df
+
+
+def table_cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,output_file='table_cca_profiles.csv'):
+    """
+    This function returns a table containing the CCA profiles for a specific percentile or return period
+    data: dataframe
+    var: prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
+    month: gives the month of interest, default takes all months (e.g. January or Jan)
+    percentile: is the percentile associated with the worst case scenario
+    return_period: a return-period e.g., 10 for a 10-yr return period
+    distrbution, method, and threshold: only used if retrun_period is specified
+    output_file: name of the csv file
+    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    """
+    if ((percentile is None) and (return_period is None)):
+        print('Please specify either a percentile or a return period in years')
+        sys.exit()
+    if not(percentile is None):
+        lev,woca,cca=cca_profiles(data,var=var,month=month,percentile=percentile)
+    if not(return_period is None):
+        lev,woca,cca=cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold)
+    list_ind=[]
+    columns=['Depth [m]']+[d for d in lev]+['Worst case']
+    table = np.zeros((len(lev),len(lev)+2))
+    nd=len(lev)
+    for row in range(nd):
+        table[row,0]=lev[row]
+        table[row,1:nd+1]=cca[row,:].round(2)
+        table[row,-1]=woca[row].round(2)
+    # Create DataFrame
+    df1 = pd.DataFrame(table, columns=columns)
+    if output_file:
+        df1.to_csv(output_file,index=False)
+    return df1
+
+
