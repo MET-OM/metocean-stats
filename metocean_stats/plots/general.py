@@ -19,10 +19,13 @@ def plot_scatter_diagram(
         var2: str, step_var2: float, 
         output_file='', 
         log_color=False, 
+        percentage_values=True,
         annot=False, 
-        annot_decimals = 2,
+        significant_digits = 2,
+        annot_nonzero_only = True,
         range_including = True, 
-        marginal_percentage = True,
+        from_origin = True,
+        marginal_values = True,
         cmap = plt.get_cmap('Blues'),
         use_cbar = True,
         square = False,
@@ -49,14 +52,20 @@ def plot_scatter_diagram(
         Output filename. Empty string will not save a file.
     log_color : bool, default False
         Use logarithmic colorscale.
+    percentage_values : bool, default True
+        Whether to use percentage of total sum in margins and cell annotations, as opposed to number of events.
     annot : bool, default False
         Write the numeric value of each cell in the figure.
-    annot_decimals : int, default 2
-        Accuracy of annotated cell values.
+    significant_digits : int, default 2
+        Number of digits used in annotated cells and/or marginal values.
+    annot_nonzero_only : bool, default True
+        If false, zero-valued cells will still be annotated.
     range_including : bool, default True
         Include the end of the range in the tick labels, e.g. 0.0-0.5 instead of just 0.0
-    marginal_percentage : bool, default True
-        Include the marginal percentage on ticks, e.g. 0.0-0.5 | 5.8%
+    from_origin : bool, default True
+        Start the scatter plot in origin, even if there are no values in the first bin(s).
+    marginal_values : bool, default True
+        Include the marginal sum/fraction on ticks, e.g. 0.0-0.5 | 5.8%
     cmap : matplotlib colormap, default "Blues"
         Any matplotlib colormap.
     use_cbar : bool, default True
@@ -75,12 +84,13 @@ def plot_scatter_diagram(
     The function is written by dung-manh-nguyen, KonstantinChri, and efvik.
     """
 
-    sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
+    sd = calculate_scatter(data, var1, step_var1, var2, step_var2,from_origin=from_origin)
 
     # Convert to percentage
     tbl = sd.values
     var1_data = data[var1]
-    tbl = tbl/len(var1_data)*100
+    if percentage_values:
+        tbl = tbl/len(var1_data)*100
 
     # Then make new row and column labels with a summed percentage
     sumcols = np.sum(tbl, axis=0)
@@ -91,10 +101,16 @@ def plot_scatter_diagram(
     lower_bin_1 = bins_var1[0] - step_var1
     lower_bin_2 = bins_var2[0] - step_var2
 
-    def _tick_writer(range_start,range_end,percentage):
-        tick = f'{range_start:.1f}'
-        if range_including: tick = tick + f'-{range_end:.1f}'
-        if marginal_percentage: tick = tick + f' | {percentage:.{annot_decimals}f}%'
+    def _tick_writer(a,b,c):
+        a = int(a) if np.isclose(int(a),a) else np.round(a,1)
+        b = int(b) if np.isclose(int(b),b) else np.round(b,1)
+        c = str(int(c)) if not percentage_values else f'{c:.{significant_digits}f}'
+
+        tick = f'{a}'
+        if range_including: tick = tick + f'-{b}'
+        if marginal_values:
+            tick = tick + f' | {c}'
+            if percentage_values: tick = tick + '%'
         return tick
 
     rows = []
@@ -112,8 +128,9 @@ def plot_scatter_diagram(
     dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
     fig,ax = plt.subplots()
     norm = LogNorm() if log_color else None
-    mask = (dfout.round(annot_decimals)>0) if annot else (dfout>0)
-    sns.heatmap(ax=ax,data=dfout.where(mask), cbar=use_cbar, cmap=cmap, fmt=f".{annot_decimals}f",norm=norm,annot=annot, square=square, linewidths=linewidths,linecolor=linecolor,**kwargs)
+    mask = (dfout.round(significant_digits) != 0) if annot_nonzero_only else np.ones_like(dfout,dtype='bool')
+    fmt = f".{significant_digits}f" if percentage_values else f'.{significant_digits}g'
+    sns.heatmap(ax=ax, data=dfout.where(mask), cbar=use_cbar, cmap=cmap, fmt=fmt, norm=norm, annot=annot, square=square, linewidths=linewidths, linecolor=linecolor, **kwargs)
 
     plt.ylabel(var1)
     plt.xlabel(var2)
