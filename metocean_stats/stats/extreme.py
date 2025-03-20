@@ -1326,13 +1326,13 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
         })
     return contours, data_2D
 
-def cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2):
+def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2):
     import sys
     """
     This function calculates the CCA profiles for a specific percentile or return period
     df: dataframe
     var: prefix of the variable name of interest e.g. 'current_speed_' for 'current_speed_{depth}m'
-    month: gives the month of interest, default takes all months (e.g. January or Jan)
+    month: gives the month of interest (e.g. January or Jan), default (None) takes all months
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
@@ -1343,7 +1343,7 @@ def cca_profiles(data,var='current_speed_',month='all',percentile=None,return_pe
     # Select the columns of interest
     df_sel=data.iloc[:, lambda data: data.columns.str.contains(var,case=False)]
     # Select the month of interest if one is specified
-    if month!='all':
+    if month!=None:
         list_months1=['January','February','March','April','May','June','July','August','September','October','November','December']
         list_months2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
         if month in list_months1:
