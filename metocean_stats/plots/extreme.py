@@ -1043,12 +1043,12 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     return fig
 
 
-def plot_cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
+def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
     """
     This function plots the CCA profiles for a specific percentile or return period
     data: dataframe
     var: prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
-    month: gives the month of interest, default takes all months (e.g. January or Jan)
+    month: gives the month of interest (e.g. January or Jan), default (None) takes all months
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
@@ -1075,12 +1075,16 @@ def plot_cca_profiles(data,var='current_speed_',month='all',percentile=None,retu
     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     ax.set_ylabel(var+' ['+unit_var+']',fontsize=16)
     ax.set_xlabel('Level ['+unit_lev+']',fontsize=16)
+    if month==None:
+        month_str=''
+    else:
+        month_str=' - Month '+month
     if not(percentile is None):
         pp=f"{percentile:.4f}"
-        ax.set_title('CCA profile - P'+pp+' - Month '+month,fontsize=16)
+        ax.set_title('CCA profile - P'+pp+month_str,fontsize=16)
     if not(return_period is None):
         rp=f"{return_period:.0f}"
-        ax.set_title('CCA profile - RP '+rp+' years'+' - Month '+month,fontsize=16)
+        ax.set_title('CCA profile - RP '+rp+' years'+month_str,fontsize=16)
     ax.tick_params(axis='both', labelsize= 16)
     ax.set_xlim(lev[0],lev[-1])
     plt.grid(color='lightgray',linestyle=':')
