@@ -1534,7 +1534,7 @@ CCA profiles Plot
    plots.plot_cca_profiles(
        df, 
        var='current_speed_', 
-       month='all', 
+       month=None, 
        return_period=10, 
        output_file='plot_cca_profiles.png'
    )
@@ -1550,7 +1550,7 @@ CCA profiles Table
    tables.table_cca_profiles(
        df, 
        var='current_speed_', 
-       month='all', 
+       month=None, 
        return_period=10, 
        output_file='table_cca_profiles.csv'
    )
