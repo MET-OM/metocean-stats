@@ -1325,3 +1325,76 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
             'y': y
         })
     return contours, data_2D
+
+def cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2):
+    import sys
+    """
+    This function calculates the CCA profiles for a specific percentile or return period
+    df: dataframe
+    var: prefix of the variable name of interest e.g. 'current_speed_' for 'current_speed_{depth}m'
+    month: gives the month of interest, default takes all months (e.g. January or Jan)
+    percentile: is the percentile associated with the worst case scenario
+    return_period: a return-period e.g., 10 for a 10-yr return period
+    distrbution, method, and threshold: only used if retrun_period is specified
+    output: list of vertical levels used, 1-d array for the worst case scenario (the percentiles or return values), the array with the profiles
+    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    Function written by clio-met based on 'Turkstra models of current profiles by Winterstein, Haver and Nygaard (2009)'
+    """
+    # Select the columns of interest
+    df_sel=data.iloc[:, lambda data: data.columns.str.contains(var,case=False)]
+    # Select the month of interest if one is specified
+    if month!='all':
+        list_months1=['January','February','March','April','May','June','July','August','September','October','November','December']
+        list_months2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        if month in list_months1:
+            im=list_months1.index(month)+1
+            df_sel=df_sel[df_sel.index.month==im]
+            del im
+        elif month in list_months2:
+            im=list_months2.index(month)+1
+            df_sel=df_sel[df_sel.index.month==im]
+            del im
+        else:
+            print('Error with the month name',month)
+            sys.exit()
+    # Get the columns names
+    list_col=df_sel.columns.tolist()
+    # Get the vertical levels available as floats and strings from the columns names
+    levels=[]
+    levels_str=[]
+    il=len(var)
+    for i in list_col:
+        levels.append(float(i[il:-1]))
+        levels_str.append(i[il:-1])
+    del il
+    if ((percentile is None) and (return_period is None)):
+        print('Please specify either a percentile or a return period in years')
+        sys.exit()
+    # Calculate the values for the worst case wcs (only depends on levels)
+    if not(percentile is None):
+        # Calculate the percentiles for each depth separately
+        wcs=np.percentile(df_sel.to_numpy(),percentile,axis=0)
+    if not(return_period is None):
+        # Calculate the return values for the specified return period for each level separately
+        wcs=np.full((len(levels)),np.nan)
+        for i in range(len(levels)):
+            if not(df_sel[list_col[i]].isnull().iloc[0]):
+                _,_,_,a=RVE_ALL(df_sel,var=list_col[i],periods=return_period,distribution=distribution,method=method,threshold=threshold)
+                wcs[i]=a
+                del a
+    # Number of vertical levels available for the point considered
+    nlevels=np.where(np.isnan(wcs))[0][0]
+    # Calculate the current at the other depths when curr_ref = percentile or return-period value  
+    cca_prof=np.zeros((nlevels,nlevels))
+    for d in range(nlevels):
+        prof_others=df_sel.drop(columns=[list_col[d]]).to_numpy() # extraxt currents as a matrix for all levels except the worst-case one
+        prof_wcd=df_sel[list_col[d]].to_numpy() # extract currents at the worst-case level
+        list_ind=np.arange(0,nlevels,1).tolist()
+        del list_ind[d] # remove the index of the worst-case level (index d)
+        cca_prof[d,d]=wcs[d]
+        i=0
+        for dd in list_ind:
+            cca_prof[dd,d]=np.mean(prof_others[:,i],axis=0)+np.corrcoef(prof_wcd,prof_others[:,i])[0][1]*np.std(prof_others[:,i],axis=0)*((wcs[d]-np.mean(prof_wcd))/np.std(prof_wcd))
+            i=i+1
+    return levels[0:nlevels],wcs[0:nlevels],cca_prof
+

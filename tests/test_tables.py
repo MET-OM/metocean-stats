@@ -576,3 +576,14 @@ def test_monthly_directional_percentiles_invalid_column():
         print("test_monthly_directional_percentiles_invalid_column passed (KeyError raised as expected).")
 
 
+def test_table_cca_profile():
+    output_file='test_table_cca_profiles.csv'
+    df = tables.table_cca_profiles(data=ds_ocean,var='current_speed_',month='all',return_period=10,output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (25, 27):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
+
+

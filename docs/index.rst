@@ -1526,6 +1526,38 @@ Max. Salinity Profile Monthly Stats Plot
 .. image:: files/plot_max_sal_profile_monthly_stats.png
    :width: 500
 
+CCA profiles Plot
+-----------------------------------------
+
+.. code-block:: python
+
+   plots.plot_cca_profiles(
+       df, 
+       var='current_speed_', 
+       month='all', 
+       return_period=10, 
+       output_file='plot_cca_profiles.png'
+   )
+
+.. image:: files/plot_cca_profiles.png
+   :width: 500
+
+CCA profiles Table
+-----------------------------------------
+
+.. code-block:: python
+
+   tables.table_cca_profiles(
+       df, 
+       var='current_speed_', 
+       month='all', 
+       return_period=10, 
+       output_file='table_cca_profiles.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_cca_profiles.csv
 
 Tidal Levels Table
 ------------------
