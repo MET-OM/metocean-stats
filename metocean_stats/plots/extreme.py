@@ -1068,7 +1068,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     n_lines = len(lev)
     cmap = mpl.colormaps['jet_r']
     colors = cmap(np.linspace(0, 1, n_lines))
-    fig, ax = plt.subplots(figsize=(9,7))
+    fig, ax = plt.subplots(figsize=(9,10))
     for d in range(len(lev)):
         ax.plot(lev,cca[:,d],color=colors[d],label=str(int(lev[d]))+' m',linewidth=2)
     ax.plot(lev,woca,label='Worst case',color='k',linewidth=3.5)
@@ -1078,7 +1078,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     if month==None:
         month_str=''
     else:
-        month_str=' - Month '+month
+        month_str=' - Month: '+month
     if not(percentile is None):
         pp=f"{percentile:.4f}"
         ax.set_title('CCA profile - P'+pp+month_str,fontsize=16)
