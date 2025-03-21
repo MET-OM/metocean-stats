@@ -1383,7 +1383,10 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
                 wcs[i]=a
                 del a
     # Number of vertical levels available for the point considered
-    nlevels=np.where(np.isnan(wcs))[0][0]
+    if len(np.where(np.isnan(wcs))[0])==0:
+        nlevels=len(wcs)
+    else:
+        nlevels=np.where(np.isnan(wcs))[0][0]
     # Calculate the current at the other depths when curr_ref = percentile or return-period value  
     cca_prof=np.zeros((nlevels,nlevels))
     for d in range(nlevels):
