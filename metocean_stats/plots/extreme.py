@@ -1078,7 +1078,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     if month==None:
         month_str=''
     else:
-        month_str=' - Month '+month
+        month_str=' - Month: '+month
     if not(percentile is None):
         pp=f"{percentile:.4f}"
         ax.set_title('CCA profile - P'+pp+month_str,fontsize=16)
