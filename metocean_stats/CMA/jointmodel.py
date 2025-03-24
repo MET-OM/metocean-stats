@@ -19,6 +19,33 @@ from .predefined import (
     get_windsea_hs_tp
 )
 
+def _load_preset(preset):
+    """Load defaults from preset."""
+    preset = preset.lower()
+    if preset == 'omae_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_Hs_Tz()
+        swap_axis = True
+    elif preset == 'dnvgl_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
+        swap_axis = True
+    elif preset == 'omae_U_hs':
+        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
+        swap_axis = False
+    elif preset == 'dnvgl_hs_U':
+        dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
+        swap_axis = True
+    elif preset == 'windsea_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_windsea_hs_tp()
+        swap_axis = True
+    elif preset == 'lonowe_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
+        swap_axis = True
+    else:
+        raise ValueError(f'Preset {preset} not found.'
+                            'See docstring for available presets.')
+    return dist_descriptions,fit_descriptions,semantics,swap_axis
+
+
 class JointProbabilityModel(GlobalHierarchicalModel):
     """
     This is a wrapper for virocon's GlobalHierarchicalModel,
@@ -55,21 +82,25 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - OMAE2020_V_Hs
              - LoNoWe_Hs_Tp
              - windsea_hs_tp
+
         dist_descriptions : list[dict], optional
             A list of dicts describing each distribution.
         fit_descriptions : list[dict], optional
             A list of dicts describing the fitting method.
         semantics : dict[list], optional
-            Names of variables, 
-        intervals : int, float or virocon IntervalSlicer
-            This divides the marginal variable (e.g. hs) into intervals,
-            the distribution of these are used to fit the 
-            dependent parameters of the conditional distribution (e.g. tp).
+            Dict desribing the variables, used for plotting.
+            Keys of the dict are "names","symbols","units", and each value is
+            a list of two strings corresponding to the two variables.
+        intervals : virocon.intervals.IntervalSlicer, optional
+            An interval slicer (NumberOfIntervalsSlicer or WidthOfIntervalSlicer),
+            from virocon.intervals. This divides the marginal intervals into
+            intervals, which are used to fit the dependent parameters 
+            of the conditional distribution (e.g. tp).
         swap_axis : bool, optional
             This determines if the produced plots should have swapped axes,
             as is common with e.g. hs tp plots.
         """
-        preset_dist,preset_fit,preset_semantics,preset_axis=self._load_preset(preset)
+        preset_dist,preset_fit,preset_semantics,preset_axis=_load_preset(preset)
 
         if dist_descriptions is None:
             dist_descriptions = preset_dist
@@ -88,32 +119,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         self.swap_axis = swap_axis
 
         super().__init__(self.dist_descriptions)
-
-    def _load_preset(self,preset):
-        """Load defaults from preset."""
-        preset = preset.lower()
-        if preset == 'omae_hs_tp':
-            dist_descriptions,fit_descriptions,semantics = get_OMAE2020_Hs_Tz()
-            swap_axis = True
-        elif preset == 'dnvgl_hs_tp':
-            dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
-            swap_axis = True
-        elif preset == 'omae_U_hs':
-            dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
-            swap_axis = False
-        elif preset == 'dnvgl_hs_U':
-            dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
-            swap_axis = True
-        elif preset == 'windsea_hs_tp':
-            dist_descriptions,fit_descriptions,semantics = get_windsea_hs_tp()
-            swap_axis = True
-        elif preset == 'lonowe_hs_tp':
-            dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
-            swap_axis = True
-        else:
-            raise ValueError(f'Preset {preset} not found.'
-                             'See docstring for available presets.')
-        return dist_descriptions,fit_descriptions,semantics,swap_axis
 
     def fit(self,data:np.ndarray|pd.DataFrame,
             var1:int|str=0,
@@ -217,7 +222,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ContourMethod = virocon.DirectSamplingContour
         elif contour_method in ["constantandexceedance","and"]:
             ContourMethod = virocon.AndContour
-        elif contour_method == ["constantorexceedance","or"]:
+        elif contour_method in ["constantorexceedance","or"]:
             ContourMethod = virocon.OrContour
         else:
             raise ValueError(f"Unknown contour method: {contour_method}")            
@@ -275,7 +280,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         return plot_2D_pdf_heatmap(
             self,
-            self.semantics,
+            semantics=self.semantics,
             limits=limits,
             bin_size=bin_size,
             bin_samples=bin_samples,
@@ -287,3 +292,4 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             color_vmin=color_vmin,
             ax=ax,
             **kwargs)
+    
