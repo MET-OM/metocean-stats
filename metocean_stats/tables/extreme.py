@@ -733,7 +733,7 @@ def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_
     return df
 
 
-def table_cca_profiles(data,var='current_speed_',month='all',percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,output_file='table_cca_profiles.csv'):
+def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2,output_file='table_cca_profiles.csv'):
     """
     This function returns a table containing the CCA profiles for a specific percentile or return period
     data: dataframe

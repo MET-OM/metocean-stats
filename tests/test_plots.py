@@ -368,6 +368,6 @@ def test_plot_environmental_contours_U_hs():
 
 
 def test_plot_cca_profile():
-    fig = plots.plot_cca_profiles(ds_ocean,var='current_speed_',month='all',return_period=10,output_file="")
+    fig = plots.plot_cca_profiles(ds_ocean,var='current_speed_',month=None,return_period=10,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
