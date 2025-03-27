@@ -1326,7 +1326,7 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
         })
     return contours, data_2D
 
-def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2):
+def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default'):
     import sys
     """
     This function calculates the CCA profiles for a specific percentile or return period
