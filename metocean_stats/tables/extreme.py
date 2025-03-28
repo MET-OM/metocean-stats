@@ -742,8 +742,10 @@ def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,retu
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
+    max: by default, the highest curve will always be the worst-case scenario
     output_file: name of the csv file
     with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
         print('Please specify either a percentile or a return period in years')
