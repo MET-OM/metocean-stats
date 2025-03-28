@@ -1,13 +1,14 @@
-from __future__ import annotations
-
-from scipy.interpolate import interp1d
 import pandas as pd
 import numpy as np
-import time
-import matplotlib.pyplot as plt
-from ..stats.spec_funcs import *
 
+import scipy.stats as st
 
+from scipy.signal import find_peaks, detrend
+from scipy.optimize import fminbound, curve_fit
+from scipy.special import gamma
+from scipy.interpolate import UnivariateSpline, interp1d
+
+from ..stats import spec_funcs
 
 def convert_latexTab_to_csv(inputFileName, outputFileName):
 
@@ -54,17 +55,16 @@ def wind_correction_nora10(df,var='W10'):
     return df 
 
 def Weibull_method_of_moment(X):
-    import scipy.stats as stats
-    X=X+0.0001;
-    n=len(X);
-    m1 = np.mean(X);
-    cm1=np.mean((X-np.mean(X))**1);
-    m2 = np.var(X);
-    cm2=np.mean((X-np.mean(X))**2);
-    m3 = stats.skew(X);
-    cm3 = np.mean((X-np.mean(X))**3);
+
+    X=X+0.0001
+    #n=len(X);
+    m1 = np.mean(X)
+    #cm1=np.mean((X-np.mean(X))**1)
+    #m2 = np.var(X)
+    cm2=np.mean((X-np.mean(X))**2)
+    #m3 = stats.skew(X)
+    cm3 = np.mean((X-np.mean(X))**3)
    
-    from scipy.special import gamma
     def m1fun(a,b,c):
         return a+b*gamma(1+1/c)
     def cm2fun(b,c):
@@ -74,14 +74,13 @@ def Weibull_method_of_moment(X):
     def cfun(c):
         return abs(np.sqrt(cm3fun(1,c)**2/cm2fun(1,c)**3)-np.sqrt(cm3**2/cm2**3))
    
-    from scipy import optimize
-    cHat = optimize.fminbound(cfun, -2, 5) # shape
+    cHat = fminbound(cfun, -2, 5) # shape
     def bfun(b):
         return abs(cm2fun(b,cHat)-cm2)
-    bHat = optimize.fminbound(bfun,-5,30) # scale
+    bHat = fminbound(bfun,-5,30) # scale
     def afun(a):
         return abs(m1fun(a,bHat,cHat)-m1)
-    aHat = optimize.fminbound(afun,-5,30) # location
+    aHat = fminbound(afun,-5,30) # location
   
     return cHat, aHat, bHat # shape, location, scale
 
@@ -110,8 +109,6 @@ def consecutive_indices(lst):
 
 
 def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,interval,X=100):
-    import scipy.stats as stats
-    from scipy.signal import find_peaks
 
     # RVE of X years 
     shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
@@ -120,7 +117,7 @@ def Hs_Tp_curve(data,pdf_Hs,pdf_Hs_Tp,f_Hs_Tp,h,t,interval,X=100):
         period=1.5873*365.2422*24/interval
     else :
         period=X*365.2422*24/interval
-    rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+    rve_X = st.weibull_min.isf(1/period, shape, loc, scale)
     
     # Find index of Hs=value
     epsilon = abs(h - rve_X)
@@ -178,14 +175,13 @@ def Gauss4(x, b2, b3):
     return y
 
 
-def DVN_steepness(df,h,t,periods,interval):
-    import scipy.stats as stats
+def DNV_steepness(df,h,t,periods,interval):
     ## steepness 
     max_y=max(periods)
     X = max_y # get max 500 year 
     period=X*365.2422*24/interval
     shape, loc, scale = Weibull_method_of_moment(df.hs.values) # shape, loc, scale
-    rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+    rve_X = st.weibull_min.isf(1/period, shape, loc, scale)
     
     h1=[]
     t1=[]
@@ -232,8 +228,6 @@ def DVN_steepness(df,h,t,periods,interval):
     return t_steepness, h_steepness
 
 def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
-    import scipy.stats as stats
-    from scipy.signal import find_peaks
 
     ## find pecentile
     # RVE of X years 
@@ -241,7 +235,7 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     X = max_y # get max 500 year 
     period=X*365.2422*24/interval
     shape, loc, scale = Weibull_method_of_moment(data) # shape, loc, scale
-    rve_X = stats.weibull_min.isf(1/period, shape, loc, scale)
+    rve_X = st.weibull_min.isf(1/period, shape, loc, scale)
     epsilon = abs(h - rve_X)
     param = find_peaks(1/epsilon) # to find the index of bottom
     index_X = param[0][0]     # the  index of Hs=value
@@ -252,7 +246,7 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     # Find peak of pdf at Hs=RVE of X year 
     for i in range(index_X):
         pdf_Hs_Tp_X = pdf_Hs_Tp[i,:] # Find pdf at RVE of X year 
-        sum_pdf = sum(pdf_Hs_Tp_X)
+        #sum_pdf = sum(pdf_Hs_Tp_X)
 
         # Create a normalized cumulative array of pdf_Hs_Tp_X 
         cumulative_pdf = np.cumsum(pdf_Hs_Tp_X) / np.sum(pdf_Hs_Tp_X)
@@ -268,29 +262,23 @@ def find_percentile(data,pdf_Hs_Tp,h,t,p,periods,interval):
     return t1,h1
 
 
-def estimate_Tz(T_p):
-    return T_p / 1.28
-
 def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
     df = 0.01
     f=np.arange(0,1,df)
     S_u = np.zeros((len(H_s),len(f)))
     for i in range(len(H_s)):
         if spectrum=='JONSWAP':
-            E = jonswap(f=f,hs=H_s[i],tp=T_p[i])
+            E = spec_funcs.jonswap(f=f,hs=H_s[i],tp=T_p[i])
         elif spectrum=='TORSEHAUGEN':
-            E = torsethaugen(f=f,hs=H_s[i],tp=T_p[i]) 
+            E = spec_funcs.torsethaugen(f=f,hs=H_s[i],tp=T_p[i]) 
 
-        S_u[i,:] = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
+        S_u[i,:] = spec_funcs.velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
     
     M0 = np.trapz(S_u*df,axis=1)
     M2 = np.trapz((f**2)*S_u*df,axis=1)
     Us = 2*np.sqrt(M0)
     Tu = np.sqrt(M0/M2)
     return Us, Tu
-
-import numpy as np
-from scipy.optimize import curve_fit
 
 # Define the function H(U)
 def Hs_as_function_of_U(U, a, b, c, d):
@@ -376,6 +364,10 @@ def wind_gust(df,var='W10',var0='W10',z=10):
     return df 
 
 
+# TODO: Which Tz estimate is better?
+# def estimate_Tz(T_p):
+#     return T_p / 1.28
+
 def estimate_Tz(Tp,gamma = 2.5):
     Tz = (0.6673 + 0.05037 * gamma - 0.006230 * gamma ** 2 + 0.0003341 * gamma ** 3) * Tp
     return Tz
@@ -408,7 +400,6 @@ def fit_profile_polynomial(z, speeds, degree=4):
 
 
 def fit_profile_spline(z, speeds, s=None):
-    from scipy.interpolate import UnivariateSpline
     """
     Fit a spline to the data.
     
@@ -454,7 +445,6 @@ def extrapolate_speeds(fit_model, z, target_speed, target_z, method='polynomial'
         # Calculate the current speed at the target depth
         current_speed_at_target_z = np.polyval(fit_model, target_z)
     elif method == 'spline':
-        from scipy.interpolate import UnivariateSpline
         # Evaluate the spline at the given depths
         extrapolated_speeds = fit_model(z)
         
@@ -500,8 +490,7 @@ def detrend_ts(df, column_name='tide'):
     Returns:
     pd.DataFrame: The DataFrame with the detrended column.
     """
-    import scipy.signal as signal
-    df[column_name] = signal.detrend(df[column_name])
+    df[column_name] = detrend(df[column_name])
     return df
 
 
@@ -512,24 +501,6 @@ def degminsec_to_decimals(degrees,minutes,seconds):
         loc_decimals=degrees+(minutes/60)+(seconds/3600)
     return loc_decimals
 
-
-def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
-    df = 0.01
-    f=np.arange(0,1,df)
-    S_u = np.zeros((len(H_s),len(f)))
-    for i in range(len(H_s)):
-        if spectrum=='JONSWAP':
-            E = jonswap(f=f,hs=H_s[i],tp=T_p[i])
-        elif spectrum=='TORSEHAUGEN':
-            E = torsethaugen(f=f,hs=H_s[i],tp=T_p[i]) 
-
-        S_u[i,:] = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
-    
-    M0 = np.trapz(S_u*df,axis=1)
-    M2 = np.trapz((f**2)*S_u*df,axis=1)
-    Us = 2*np.sqrt(M0)
-    Tu = np.sqrt(M0/M2)
-    return Us, Tu
 
 def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01):
     """
@@ -548,13 +519,13 @@ def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01)
     df = 0.01
     f=np.arange(0,1,df)
     if spectrum=='JONSWAP':
-        E = jonswap(f=f,hs=Hs,tp=Tp)
+        E = spec_funcs.jonswap(f=f,hs=Hs,tp=Tp)
     elif spectrum=='TORSEHAUGEN':
-        E = torsethaugen(f=f,hs=Hs,tp=Tp) 
+        E = spec_funcs.torsethaugen(f=f,hs=Hs,tp=Tp) 
 
     depth_list = np.arange(0,ref_depth+0.5,0.5)
     for depth in depth_list[::-1]:
-        S_u = velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
+        S_u = spec_funcs.velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
         M0 = np.trapz(S_u, x = f)
         Us = 2 * np.sqrt(M0)
         if Us>theshold:

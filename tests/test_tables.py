@@ -1,8 +1,9 @@
-from metocean_stats import plots, tables, stats, maps
-from metocean_stats.stats.aux_funcs import *
-import pandas as pd
-
 import os
+import pandas as pd
+import numpy as np
+
+from metocean_stats import tables
+from metocean_stats.stats.aux_funcs import readNora10File
 
 # Define TimeSeries-object for NORA3
 ds = readNora10File('tests/data/NORA_test.txt')
@@ -68,7 +69,7 @@ def test_table_directional_joint_distribution_Hs_Tp_param(ds=ds):
     else:
         raise ValueError("Shape is not correct")
 
-def test_table_directional_return_periods(ds=ds):
+def test_table_directional_return_periods_norsok(ds=ds):
     output_file = 'test_directional_return_periods.csv'
     df = tables.table_directional_return_periods(ds, var='HS', periods=[1, 10, 100, 10000], units='m', var_dir='DIRM', distribution='Weibull3P_MOM', adjustment='NORSOK', output_file=output_file)
     if os.path.exists(output_file):

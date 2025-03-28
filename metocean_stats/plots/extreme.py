@@ -1,11 +1,16 @@
-from typing import Dict, Sequence
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import xarray as xr
-from ..stats.extreme import *
-from ..tables.extreme import *
+import matplotlib.ticker as mticker
 
+import scipy.stats as st
+
+from cycler import cycler
+from pyextremes import get_extremes
+
+from .. import stats
+from .. import tables
+from ..stats import aux_funcs
 
 def plot_return_levels(data, var, rl, output_file):
     """
@@ -19,7 +24,6 @@ def plot_return_levels(data, var, rl, output_file):
     
     Function written by dung-manh-nguyen and KonstantinChri.
     """
-    from pyextremes import get_extremes
     
     method = rl.attrs['method']
 
@@ -57,14 +61,14 @@ def plot_return_levels(data, var, rl, output_file):
     plt.legend(loc='center left')
     plt.title(output_file.split('.')[0], fontsize=18)
     plt.tight_layout()
-    if output_file != "": plt.savefig(output_file)
+    if output_file != "": 
+        plt.savefig(output_file)
     plt.close()
 
 
 def probplot(data, sparams):    
-    import scipy.stats as stats
-    stats.probplot(data, sparams=sparams, 
-                   dist=stats.genpareto,fit=True, plot=plt)
+    st.probplot(data, sparams=sparams, 
+                   dist=st.genpareto,fit=True, plot=plt)
     plt.grid()
     plt.axline((data[0], data[0]), slope=1,label='y=x')
     plt.legend()
@@ -93,14 +97,14 @@ def plot_diagnostic_return_levels(data, var, dist,
     if dist in ['GP', 'EXP', 'Weibull_2P']:
         
         if threshold is None:
-             threshold = get_threshold_os(data=data, var=var)  
+             threshold = stats.get_threshold_os(data=data, var=var)  
         
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels(data=data, var=var, 
+        df_emp_rl = stats.get_empirical_return_levels(data=data, var=var, 
                                                 method='POT', 
                                                 threshold=threshold)
         # Get model return levels and periods                                         
-        df_model_rl = return_levels_pot(data, var, 
+        df_model_rl = stats.return_levels_pot(data, var, 
                                         dist=dist,
                                         threshold=threshold, 
                                         periods=periods)
@@ -108,10 +112,10 @@ def plot_diagnostic_return_levels(data, var, dist,
     elif dist in ['GEV', 'GUM']:
     
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels(data=data, var=var, 
+        df_emp_rl = stats.get_empirical_return_levels(data=data, var=var, 
                                                 method='BM')
         # Get model return levels and periods                                        
-        df_model_rl = return_levels_annual_max(data, 
+        df_model_rl = stats.return_levels_annual_max(data, 
                                                var,
                                                dist=dist,
                                                periods=periods)
@@ -164,10 +168,10 @@ def plot_multi_diagnostic_return_levels(data, var,
         
         # Get empirical return levels and periods
         if threshold is None:
-             threshold = get_threshold_os(data=data, var=var)  
+             threshold = stats.get_threshold_os(data=data, var=var)  
         
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels(data=data, 
                                                 var=var, 
                                                 method='POT', 
                                                 threshold=threshold)
@@ -175,7 +179,7 @@ def plot_multi_diagnostic_return_levels(data, var,
     elif ('GEV' or 'GUM') in dist_list:
     
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels(data=data, 
                                                 var=var, 
                                                 method='BM')
     elif ('Weibull_3P') in dist_list:
@@ -183,7 +187,7 @@ def plot_multi_diagnostic_return_levels(data, var,
         interval = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
         interval_day = 1/(24/interval)
         
-        df_emp_rl = get_empirical_return_levels(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels(data=data, 
                                                 var=var, 
                                                 method='BM',
                                                 block_size= str(interval_day) + "D")
@@ -218,18 +222,18 @@ def plot_multi_diagnostic_return_levels(data, var,
     for dist in dist_list:
 
         if dist in ['GP','Weibull_2P','EXP']:
-            df_model_rl_tmp = return_levels_pot(data, var,
+            df_model_rl_tmp = stats.return_levels_pot(data, var,
                                                 dist=dist,
                                                 threshold=threshold,
                                                 periods=periods)
 
         elif dist in ['GEV','GUM']:
-            df_model_rl_tmp = return_levels_annual_max(data, var,
+            df_model_rl_tmp = stats.return_levels_annual_max(data, var,
                                                        dist=dist,
                                                        periods=periods)
                                                        
         elif dist in ['Weibull_3P']:
-            df_model_rl_tmp = return_levels_idm(data, var, 
+            df_model_rl_tmp = stats.return_levels_idm(data, var, 
                                                dist=dist, 
                                                periods=periods)
 
@@ -312,17 +316,17 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
     if (('GP' in dist_list) or ('EXP' in dist_list) or ('Weibull_2P' in dist_list)):
         # Get empirical return levels and periods
         if threshold is None:
-             threshold = get_threshold_os(data=data, var=var)
+             threshold = stats.get_threshold_os(data=data, var=var)
 
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels_new(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels_new(data=data, 
                                                 var=var, 
                                                 method='POT', 
                                                 threshold=threshold)
     elif (('GEV' in dist_list) or ('GUM' in dist_list)):
     
         # Get empirical return levels and periods 
-        df_emp_rl = get_empirical_return_levels_new(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels_new(data=data, 
                                                 var=var, 
                                                 method='BM')
     elif ('Weibull_3P' in dist_list):
@@ -330,7 +334,7 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
         interval = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
         interval_day = 1/(24/interval)
 
-        df_emp_rl = get_empirical_return_levels_new(data=data, 
+        df_emp_rl = stats.get_empirical_return_levels_new(data=data, 
                                                 var=var, 
                                                 method='BM',
                                                 block_size= str(interval_day) + "D")
@@ -354,18 +358,18 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
     for dist in dist_list:
 
         if dist in ['GP','Weibull_2P','EXP']:
-            df_model_rl_tmp = return_levels_pot_uncertainty(data, var,
+            df_model_rl_tmp = stats.return_levels_pot_uncertainty(data, var,
                                                 dist=dist,
                                                 threshold=threshold,
                                                 periods=periods,
                                                 uncertainty=uncertainty)
         elif dist in ['GEV','GUM']:
-            df_model_rl_tmp = return_levels_annual_max_uncertainty(data, var,
+            df_model_rl_tmp = stats.return_levels_annual_max_uncertainty(data, var,
                                                        dist=dist,
                                                        periods=periods,
                                                        uncertainty=uncertainty)
         elif dist in ['Weibull_3P']:
-            df_model_rl_tmp = return_levels_idm(data, var, 
+            df_model_rl_tmp = stats.return_levels_idm(data, var, 
                                                dist=dist, 
                                                periods=periods)
         df_model_rl_tmp=df_model_rl_tmp.dropna()
@@ -374,7 +378,7 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
             pl=ax.plot(df_model_rl_tmp['return_levels'],
                        df_model_rl_tmp['prob_non_exceedance'],
                        label=dist,zorder=10)
-            if uncertainty!=None:
+            if uncertainty is not None:
                 ax.fill_betweenx(df_model_rl_tmp['prob_non_exceedance'],
                                 df_model_rl_tmp['ci_lower_rl'],
                                 df_model_rl_tmp['ci_upper_rl'],
@@ -394,7 +398,7 @@ def plot_multi_diagnostic_return_levels_uncertainty(data, var,
             pl=ax.plot(df_model_rl_tmp.index,
                        df_model_rl_tmp['return_levels'],
                        label=dist,zorder=10)
-            if uncertainty!=None:
+            if uncertainty is not None:
                 ax.fill_between(df_model_rl_tmp.index,
                                 df_model_rl_tmp['ci_lower_rl'],
                                 df_model_rl_tmp['ci_upper_rl'],
@@ -474,8 +478,8 @@ def plot_threshold_sensitivity(df, output_file):
 
     return fig
 
-def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png') -> Sequence[Dict]:
-    contours, data_2D = get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
+def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png'):
+    contours, data_2D = stats.get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
     """Plot joint contours for the given return periods. 
     Input:
         data: pd.DataFrame
@@ -530,9 +534,6 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
     # method: 'default', 'AM' or 'POT'
     # threshold='default'(min anual maxima), or a value 
 
-    import scipy.stats as stats
-    from pyextremes import get_extremes
-    
     it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
     
     df = dataframe[var]
@@ -561,37 +562,37 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
         if period == 1 : 
             period = 1.5873
             
-    duration = (df.index[-1]-df.index[0]).days + 1 
-    length_data = data.shape[0]
+    # duration = (df.index[-1]-df.index[0]).days + 1 
+    # length_data = data.shape[0]
     #interval = duration*24/length_data # in hours 
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     period = period*365.2422*24/interval # years is converted to K-th
     
     # Fit a distribution to the data
     if distribution == 'EXP' : 
-        loc, scale = stats.expon.fit(data)
-        value = stats.expon.isf(1/period, loc, scale)
-        #value = stats.expon.ppf(1 - 1 / period, loc, scale)
+        loc, scale = st.expon.fit(data)
+        value = st.expon.isf(1/period, loc, scale)
+        #value = st.expon.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'GEV' :
-        shape, loc, scale = stats.genextreme.fit(data) # fit data   
-        value = stats.genextreme.isf(1/period, shape, loc, scale)
-        #value = stats.genextreme.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.genextreme.fit(data) # fit data   
+        value = st.genextreme.isf(1/period, shape, loc, scale)
+        #value = st.genextreme.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'GUM' :
-        loc, scale = stats.gumbel_r.fit(data) # fit data
-        value = stats.gumbel_r.isf(1/period, loc, scale)
-        #value = stats.gumbel_r.ppf(1 - 1 / period, loc, scale)
+        loc, scale = st.gumbel_r.fit(data) # fit data
+        value = st.gumbel_r.isf(1/period, loc, scale)
+        #value = st.gumbel_r.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'LoNo' :
-        shape, loc, scale = stats.lognorm.fit(data)
-        value = stats.lognorm.isf(1/period, shape, loc, scale)
-        #value = stats.lognorm.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.lognorm.fit(data)
+        value = st.lognorm.isf(1/period, shape, loc, scale)
+        #value = st.lognorm.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull2P' :
-        shape, loc, scale = stats.weibull_min.fit(data, floc=0) # (ML)
-        value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.weibull_min.fit(data, floc=0) # (ML)
+        value = st.weibull_min.isf(1/period, shape, loc, scale)
+        #value = st.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull3P' : 
-        shape, loc, scale = stats.weibull_min.fit(data) # (ML)
-        value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.weibull_min.fit(data) # (ML)
+        value = st.weibull_min.isf(1/period, shape, loc, scale)
+        #value = st.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     else:
         print ('Please check the distribution')    
         
@@ -605,9 +606,6 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
     return 
 
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
-    import matplotlib.pyplot as plt
-    from cycler import cycler
-
     """
     Plot joint distribution of Hs-Tp for a given return period for eached binned var3 data
     Input:
@@ -633,7 +631,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
         hs = df[var_hs].where(var_3.notnull()).dropna()
         tp = df[var_tp].where(var_3.notnull()).dropna()
         dff = pd.DataFrame({'HS': hs, 'TP': tp, var3_name: var_3})
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
         t3_.append(t3)
         h3_.append(h3)
         linestyle = '-' if i % 2 == 0 else '--'
@@ -641,7 +639,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
         plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
 
     #include the whole dataset also:
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=df,var_hs=var_hs,var_tp=var_tp,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=df,var_hs=var_hs,var_tp=var_tp,periods=periods)
     labels = str(np.round(window[0],2))+'-'+str(np.round(window[-1],2))
     plt.plot(t3[0],h3[0],label=var3_name+'$_{all}$'+'$\\in$ ' + labels+ ' ['+var3_units+']') 
     plt.xlabel('Tp - Peak Period [s]')
@@ -661,7 +659,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
 ##################
 
 def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
+    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     df = data
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
@@ -679,17 +677,16 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
               
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
-    t_steepness, h_steepness = DVN_steepness(df,h,t,periods,interval)
-    percentile05 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5,periods,interval)
-    percentile50 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50,periods,interval)
-    percentile95 = find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95,periods,interval)
+    t_steepness, h_steepness = aux_funcs.DNV_steepness(df,h,t,periods,interval)
+    percentile05 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5,periods,interval)
+    percentile50 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50,periods,interval)
+    percentile95 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95,periods,interval)
     
     fig, ax = plt.subplots(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
     if density_plot is False: 
         plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
     else:
-        from matplotlib.colors import LogNorm
         #plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
         plt.hist2d(df['tp'].values, df['hs'].values,bins=50, cmap='hot',cmin=1)
         plt.colorbar()
@@ -717,31 +714,25 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
     return fig
 
 def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
-    from metocean_stats.stats import general_stats, extreme_stats, dir_stats, aux_funcs
-    import pandas as pd 
-    import numpy as np 
-    from scipy.stats import weibull_min
-    import scipy.stats as stats
-    import matplotlib.pyplot as plt
     
     def readNora10File(file):
         df = pd.read_csv(file, delim_whitespace=True, header=3) # sep=' ', header=None,0,1,2,3
         df.index= pd.to_datetime(df.YEAR*1000000+df.M*10000+df.D*100+df.H,format='%Y%m%d%H')
-        df['tp_corr_nora10'] = aux_funcs.Tp_correction(df.TP.values)
+        df['tp_corr_nora10'] = stats.aux_funcs.Tp_correction(df.TP.values)
         return df
     
     df = readNora10File(file)
     
     # Fit Weibull distribution to your data and estimate parameters
     data = df.HS.values  # Your data
-    shape, loc, scale = Weibull_method_of_moment(data)
+    shape, loc, scale = stats.Weibull_method_of_moment(data)
     
     # Define return periods
     periods = np.arange(1.5873, 10000, 100) 
     return_periods = periods
     return_periods = return_periods*365.2422*24/3
     # Calculate return values
-    return_values = weibull_min.ppf(1 - 1 / return_periods, shape, loc, scale)
+    return_values = st.weibull_min.ppf(1 - 1 / return_periods, shape, loc, scale)
     
     # Bootstrap to estimate confidence bounds
     num_bootstrap_samples = 1000
@@ -751,9 +742,9 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
         bootstrap_sample = np.random.choice(data, size=1000, replace=True)
         
         # Fit Weibull distribution to resampled data
-        shape_b, loc_b, scale_b = Weibull_method_of_moment(bootstrap_sample)
+        shape_b, loc_b, scale_b = stats.Weibull_method_of_moment(bootstrap_sample)
         # Calculate return values for resampled distribution
-        bootstrap_return_values.append(weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
+        bootstrap_return_values.append(st.weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
     
     # Calculate confidence bounds
     lower_bounds = np.percentile(bootstrap_return_values, 2.5, axis=0)
@@ -789,7 +780,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     return 
 
 def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='default',threshold='default', units='m',output_file='monthly_extremes_weibull.png'):
-    df = table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method,threshold=threshold, units=units, output_file=None)
+    df = tables.table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method,threshold=threshold, units=units, output_file=None)
     fig, ax = plt.subplots()
     for i in range(len(periods)):
         plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1])
@@ -803,7 +794,7 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
 
 
 def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
-    df = table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment,method=method,threshold=threshold, output_file=None)
+    df = tables.table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
     for i in periods:
         plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years')
@@ -817,7 +808,7 @@ def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 1
 
 
 def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', periods=[1, 10, 100, 10000], distribution='Weibull', units='m', adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
-    df = table_directional_return_periods(data=data, var=var, var_dir=var_dir, periods=periods, distribution=distribution, units=units, adjustment=adjustment, method=threshold,threshold=threshold,output_file=None)
+    df = tables.table_directional_return_periods(data=data, var=var, var_dir=var_dir, periods=periods, distribution=distribution, units=units, adjustment=adjustment, method=threshold,threshold=threshold,output_file=None)
 
     # Remove degree symbols and convert to numeric
     directions_str = df['Direction sector'][1:-1].str.rstrip('°')
@@ -850,17 +841,17 @@ def plot_polar_directional_return_periods(data, var='hs', var_dir='Pdir', period
 
 
 def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot_prob_non_exceedance_fitted_3p_weibull.png'):
-    hs, y, cdf, prob_non_exceedance_obs, shape, location, scale = prob_non_exceedance_fitted_3p_weibull(data=data, var=var)
+    hs, y, cdf, prob_non_exceedance_obs, shape, location, scale = stats.prob_non_exceedance_fitted_3p_weibull(data=data, var=var)
     fig, ax = plt.subplots()
 
     a = np.array([0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 0.999, 0.9999, 0.99999, 0.999999])
     b1 = np.array([0, 1, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6.5, 7, 7.5, 8, 8.5])
     a1 = prob_non_exceedance_obs / 100
     yinterp = np.interp(a1, a, b1)
-    b = np.arange(0, len(yinterp), 1)
+    # b = np.arange(0, len(yinterp), 1)
     a2 = cdf
     yinterp2 = np.interp(a2, a, b1)
-    b2 = np.arange(0, len(yinterp2), 1)
+    # b2 = np.arange(0, len(yinterp2), 1)
     ax.plot(np.log(np.sort(y)), np.log(np.sort(yinterp2)), label='fitted')
     ax.plot(np.log(hs), np.log(yinterp), 'r*', label='data')
     
@@ -904,7 +895,7 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
 
 
 def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_file='tp_for_given_hs.png'):
-    df = table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
+    df = tables.table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
@@ -925,7 +916,7 @@ def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_fil
     return fig
 
 def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output_file='hs_for_given_wind.png'):
-    df = table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
+    df = tables.table_hs_for_given_wind(data=data, var_hs=var_hs, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_hs], bins=50, cmap='hot', cmin=1)
@@ -948,19 +939,18 @@ def plot_hs_for_given_wind(data: pd.DataFrame, var_hs: str, var_wind: str,output
     return fig
 
 def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],reverse_yaxis=False,title='Return Periods over z',units = 'm/s',distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.png'):
-    import matplotlib.ticker as ticker
-    df = table_profile_return_values(data,var=var, z=z, periods=periods,units = units ,distribution=distribution,method=method,threshold=threshold, output_file=None)
+    df = tables.table_profile_return_values(data,var=var, z=z, periods=periods,units = units ,distribution=distribution,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
     df.columns = [col.replace('Return period ', '') for col in df.columns] # for legends
     plt.yticks(z)  # Set yticks to be the values in z
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
 
     for column in df.columns[1:]:
         plt.plot(df[column][1:],z,marker='.', label=column)
     plt.ylabel('z[m]')
     plt.xlabel('[m/s]')
     plt.title(title)
-    if reverse_yaxis == True:
+    if reverse_yaxis is True:
         plt.gca().invert_yaxis()
     plt.legend()
     plt.grid(True)
@@ -972,7 +962,7 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
 
 
 def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str,output_file='curr_for_given_wind.png'):
-    df = table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
+    df = tables.table_current_for_given_wind(data=data, var_curr=var_curr, var_wind=var_wind, bin_width=2,max_wind=np.ceil(data[var_wind].max()), output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_wind],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -996,7 +986,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
 
 
 def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
-    df = table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df = tables.table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -1020,7 +1010,7 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
 
 
 def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: str,max_hs=20,output_file='surge_for_given_hs.png'):
-    df, df_coeff = table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df, df_coeff = tables.table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_surge], bins=50, cmap='hot', cmin=1)
@@ -1060,15 +1050,13 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
-        print('Please specify either a percentile or a return period in years')
-        sys.exit()
+        raise ValueError('Please specify either a percentile or a return period in years')
     if not(percentile is None):
-        lev,woca,cca=cca_profiles(data,var=var,month=month,percentile=percentile)
+        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,percentile=percentile)
     if not(return_period is None):
-        lev,woca,cca=cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold,max=max)
-    import matplotlib as mpl
+        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold,max=max)
     n_lines = len(lev)
-    cmap = mpl.colormaps['jet_r']
+    cmap = plt.get_cmap('jet_r')
     colors = cmap(np.linspace(0, 1, n_lines))
     fig, ax = plt.subplots(figsize=(9,10))
     for d in range(len(lev)):
@@ -1077,14 +1065,14 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     ax.set_ylabel(var+' ['+unit_var+']',fontsize=16)
     ax.set_xlabel('Level ['+unit_lev+']',fontsize=16)
-    if month==None:
+    if month is None:
         month_str=''
     else:
         month_str=' - Month: '+month
-    if not(percentile is None):
+    if percentile is not None:
         pp=f"{percentile:.4f}"
         ax.set_title('CCA profile - P'+pp+month_str,fontsize=16)
-    if not(return_period is None):
+    if return_period is not None:
         rp=f"{return_period:.0f}"
         ax.set_title('CCA profile - RP '+rp+' years'+month_str,fontsize=16)
     ax.tick_params(axis='both', labelsize= 16)

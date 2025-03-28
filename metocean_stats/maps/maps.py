@@ -259,8 +259,11 @@ def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_exte
         The figure object containing the plot.
     """    
     if product == 'NORA3':
-        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Overall_Mean_AirTemperature2m_1991_2020.nc')
-        #standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'x', 'y', projection_type='lambert_conformal')
+        ds = xr.open_dataset('https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Overall_Mean_AirTemperature2m_1991_2020.nc')
+        ## The code `standard_lon` appears to be a variable name in Python. It is not assigned any
+        # value or operation in the provided snippet, so it is not doing anything specific in this
+        # context.
+        standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'x', 'y', projection_type='lambert_conformal')
         hs_flat = ds['air_temperature_2m'].isel(time=0).values.flatten()
         lon_flat = ds['longitude'].values.flatten()
         lat_flat = ds['latitude'].values.flatten()

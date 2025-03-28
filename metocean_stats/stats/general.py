@@ -5,9 +5,12 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
-from math import floor,ceil
+import scipy.stats as st
 
-from .aux_funcs import convert_latexTab_to_csv, add_direction_sector, consecutive_indices
+from math import floor,ceil
+from scipy.signal import find_peaks
+
+from .aux_funcs import convert_latexTab_to_csv
 
 def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
     """
@@ -273,10 +276,6 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
 
 def Cmax(Hs,Tm,depth):
     
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from scipy.signal import find_peaks
-    
     # calculate k1
     g = 9.80665 # m/s2, gravity 
     Tm01 = Tm # second, period 
@@ -340,31 +339,24 @@ def Cmax(Hs,Tm,depth):
     
 def pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=70)
     
-    import matplotlib.pyplot as plt
-    from scipy.stats import expon
-    from scipy.stats import genextreme
-    from scipy.stats import gumbel_r 
-    from scipy.stats import lognorm 
-    from scipy.stats import weibull_min
-    
     data = data[var].values
     
     x=np.linspace(min(data),max(data),100)
     
-    param = weibull_min.fit(data) # shape, loc, scale
-    pdf_weibull = weibull_min.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.weibull_min.fit(data) # shape, loc, scale
+    pdf_weibull = st.weibull_min.pdf(x, param[0], loc=param[1], scale=param[2])
     
-    param = expon.fit(data) # loc, scale
-    pdf_expon = expon.pdf(x, loc=param[0], scale=param[1])
+    # param = expon.fit(data) # loc, scale
+    # pdf_expon = expon.pdf(x, loc=param[0], scale=param[1])
     
-    param = genextreme.fit(data) # shape, loc, scale
-    pdf_gev = genextreme.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.genextreme.fit(data) # shape, loc, scale
+    pdf_gev = st.genextreme.pdf(x, param[0], loc=param[1], scale=param[2])
     
-    param = gumbel_r.fit(data) # loc, scale
-    pdf_gumbel = gumbel_r.pdf(x, loc=param[0], scale=param[1])
+    param = st.gumbel_r.fit(data) # loc, scale
+    pdf_gumbel = st.gumbel_r.pdf(x, loc=param[0], scale=param[1])
     
-    param = lognorm.fit(data) # shape, loc, scale
-    pdf_lognorm = lognorm.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.lognorm.fit(data) # shape, loc, scale
+    pdf_lognorm = st.lognorm.pdf(x, param[0], loc=param[1], scale=param[2])
     
     fig, ax = plt.subplots(1, 1)
     #ax.plot(x, pdf_expon, label='pdf-expon')
@@ -402,8 +394,8 @@ def scatter(df,var1,var2,location,regression_line,qqplot=True):
         ax.scatter(qn_x,qn_y,marker='.',s=80,c='b')
 
     if regression_line:  
-        m,b,r,p,se1=stats.linregress(x,y)
-        cm0="$"+('y=%2.2fx+%2.2f'%(m,b))+"$";   
+        m,b,r,p,se1=st.linregress(x,y)
+        cm0="$"+('y=%2.2fx+%2.2f'%(m,b))+"$"
         plt.plot(x, m*x + b, 'k--', label=cm0)
         plt.legend(loc='best')
         
@@ -487,7 +479,7 @@ def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_si
     plt.show()    
     #breakpoint()
     # add all periods with zero waiting time (consecutive_periods==1)
-    counter_list_no_waiting = [window_size]*int((np.sum(consecutive_periods)*dt)//window_size)
+    # counter_list_no_waiting = [window_size]*int((np.sum(consecutive_periods)*dt)//window_size)
     # add all periods with waiting time (consecutive_periods==0)
     counter = 0
     counter_list_with_waiting =   [[] for _ in range(12)]
@@ -552,7 +544,7 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
     wt1=(np.array(wt)+op_duration)/24
     # Note that we this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
-    if month==None:
+    if month is None:
         mean = np.mean(wt1)
         p10 = np.percentile(wt1,10)
         p50 = np.percentile(wt1,50)

@@ -1,10 +1,15 @@
 import numpy as np
-import matplotlib
-from ..stats.general import *
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+import matplotlib.ticker as mticker
+import scipy.stats as st
+
+#from ..stats.general import *
+from .. import stats
+
+
 
 def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regression_line='effective-variance',qqplot=True,density=True,output_file='scatter_plot.png'):
-    import matplotlib.pyplot as plt
-    import scipy.stats as stats
     """
     Plots a scatter plot with optional density, regression line, and QQ plot. 
     Calculates and displays statistical metrics on the plot.
@@ -28,10 +33,9 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
     x=df[var1].values
     y=df[var2].values
     fig, ax = plt.subplots()
-    if density == False:
+    if density is False:
         ax.scatter(x,y,marker='.',s=10,c='g')
     else:
-        from matplotlib.colors import LogNorm
         plt.hist2d(x, y,bins=50, cmap='hot',cmin=1)
         plt.colorbar()
 
@@ -49,14 +53,14 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
         ax.scatter(qn_x,qn_y,marker='.',s=80,c='b')
 
     if regression_line == 'least-squares':
-        slope=stats.linregress(x,y).slope
-        intercept=stats.linregress(x,y).intercept
+        slope=st.linregress(x,y).slope
+        intercept=st.linregress(x,y).intercept
     elif regression_line == 'mean-slope':
         slope = np.mean(y)/np.mean(x)
         intercept = 0 
     elif regression_line == 'effective-variance':
-        slope = linfitef(x,y)[0] 
-        intercept = linfitef(x,y)[1] 
+        slope = stats.linfitef(x,y)[0] 
+        intercept = stats.linfitef(x,y)[1] 
     else:
         slope = None
         intercept = None
@@ -95,12 +99,6 @@ def plot_scatter(df,var1,var2,var1_units='m', var2_units='m',title=' ',regressio
 
 
 def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram.png'):
-
-    import matplotlib.pyplot as plt
-    import math
-    import matplotlib.lines as mlines
-    import matplotlib.ticker as ticker
-
     """
     Plot a Taylor diagram
     df: dataframe with all timeseries
@@ -140,7 +138,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
             ycr=np.zeros((len(corr),len(xbc1)))
             for r in range(len(corr)):
                 for a in range(len(xbc1)):
-                    ycr[r,a]=math.tan(math.acos(corr[r]))*xbc1[a]
+                    ycr[r,a]=np.tan(np.acos(corr[r]))*xbc1[a]
                     d=np.sqrt(ycr[r,a]**2+xbc1[a]**2)
                     if d>np.max(radius):
                         ycr[r,a]=np.nan
@@ -152,7 +150,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
             std[0]=np.std(df[var_ref].to_numpy())
             for i in range(len(var_comp)):
                 std[i+1]=np.std(df[var_comp[i]].to_numpy())
-            if norm_std==True:
+            if norm_std is True:
                 std=std/std[0]
 
             # Coordinates of the big circles
@@ -203,12 +201,12 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
             for i in range(len(corr1)):
                 text.append(str(corr1[i]))
                 xt[i]=corr1[i]*(max_std+0.1)
-                yt[i]=math.sin(math.acos(corr1[i]))*(max_std+0.1)
+                yt[i]=np.sin(np.acos(corr1[i]))*(max_std+0.1)
                 #angle[i]=math.acos(corr1[i])*180.0/math.pi
                 angle[i]=angle[i]
             #angle=0.0-angle[::-1]
             
-            if show==True:
+            if show:
                 for r in range(len(radius)):
                     ax.plot(xbc[:],ybc[r,:],'k',linewidth=1.0)
                 for r in range(len(corr)):
@@ -229,7 +227,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
             levels_crms=np.arange(step,np.nanmax(zz)-step,step) if step<1 else np.arange(step,np.nanmax(zz),step)
             CS = ax.contour(xx,yy,zz,colors='gray',linewidths=1.0,linestyles='--',levels=levels_crms)
-            fmt = ticker.ScalarFormatter()
+            fmt = mticker.ScalarFormatter()
             fmt.create_dummy_axis()
             list_tup=[(std[0],yv) for yv in levels_crms]
             ax.clabel(CS, CS.levels, fmt=fmt, fontsize=14,inline=True,inline_spacing=-2,manual=list_tup)
@@ -259,7 +257,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
                 ax.plot(x[ri],y[ri],clip_on=False,marker=combinations[rj-1][0],color=combinations[rj-1][1],markersize=14,markerfacecolor=combinations[rj-1][1])
                 legends.append(mlines.Line2D([],[],marker=combinations[rj-1][0],color=combinations[rj-1][1], linestyle='None',markersize=14, label=var_comp[ri-1]))
 
-            if show==True:
+            if show:
                 num_lines = len(legends)
                 ncol=1 if num_lines < 7 else 2 if num_lines < 13 else 3
                 Size='x-large' if ncol<3 else 'large' 
@@ -271,12 +269,12 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
                 ax.plot(xt[i],yt[i],clip_on=False,marker='o',color='None',markersize=6,markerfacecolor='None')
                 ax.text(xt[i],yt[i],text[i],ha="center", va="center", size=16, rotation=angle[i])
             
-            if norm_std==True:
+            if norm_std:
                 ax.set_xlabel('Normalized standard deviation',fontsize=18)
             else:
                 ax.set_xlabel('Standard deviation',fontsize=18)
             
-            if show==True:
+            if show:
                 plt.xlim(0,max_std+0.02)
                 plt.ylim(0,max_std+0.02)
                 plt.xticks(fontsize=16)
@@ -301,7 +299,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
         run_taylor(var_ref,var_comp,maxx,index,show,fig, ax)
 
     elif (len(var_ref)>len(var_comp)) and (len(var_comp)==1): #for option 1
-        if norm_std != True:
+        if norm_std is not True:
             print('This option can only be runned with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -327,7 +325,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
                 run_taylor([var_ref1],[var_comp1],maxx,index,show,fig,ax)
 
     elif len(var_ref)==len(var_comp): #for option 3
-        if norm_std != True:
+        if norm_std is not True:
             print('This option can only be runned with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
