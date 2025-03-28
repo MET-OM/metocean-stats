@@ -1737,6 +1737,28 @@ Plot mean 2-m air temperature based on NORA3 data:
 .. image:: files/mean_air_temperature_map.png
   :width: 500
 
+Plot bathymetry based on NORKYST800 url:
+
+.. code-block:: python
+
+   plot_bathymetry_cross_section(product = "NORKYST800",
+                                 lon=4,
+                                 lat=60.5)
+
+.. image ::files/Bathymetry_cross_section.png
+  :width: 500
+
+Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on NORKYST800 url and csv file:
+
+.. code-block:: python
+   
+   plot_bathymetry_cross_section_with_variable_from_NORKYST800_overall(product='https://thredds.met.no/thredds/dodsC/fou-hi/norkyst800m-1h/NorKyst-800m_ZDEPTHS_his.an.2025020700.nc',
+                                                                       df='NORKYST800_test.csv',
+                                                                       lon=4,
+                                                                       lat=60.5,
+                                                                       var="salinity")
+.. image ::files/Bathymetry_cross_section_with_variable=salinity.png
+
 Verification Functions
 ===================
 Scatter Plot
