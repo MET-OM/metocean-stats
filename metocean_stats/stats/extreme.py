@@ -1,10 +1,14 @@
-from typing import Dict, Sequence
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import xarray as xr
-from .aux_funcs import *
+import scipy.stats as st
 
+from scipy.signal import find_peaks
+from scipy.optimize import curve_fit, minimize
+
+from . import aux_funcs
+
+from pyextremes import get_extremes, get_return_periods
 
 def return_levels_pot(data, var, dist='Weibull_2P', 
                       periods=[50, 100, 1000], 
@@ -31,13 +35,9 @@ def return_levels_pot(data, var, dist='Weibull_2P',
     
     Function written by dung-manh-nguyen and KonstantinChri.
     """
-    import scipy.stats as stats
-    from pyextremes import get_extremes
 
-    if threshold == None:
+    if threshold is None:
         threshold = get_threshold_os(data=data, var=var)
-    else:
-        pass
     
     extremes = get_extremes(data[var], method="POT", threshold=threshold, r=r)
     
@@ -50,17 +50,17 @@ def return_levels_pot(data, var, dist='Weibull_2P',
     return_periods = np.array(periods)*24*365.2422/time_step
     
     if dist == 'Weibull_2P':
-        shape, loc, scale = stats.weibull_min.fit(extremes-threshold, floc=0)
-        return_levels = stats.weibull_min.isf(1/return_periods, 
+        shape, loc, scale = st.weibull_min.fit(extremes-threshold, floc=0)
+        return_levels = st.weibull_min.isf(1/return_periods, 
                                               shape, loc, scale)\
                                               + threshold
     elif dist == 'EXP':
-        loc, scale = stats.expon.fit(extremes-threshold)
-        return_levels = stats.expon.isf(1/return_periods, loc, scale)\
+        loc, scale = st.expon.fit(extremes-threshold)
+        return_levels = st.expon.isf(1/return_periods, loc, scale)\
                                         + threshold
     elif dist == 'GP':
-        shape, loc, scale = stats.genpareto.fit(extremes-threshold)
-        return_levels = stats.genpareto.isf(1/return_periods, 
+        shape, loc, scale = st.genpareto.fit(extremes-threshold)
+        return_levels = st.genpareto.isf(1/return_periods, 
                                             shape, loc, scale)\
                                             + threshold
     else:
@@ -112,17 +112,15 @@ def return_levels_annual_max(data, var='hs', dist='GEV',
             periods[i] = 1.6
 
     if dist == 'GEV':
-        from scipy.stats import genextreme
         # fit data
-        shape, loc, scale = genextreme.fit(data_am) 
+        shape, loc, scale = st.genextreme.fit(data_am) 
         # Compute the return levels for several return periods       
-        return_levels = genextreme.isf(1/periods, shape, loc, scale)
+        return_levels = st.genextreme.isf(1/periods, shape, loc, scale)
 
     elif dist == 'GUM': 
-        from scipy.stats import gumbel_r 
-        loc, scale = gumbel_r.fit(data_am) # fit data
+        loc, scale = st.gumbel_r.fit(data_am) # fit data
         # Compute the return levels for several return periods.
-        return_levels = gumbel_r.isf(1/periods, loc, scale)
+        return_levels = st.gumbel_r.isf(1/periods, loc, scale)
 
     else:
         print ('please check method/distribution, must be either GEV or GUM')
@@ -158,7 +156,6 @@ def return_levels_idm(data, var, dist='Weibull_3P',
                                and the distribution.
     
     """
-    import scipy.stats as stats
 
     # time step between each data, in hours
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
@@ -166,8 +163,8 @@ def return_levels_idm(data, var, dist='Weibull_3P',
     return_periods = np.array(periods)*24*365.2422/time_step
     
     if dist == 'Weibull_3P':
-        shape, loc, scale = param = Weibull_method_of_moment(data[var])
-        return_levels = stats.weibull_min.isf(1/return_periods, 
+        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
+        return_levels = st.weibull_min.isf(1/return_periods, 
                                               shape, loc, scale)
         
     else:
@@ -208,9 +205,8 @@ def get_threshold_os(data, var):
 
 
 def probplot(data, sparams):    
-    import scipy.stats as stats
-    stats.probplot(data, sparams=sparams, 
-                   dist=stats.genpareto,fit=True, plot=plt)
+    st.probplot(data, sparams=sparams, 
+                   dist=st.genpareto,fit=True, plot=plt)
     plt.grid()
     plt.axline((data[0], data[0]), slope=1,label='y=x')
     plt.legend()
@@ -238,7 +234,6 @@ def get_empirical_return_levels(data, var, method="POT",
                                about the method used, threshold or block size 
                                used, and variable of interest.   
     """
-    from pyextremes import get_extremes, get_return_periods
     
     if method == 'BM':
         extremes = get_extremes(ts=data[var],
@@ -267,7 +262,7 @@ def get_empirical_return_levels(data, var, method="POT",
         extremes = get_extremes(ts=data[var],
                                 method=method,
                                 threshold=threshold)
-        rp = get_return_periods(ts=data[var],
+        rp = aux_funcs.get_return_periods(ts=data[var],
                                 extremes=extremes,
                                 extremes_method=method,
                                 extremes_type="high")
@@ -364,20 +359,17 @@ def return_levels_weibull_2p(data, var,
     
     Function written by dung-manh-nguyen and KonstantinChri.
     """                         
-    import scipy.stats as stats
-    from pyextremes import get_extremes
     # how to use, to test this 
     #return_period = np.array([1,10,100,10000],dtype=float)
     #return_values = RVE_Weibull_2P(df.hs,return_period,threshold=6.2)
     #print (return_values)
-    if threshold == None:
+    if threshold is None:
         threshold = get_threshold_os(data=data, var=var)
-    else:
-        pass
+
     extremes = get_extremes(data[var], method="POT", threshold=threshold, r=r)
 
     # Fit a 2-parameter Weibull distribution to the data
-    shape, loc, scale = stats.weibull_min.fit(extremes, floc=0)
+    shape, loc, scale = st.weibull_min.fit(extremes, floc=0)
 
     years = data.index.year
     yr_num = years[-1]-years[0]+1
@@ -388,7 +380,7 @@ def return_levels_weibull_2p(data, var,
     return_period = np.array(periods)*24*365.2422/time_step 
 
     # Calculate the 2-parameter Weibull return value
-    return_value = stats.weibull_min.isf(1/return_period, shape, loc, scale)
+    return_value = st.weibull_min.isf(1/return_period, shape, loc, scale)
 
     #for i in range(len(return_value)) : 
     #    return_value[i] = round(return_value[i],1)
@@ -415,18 +407,15 @@ def return_levels_exp(data, var='hs', periods=[50, 100, 1000],
     
     Function written by dung-manh-nguyen and KonstantinChri.
     """        
-    from scipy.stats import expon
-    from pyextremes import get_extremes
     # how to use this function 
     #return_periods = np.array([1.6, 10, 100, 10000]) # in years
     #return_values = RVE_EXP(df.hs,return_periods,4)
     #print (return_values)
-    if threshold == None:
+    if threshold is None:
         threshold = get_threshold_os(data=data, var=var)
-    else:
-        pass
+
     extremes = get_extremes(data[var], method="POT", threshold=threshold, r=r)
-    loc, scale = expon.fit(extremes)
+    loc, scale = st.expon.fit(extremes)
     #print (loc,scale)
 
     years = data.index.year
@@ -436,7 +425,7 @@ def return_levels_exp(data, var='hs', periods=[50, 100, 1000],
     # years is converted to K-th
     return_periods = np.array(periods)*24*365.2422/interval 
 
-    return_levels = expon.isf(1/return_periods, loc, scale)
+    return_levels = st.expon.isf(1/return_periods, loc, scale)
 
     return return_levels
         
@@ -452,10 +441,9 @@ def old_return_levels_GP(data, var, threshold=None,
     3) periods is a numpy array containing the return periods (in years) of interest (ex: np.array([20,30,50,100]))
     - Follows the POT method
     """
-    if threshold == None:
+    if threshold is None:
         threshold = get_threshold_os(data=data, var=var)
-    else:
-        pass
+
     periods = np.array(periods, dtype=float)
     ts = data[var]
     # select the values above the threshold in the timeseries ts
@@ -466,31 +454,31 @@ def old_return_levels_GP(data, var, threshold=None,
     larrs=np.split(it,np.where(np.diff(it)>number_days_diff*24)[0]+1)
     it_selected_max=[]
     # Pick the maximum value of the variable within groups
-    for l in range(len(larrs)):
-        mxi=np.argmax(ts.iloc[larrs[l]].values) # If several values are equal to the max, argmax takes the first occurrence 
-        it_selected_max.append(larrs[l][mxi]) # index of points used in the analysis
-        del mxi
+    for arr in larrs:
+        mxi=np.argmax(ts.iloc[arr].values) # If several values are equal to the max, argmax takes the first occurrence 
+        it_selected_max.append(arr[mxi]) # index of points used in the analysis
+
     # Get the selected values and time for the extreme value analysis
     sel_val=ts.iloc[it_selected_max]
 
     #sel_time=sel_val.index
     # Total number of selected values
-    ns=len(sel_val)
+    #ns=len(sel_val)
     # Number of selected values in each year
     ns_yr=sel_val.resample("YS").count() # Should give an array of 30+ values if 30 years are considered
     # Expected rate of occurrence (mean number of occurrences per year)
     lambd=np.mean(ns_yr.values,axis=0)
     # Fit the Generalized Pareto distribution to the selected values
-    from scipy.stats import genpareto
-    shape,loc,scale = genpareto.fit(sel_val.values-threshold)
-    rl = genpareto.isf(1/(lambd*periods), shape, loc, scale) + threshold
+    shape,loc,scale = st.genpareto.fit(sel_val.values-threshold)
+    rl = st.genpareto.isf(1/(lambd*periods), shape, loc, scale) + threshold
 
     # If the return level is unrealistic (usually very high), set rl to a special number
     rl=np.where(rl>=3*threshold,np.nan,rl)
-    if output_file == False:
-        pass
-    else:
-      plot_return_levels(data,var,rl,periods,output_file,
+    if output_file:
+        # TODO: We should probably not call the plots module from stats,
+        # due to circular imports etc.
+        from ..plots import plot_return_levels
+        plot_return_levels(data,var,rl,periods,output_file,
                          it_selected_max=ts.iloc[it_selected_max].index)
         #probplot(data=sel_val.values, sparams=(shape, loc, scale))
 
@@ -504,11 +492,9 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
     # method: 'default' (all data), 'AM' or 'POT'
     # threshold='default'(min anual maxima), or a value 
 
-    import scipy.stats as stats
-    from pyextremes import get_extremes
     shape, loc, scale = [], [], []
     periods = np.array(periods)
-    it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
+    #it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
     df = dataframe[var]
     
     period = periods
@@ -535,45 +521,45 @@ def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',
         if period == 1 : 
             period = 1.5873
             
-    duration = (df.index[-1]-df.index[0]).days + 1 
-    length_data = data.shape[0]
+    # duration = (df.index[-1]-df.index[0]).days + 1 
+    # length_data = data.shape[0]
     #interval = duration*24/length_data # in hours 
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     period = period*365.2422*24/interval # years is converted to K-th
     
     # Fit a distribution to the data
     if distribution == 'EXP' : 
-        loc, scale = stats.expon.fit(data)
-        value = stats.expon.isf(1/period, loc, scale)
-        #value = stats.expon.ppf(1 - 1 / period, loc, scale)
+        loc, scale = st.expon.fit(data)
+        value = st.expon.isf(1/period, loc, scale)
+        #value = st.expon.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'GEV' :
-        shape, loc, scale = stats.genextreme.fit(data) # fit data   
-        value = stats.genextreme.isf(1/period, shape, loc, scale)
-        #value = stats.genextreme.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.genextreme.fit(data) # fit data   
+        value = st.genextreme.isf(1/period, shape, loc, scale)
+        #value = st.genextreme.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'GUM' :
-        loc, scale = stats.gumbel_r.fit(data) # fit data
-        value = stats.gumbel_r.isf(1/period, loc, scale)
-        #value = stats.gumbel_r.ppf(1 - 1 / period, loc, scale)
+        loc, scale = st.gumbel_r.fit(data) # fit data
+        value = st.gumbel_r.isf(1/period, loc, scale)
+        #value = st.gumbel_r.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'GUM_L' : # Gumbel Left-skewed (for minimum order statistic) Distribution
-        loc, scale = stats.gumbel_l.fit(data) # fit data
-        value = stats.gumbel_l.ppf(1/period, loc, scale)
-        #value = stats.gumbel_l.ppf(1 - 1 / period, loc, scale)
+        loc, scale = st.gumbel_l.fit(data) # fit data
+        value = st.gumbel_l.ppf(1/period, loc, scale)
+        #value = st.gumbel_l.ppf(1 - 1 / period, loc, scale)
     elif distribution == 'LoNo' :
-        shape, loc, scale = stats.lognorm.fit(data)
-        value = stats.lognorm.isf(1/period, shape, loc, scale)
-        #value = stats.lognorm.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.lognorm.fit(data)
+        value = st.lognorm.isf(1/period, shape, loc, scale)
+        #value = st.lognorm.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull2P' :
-        shape, loc, scale = stats.weibull_min.fit(data, floc=0) # (ML)
-        value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.weibull_min.fit(data, floc=0) # (ML)
+        value = st.weibull_min.isf(1/period, shape, loc, scale)
+        #value = st.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull3P' : 
-        shape, loc, scale = stats.weibull_min.fit(data) # (ML)
-        value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = st.weibull_min.fit(data) # (ML)
+        value = st.weibull_min.isf(1/period, shape, loc, scale)
+        #value = st.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     elif distribution == 'Weibull3P_MOM' : 
-        shape, loc, scale = Weibull_method_of_moment(data)
-        value = stats.weibull_min.isf(1/period, shape, loc, scale)
-        #value = stats.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
+        shape, loc, scale = aux_funcs.Weibull_method_of_moment(data)
+        value = st.weibull_min.isf(1/period, shape, loc, scale)
+        #value = st.weibull_min.ppf(1 - 1 / period, shape, loc, scale)
     else:
         print ('Please check the distribution')    
         
@@ -600,17 +586,12 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     else:
         periods_adj = periods
     df  = data
-    max_y = max(periods)
-    period = np.array(periods)
+    # max_y = max(periods)
+    # period = np.array(periods)
     pd.options.mode.chained_assignment = None  # default='warn'
     df.loc[:,'hs'] = df[var_hs].values
-    df.loc[:,'tp'] = Tp_correction(df[var_tp].values)
+    df.loc[:,'tp'] = aux_funcs.Tp_correction(df[var_tp].values)
     
-    import scipy.stats as stats
-    from matplotlib import pyplot as plt
-    from scipy.optimize import curve_fit
-    from scipy.signal import find_peaks
-   
     # calculate lognormal and weibull parameters and plot the PDFs 
     mu = np.mean(np.log(df.hs.values)) # mean of ln(Hs)
     std = np.std(np.log(df.hs.values)) # standard deviation of ln(Hs)
@@ -626,12 +607,12 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
         #Based on Moan et al. (2005), "Uncertainty of wave-induced response of marine structures due to long-term variation of extratropical wave conditions":
         pdf_Hs1 = 1/(np.sqrt(2*np.pi)*sigma*h)*np.exp(-(np.log(h)-alpha)**2/(2*sigma**2))
     else:
-        param = stats.lognorm.fit(df.hs.values,) # shape, loc, scale
-        pdf_lognorm = stats.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
+        param = st.lognorm.fit(df.hs.values,) # shape, loc, scale
+        pdf_lognorm = st.lognorm.pdf(h, param[0], loc=param[1], scale=param[2])
         pdf_Hs1 = pdf_lognorm
     
-    param = Weibull_method_of_moment(df.hs.values) #stats.weibull_min.fit(df.hs.values) # shape, loc, scale
-    pdf_Hs2 = stats.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
+    param = aux_funcs.Weibull_method_of_moment(df.hs.values) #st.weibull_min.fit(df.hs.values) # shape, loc, scale
+    pdf_Hs2 = st.weibull_min.pdf(h, param[0], loc=param[1], scale=param[2])
     
     
     # Find the index where two PDF cut, between P60 and P99 
@@ -682,7 +663,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     elif maxHs>=4 and maxHs<10 :
         intx=0.5
     else : 
-        intx=1.0;
+        intx=1.0
     
     mean_hs = []
     variance_lnTp = []
@@ -701,7 +682,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     variance_lnTp = np.asarray(variance_lnTp)
 
     # calcualte a1, a2, a3 
-    parameters, covariance = curve_fit(Gauss3, mean_hs, mean_lnTp)
+    parameters, covariance = curve_fit(aux_funcs.Gauss3, mean_hs, mean_lnTp)
     a1 = parameters[0]
     a2 = parameters[1]
     a3 = 0.36
@@ -710,7 +691,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     start = 1
     x = mean_hs[start:]
     y = variance_lnTp[start:]
-    parameters, covariance = curve_fit(Gauss4, x, y)#,maxfev=10000)
+    parameters, covariance = curve_fit(aux_funcs.Gauss4, x, y)#,maxfev=10000)
     b1 = 0.005
     b2 = parameters[0]
     b3 = parameters[1]
@@ -738,7 +719,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
 
     # Assuming Hs_Tp_curve() returns four values, otherwise adjust accordingly
     for i in range(len(periods)):
-        t3_val, h3_val, X_val, hs_tpl_tph_val = Hs_Tp_curve(df.hs.values, pdf_Hs, pdf_Hs_Tp, f_Hs_Tp, h, t, interval, X=periods_adj[i])
+        t3_val, h3_val, X_val, hs_tpl_tph_val = aux_funcs.Hs_Tp_curve(df.hs.values, pdf_Hs, pdf_Hs_Tp, f_Hs_Tp, h, t, interval, X=periods_adj[i])
         t3.append(t3_val)
         h3.append(h3_val)
         X.append(X_val)
@@ -751,14 +732,13 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
 
 def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', method='default', threshold='default'):
-    from scipy.stats import weibull_min
     # Calculate parameters for each month based on different method
     params = []
     return_values = [] #np.zeros((13, len(periods)))
     num_events_per_year = []
-    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
     # years is converted to K-th
-    periods1 = np.array(periods)*24*365.2422/time_step
+    # periods1 = np.array(periods)*24*365.2422/time_step
     threshold_values = []
     for month in range(1, 13):
         month_data = data[data.index.month == month]
@@ -819,8 +799,6 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
     return params, return_values, threshold_values, num_events_per_year
 
 def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull3_MOM', adjustment='NORSOK', method='default', threshold='default'):
-    
-    from scipy.stats import weibull_min, gumbel_r
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
     sector_prob = []
@@ -828,9 +806,9 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     threshold_values = []
     num_events_per_year = []
     return_values = []
-    add_direction_sector(data=data,var_dir=var_dir)
+    aux_funcs.add_direction_sector(data=data,var_dir=var_dir)
     # time step between each data, in hours
-    time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
+    # time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
     
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir]
@@ -899,16 +877,15 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     return params, return_values, sector_prob,  threshold_values, num_events_per_year
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):
-    from scipy.stats import weibull_min
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
     weibull_params = []
     for month in range(1, 13):
         month_data = data[data.index.month == month][var]
-        shape, loc, scale = Weibull_method_of_moment(month_data)
+        shape, loc, scale = aux_funcs.Weibull_method_of_moment(month_data)
         weibull_params.append((shape, loc, scale))
     # add annual
-    shape, loc, scale = Weibull_method_of_moment(data[var])
+    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data[var])
     weibull_params.append((shape, loc, scale))       
     # time step between each data, in hours
     time_step = ((data.index[-1]-data.index[0]).days + 1)*24/data.shape[0]
@@ -919,20 +896,19 @@ def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100
     return_values = np.zeros((13, len(periods)))
     for i, (shape, loc, scale) in enumerate(weibull_params):
         for j, period in enumerate(periods1):
-            return_value = weibull_min.isf(1/period, shape, loc, scale)
+            return_value = st.weibull_min.isf(1/period, shape, loc, scale)
             return_values[i, j] = round(return_value, 1)
 
     return weibull_params, return_values
     
 def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
-    from scipy.stats import percentileofscore, weibull_min
     #step = 0.01
     #hs = np.arange(0.5,data[var].max()+step,step)
     y_obs = np.arange(1,int(data[var].max())+0.5,0.5)
-    prob_non_exceedance_obs = percentileofscore(data[var], y_obs)
+    prob_non_exceedance_obs = st.percentileofscore(data[var], y_obs)
     #print(prob_non_exceedance_obs)
-    shape, location, scale =  Weibull_method_of_moment(data[var])
-    weibull_dist = weibull_min(c=shape, scale=scale, loc=location)
+    shape, location, scale =  aux_funcs.Weibull_method_of_moment(data[var])
+    weibull_dist = st.weibull_min(c=shape, scale=scale, loc=location)
     # Generate random samples
     num_samples = 1000000  # Number of samples to generate
     y_fitted = weibull_dist.rvs(size=num_samples)
@@ -942,8 +918,8 @@ def prob_non_exceedance_fitted_3p_weibull(data, var='hs'):
     
 
 def weib_3(arr,sh,lo,sc):
-    a=sh/sc
-    b=((arr-lo)/sc)**(sh-1)
+    # a=sh/sc
+    # b=((arr-lo)/sc)**(sh-1)
     c=0.0-((arr-lo)/sc)**(sh)
     d=np.exp(c)
     return d
@@ -961,7 +937,7 @@ def model_tp_given_hs(hs: float, a1, a2, a3, b1, b2, b3):
     return P5_model,Mean_model,P95_model
 
 def estimate_forristal_maxCrest(Hs, Tp, depth=50, twindow=3, sea_state = 'short-crested'):
-    from scipy.optimize import minimize
+
     # Example usage
     #Hs = 3.0  # Significant wave height
     #Tp = 10.0  # Peak period
@@ -973,8 +949,8 @@ def estimate_forristal_maxCrest(Hs, Tp, depth=50, twindow=3, sea_state = 'short-
     SWL = 0  # Still Water Level
     g = 9.81  # Gravity
 
-    Tz = estimate_Tz(Tp,gamma = 2.5)
-    Tm01 = estimate_Tm01(Tp,gamma = 2.5)
+    Tz = aux_funcs.estimate_Tz(Tp,gamma = 2.5)
+    Tm01 = aux_funcs.estimate_Tm01(Tp,gamma = 2.5)
     S1 = (2 * np.pi) / g * (Hs / Tm01 ** 2)
     k1 = (2 * np.pi) ** 2 / (g * Tm01 ** 2)  # Deep water
 
@@ -1007,7 +983,7 @@ def estimate_forristal_maxCrest(Hs, Tp, depth=50, twindow=3, sea_state = 'short-
     return Cmax
 
 def estimate_Hmax(Hs, Tp, twindow=3, k=0.9):
-    Tz = estimate_Tz(Tp,gamma = 2.5)
+    Tz = aux_funcs.estimate_Tz(Tp,gamma = 2.5)
     N = (twindow*3600)/ Tz
     Hmax =  Hs * ( np.sqrt(np.log(N)/2) + 0.2886/np.sqrt(2*np.log(N))  ) # Expected largest Hmax based on Max Wave Distribution
     return Hmax
@@ -1045,18 +1021,16 @@ def return_levels_annual_max_uncertainty(data, var='hs', dist='GEV',
     data_am = data[var].loc[it_selected_max]
     periods = np.array(periods, dtype=float)
     if dist == 'GEV':
-        from scipy.stats import genextreme
         # fit data
-        shape, loc, scale = genextreme.fit(data_am) 
+        shape, loc, scale = st.genextreme.fit(data_am) 
         # Compute the return levels for several return periods
-        return_levels = genextreme.isf(1/periods, shape, loc, scale)
-        prob_non_exc = genextreme.cdf(return_levels, shape, loc, scale)
+        return_levels = st.genextreme.isf(1/periods, shape, loc, scale)
+        prob_non_exc = st.genextreme.cdf(return_levels, shape, loc, scale)
     elif dist == 'GUM': 
-        from scipy.stats import gumbel_r 
-        loc, scale = gumbel_r.fit(data_am) # fit data
+        loc, scale = st.gumbel_r.fit(data_am) # fit data
         # Compute the return levels for several return periods.
-        return_levels = gumbel_r.isf(1/periods, loc, scale)
-        prob_non_exc = gumbel_r.cdf(return_levels, loc, scale)
+        return_levels = st.gumbel_r.isf(1/periods, loc, scale)
+        prob_non_exc = st.gumbel_r.cdf(return_levels, loc, scale)
 
     else:
         print ('please check method/distribution, must be either GEV or GUM')
@@ -1069,22 +1043,20 @@ def return_levels_annual_max_uncertainty(data, var='hs', dist='GEV',
     df.attrs['dist'] = dist
     df.attrs['var'] = var
 
-    if uncertainty!=None:
+    if uncertainty is not None:
         rl=np.zeros((len(periods),1000))
         for i in range(1000):
             extremes1=np.random.choice(data_am.to_numpy(), size=len(data_am), replace=True)
             extremes1=pd.Series(extremes1,index=data_am.index,name=var)
             if dist == 'GEV':
-                from scipy.stats import genextreme
                 # fit data
-                shape, loc, scale = genextreme.fit(extremes1) 
+                shape, loc, scale = st.genextreme.fit(extremes1) 
                 # Compute the return levels for several return periods       
-                return_levels = genextreme.isf(1/periods, shape, loc, scale)
+                return_levels = st.genextreme.isf(1/periods, shape, loc, scale)
             elif dist == 'GUM':
-                from scipy.stats import gumbel_r 
-                loc, scale = gumbel_r.fit(extremes1) # fit data
+                loc, scale = st.gumbel_r.fit(extremes1) # fit data
                 # Compute the return levels for several return periods.
-                return_levels = gumbel_r.isf(1/periods, loc, scale)
+                return_levels = st.gumbel_r.isf(1/periods, loc, scale)
             else:
                 print ('please check method/distribution, must be either GEV or GUM')
             rl[:,i]=return_levels
@@ -1125,10 +1097,8 @@ def return_levels_pot_uncertainty(data, var, dist='Weibull_2P',
     Function written by dung-manh-nguyen and KonstantinChri.
     Modified by clio-met
     """
-    import scipy.stats as stats
-    from pyextremes import get_extremes
 
-    if threshold == None:
+    if threshold is None:
         threshold = get_threshold_os(data=data, var=var)
     else:
         pass
@@ -1147,22 +1117,22 @@ def return_levels_pot_uncertainty(data, var, dist='Weibull_2P',
     ns_yr=np.mean(np.array(nbev))
     del nbev
     if dist == 'Weibull_2P':
-        shape, loc, scale = stats.weibull_min.fit(extremes-threshold, floc=0)
-        return_levels = stats.weibull_min.isf(1/(ns_yr*return_periods), 
+        shape, loc, scale = st.weibull_min.fit(extremes-threshold, floc=0)
+        return_levels = st.weibull_min.isf(1/(ns_yr*return_periods), 
                                               shape, loc, scale)\
                                               + threshold
-        prob_non_exc = stats.weibull_min.cdf(return_levels-threshold, shape, loc, scale)
+        prob_non_exc = st.weibull_min.cdf(return_levels-threshold, shape, loc, scale)
     elif dist == 'EXP':
-        loc, scale = stats.expon.fit(extremes-threshold)
-        return_levels = stats.expon.isf(1/(ns_yr*return_periods), loc, scale)\
+        loc, scale = st.expon.fit(extremes-threshold)
+        return_levels = st.expon.isf(1/(ns_yr*return_periods), loc, scale)\
                                         + threshold
-        prob_non_exc = stats.expon.cdf(return_levels-threshold, loc, scale)
+        prob_non_exc = st.expon.cdf(return_levels-threshold, loc, scale)
     elif dist == 'GP':
-        shape, loc, scale = stats.genpareto.fit(extremes-threshold)
-        return_levels = stats.genpareto.isf(1/(ns_yr*return_periods), 
+        shape, loc, scale = st.genpareto.fit(extremes-threshold)
+        return_levels = st.genpareto.isf(1/(ns_yr*return_periods), 
                                             shape, loc, scale)\
                                             + threshold
-        prob_non_exc = stats.genpareto.cdf(return_levels-threshold, shape, loc, scale)
+        prob_non_exc = st.genpareto.cdf(return_levels-threshold, shape, loc, scale)
     else:
         print ('please check method/distribution, must be one of: EXP, \
                 GP or Weibull_2P')
@@ -1176,7 +1146,7 @@ def return_levels_pot_uncertainty(data, var, dist='Weibull_2P',
     df.attrs['r'] = '48h'
     df.attrs['threshold'] = threshold
     df.attrs['var'] = var
-    if uncertainty!=None:
+    if uncertainty is not None:
         rl=np.zeros((len(return_periods),1000))
         for i in range(1000):
             extremes1=np.random.choice(extremes.to_numpy(), size=len(extremes), replace=True)
@@ -1189,17 +1159,17 @@ def return_levels_pot_uncertainty(data, var, dist='Weibull_2P',
             ns_yr=np.mean(np.array(nbev))
             del nbev,yrs_ev
             if dist == 'Weibull_2P':
-                shape, loc, scale = stats.weibull_min.fit(extremes1-threshold, floc=0)
-                return_levels = stats.weibull_min.isf(1/(ns_yr*return_periods), 
+                shape, loc, scale = st.weibull_min.fit(extremes1-threshold, floc=0)
+                return_levels = st.weibull_min.isf(1/(ns_yr*return_periods), 
                                                     shape, loc, scale)\
                                                     + threshold
             elif dist == 'EXP':
-                loc, scale = stats.expon.fit(extremes1-threshold)
-                return_levels = stats.expon.isf(1/(ns_yr*return_periods), loc, scale)\
+                loc, scale = st.expon.fit(extremes1-threshold)
+                return_levels = st.expon.isf(1/(ns_yr*return_periods), loc, scale)\
                                                 + threshold # Delta_t    # Delta T /return_periods
             elif dist == 'GP':
-                shape, loc, scale = stats.genpareto.fit(extremes1-threshold)
-                return_levels = stats.genpareto.isf(1/(ns_yr*return_periods), 
+                shape, loc, scale = st.genpareto.fit(extremes1-threshold)
+                return_levels = st.genpareto.isf(1/(ns_yr*return_periods), 
                                                     shape, loc, scale)\
                                                     + threshold
             else:
@@ -1235,7 +1205,6 @@ def get_empirical_return_levels_new(data, var, method="POT",
                                used, and variable of interest.   
     Modified by clio-met
     """
-    from pyextremes import get_extremes, get_return_periods
     
     if method == 'BM':
         extremes = get_extremes(ts=data[var],
@@ -1294,7 +1263,7 @@ def get_empirical_return_levels_new(data, var, method="POT",
 
     return df
 
-def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]) -> Sequence[Dict]:
+def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]):
     """Compute a joint contour for the given return periods. 
     Input:
         data: pd.DataFrame
@@ -1305,7 +1274,7 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
          contours : list of joint contours, 
          i.e.,  number of contours based on given return_periods 
     """
-    from virocon import get_OMAE2020_Hs_Tz, get_DNVGL_Hs_U,get_OMAE2020_Hs_Tz,get_OMAE2020_V_Hs, GlobalHierarchicalModel,IFORMContour, ISORMContour     
+    from virocon import get_OMAE2020_Hs_Tz, GlobalHierarchicalModel,IFORMContour
     # Define 2D joint distribution model
     dist_descriptions, fit_descriptions, _ = get_OMAE2020_Hs_Tz()
     model = GlobalHierarchicalModel(dist_descriptions)
@@ -1327,7 +1296,6 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
     return contours, data_2D
 
 def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold=0.2):
-    import sys
     """
     This function calculates the CCA profiles for a specific percentile or return period
     df: dataframe
@@ -1343,7 +1311,7 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
     # Select the columns of interest
     df_sel=data.iloc[:, lambda data: data.columns.str.contains(var,case=False)]
     # Select the month of interest if one is specified
-    if month!=None:
+    if month is not None:
         list_months1=['January','February','March','April','May','June','July','August','September','October','November','December']
         list_months2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
         if month in list_months1:
@@ -1355,8 +1323,7 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
             df_sel=df_sel[df_sel.index.month==im]
             del im
         else:
-            print('Error with the month name',month)
-            sys.exit()
+            raise ValueError(f'Error with the month name {month}')
     # Get the columns names
     list_col=df_sel.columns.tolist()
     # Get the vertical levels available as floats and strings from the columns names
@@ -1368,13 +1335,12 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
         levels_str.append(i[il:-1])
     del il
     if ((percentile is None) and (return_period is None)):
-        print('Please specify either a percentile or a return period in years')
-        sys.exit()
+        raise ValueError('Please specify either a percentile or a return period in years')
     # Calculate the values for the worst case wcs (only depends on levels)
-    if not(percentile is None):
+    if percentile is not None:
         # Calculate the percentiles for each depth separately
         wcs=np.percentile(df_sel.to_numpy(),percentile,axis=0)
-    if not(return_period is None):
+    if return_period is not None:
         # Calculate the return values for the specified return period for each level separately
         wcs=np.full((len(levels)),np.nan)
         for i in range(len(levels)):

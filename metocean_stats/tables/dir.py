@@ -1,11 +1,8 @@
-import matplotlib.pyplot as plt
+import os
 import numpy as np
 import pandas as pd
-import windrose
-import matplotlib.cm as cm
-import os
-from ..stats.aux_funcs import convert_latexTab_to_csv, add_direction_sector, consecutive_indices
 
+from ..stats.aux_funcs import convert_latexTab_to_csv, add_direction_sector
 
 def table_directional_min_mean_max(data, direction, intensity, output_file) : 
     direction = data[direction]

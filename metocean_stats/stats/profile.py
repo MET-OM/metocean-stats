@@ -1,7 +1,5 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
 
 def mean_profile(data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file='mean_wind_profile.png'):  
     """
@@ -19,10 +17,8 @@ def mean_profile(data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m
     mean_values = np.mean(nparr,axis=0) 
     #breakpoint()
 
-    if output_file==False:
-        pass
-    else:
-        fig, ax = plt.subplots(figsize=(4,8))
+    if output_file:
+        # fig, ax = plt.subplots(figsize=(4,8))
         plt.fill_betweenx(np.array(height_levels),np.percentile(nparr,perc[0],axis=0),np.percentile(nparr,perc[1],axis=0),color='lightgray',label=f'{perc[0]}-{perc[1]}%')
         plt.plot(mean_values,np.array(height_levels),'k-',linewidth=2.5,label='Mean wind speed')
         plt.ylim(np.min(height_levels),np.max(height_levels))
@@ -64,10 +60,8 @@ def profile_shear(data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50
     b = np.log(z[1]/z[0])
     alfa = a/b
     
-    if output_file==False:
-        pass
-    else:
-        fig, ax = plt.subplots(figsize=(8,4))
+    if output_file:
+        # fig, ax = plt.subplots(figsize=(8,4))
         N, bins, range = plt.hist(alfa,50)
         locs, _ = plt.yticks() 
         #print(locs)

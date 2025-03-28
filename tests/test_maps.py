@@ -1,5 +1,5 @@
-import os
-from metocean_stats import maps
+# import os
+# from metocean_stats import maps
 
 #def test_plot_points_on_map():
 #     output_file = 'test_points.png'

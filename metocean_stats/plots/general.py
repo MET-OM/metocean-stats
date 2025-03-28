@@ -1,15 +1,16 @@
-import os
-import math
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import scipy.stats as st
 import matplotlib.pyplot as plt
-import scipy.stats as stats
+
 from matplotlib.dates import MonthLocator, DateFormatter
-import calendar
-from math import floor,ceil
-from ..stats.general import *
-from ..tables.general import *
+import matplotlib.ticker as mticker
+import matplotlib.patches as mpatches
+from cycler import cycler
+
+from .. import stats
+from .. import tables
 
 
 def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
@@ -21,7 +22,7 @@ def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: 
     outputfile: name of output file with extrensition e.g., png, eps or pdf 
      """
 
-    sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
+    sd = tables.calculate_scatter(data, var1, step_var1, var2, step_var2)
 
     # Convert to percentage
     tbl = sd.values
@@ -67,31 +68,24 @@ def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: 
     
 def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=70)
     
-    import matplotlib.pyplot as plt
-    from scipy.stats import expon
-    from scipy.stats import genextreme
-    from scipy.stats import gumbel_r 
-    from scipy.stats import lognorm 
-    from scipy.stats import weibull_min
-    
     data = data[var].values
     
     x=np.linspace(min(data),max(data),100)
     
-    param = weibull_min.fit(data) # shape, loc, scale
-    pdf_weibull = weibull_min.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.weibull_min.fit(data) # shape, loc, scale
+    pdf_weibull = st.weibull_min.pdf(x, param[0], loc=param[1], scale=param[2])
     
-    param = expon.fit(data) # loc, scale
-    pdf_expon = expon.pdf(x, loc=param[0], scale=param[1])
+    # param = expon.fit(data) # loc, scale
+    # pdf_expon = expon.pdf(x, loc=param[0], scale=param[1])
     
-    param = genextreme.fit(data) # shape, loc, scale
-    pdf_gev = genextreme.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.genextreme.fit(data) # shape, loc, scale
+    pdf_gev = st.genextreme.pdf(x, param[0], loc=param[1], scale=param[2])
     
-    param = gumbel_r.fit(data) # loc, scale
-    pdf_gumbel = gumbel_r.pdf(x, loc=param[0], scale=param[1])
+    param = st.gumbel_r.fit(data) # loc, scale
+    pdf_gumbel = st.gumbel_r.pdf(x, loc=param[0], scale=param[1])
     
-    param = lognorm.fit(data) # shape, loc, scale
-    pdf_lognorm = lognorm.pdf(x, param[0], loc=param[1], scale=param[2])
+    param = st.lognorm.fit(data) # shape, loc, scale
+    pdf_lognorm = st.lognorm.pdf(x, param[0], loc=param[1], scale=param[2])
     
     fig, ax = plt.subplots(1, 1)
     #ax.plot(x, pdf_expon, label='pdf-expon')
@@ -127,7 +121,7 @@ def _percentile_str_to_pd_format(percentiles):
             return mapping[name]
         else: return name
 
-    if type(percentiles)==str: return strconv(percentiles)
+    if type(percentiles) is str: return strconv(percentiles)
     else: return [strconv(p) for p in percentiles]
 
 def plot_monthly_stats(data: pd.DataFrame,
@@ -285,7 +279,7 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
         plot_directional_stats(data, 'hs', 0.1, 'Pdir', title='Directional Wave Statistics', output_file='directional_hs_stats.png')
     """    
     fig, ax = plt.subplots()
-    cumulative_percentage = table_directional_non_exceedance(data,var,step_var,var_dir)
+    cumulative_percentage = tables.table_directional_non_exceedance(data,var,step_var,var_dir)
     for i in show:
         cumulative_percentage.loc[i][:-1].plot(marker = 'o')
     #cumulative_percentage.loc['Maximum'][:-1].plot(marker = 'o')
@@ -300,7 +294,7 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
     return fig
 
 def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
-    results_df = calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size)
+    results_df = stats.calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
     results_df.T.plot(marker='o')
@@ -335,39 +329,40 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
 
     return fig, table
 
+# This function doesn't work, because sort_by_month is not defined. 
+# Therefore it's commented out. Maybe plot_monthly_stats above is a replacement.
 
-def plot_monthly_max_mean_min(df,var='T2m',out_file='plot_monthly_max_min_min.png'):
-    out = sort_by_month(df)
-    df2 = pd.DataFrame()
-    months = calendar.month_name[1:] # eliminate the first insane one 
-    df2['month']=[x[:3] for x in months] # get the three first letters 
-    df2['Min']=[np.min(out[m][var]) for m in out]
-    df2['Mean']=[np.mean(out[m][var]) for m in out]
-    df2['Max']=[np.max(out[m][var]) for m in out]
+# def plot_monthly_max_mean_min(df,var='T2m',out_file='plot_monthly_max_min_min.png'):
+#     out = sort_by_month(df)
+#     df2 = pd.DataFrame()
+#     months = calendar.month_name[1:] # eliminate the first insane one 
+#     df2['month']=[x[:3] for x in months] # get the three first letters 
+#     df2['Min']=[np.min(out[m][var]) for m in out]
+#     df2['Mean']=[np.mean(out[m][var]) for m in out]
+#     df2['Max']=[np.max(out[m][var]) for m in out]
     
-    plt.plot(df2['month'],df2['Min'])
-    plt.plot(df2['month'],df2['Mean'])
-    plt.plot(df2['month'],df2['Max'])
-    plt.ylabel('Temperature [℃]') 
-    plt.grid()
-    plt.savefig(out_file,dpi=100,facecolor='white',bbox_inches='tight')
+#     plt.plot(df2['month'],df2['Min'])
+#     plt.plot(df2['month'],df2['Mean'])
+#     plt.plot(df2['month'],df2['Max'])
+#     plt.ylabel('Temperature [℃]') 
+#     plt.grid()
+#     plt.savefig(out_file,dpi=100,facecolor='white',bbox_inches='tight')
     
-    return df2 
+#     return df2 
 
 
 def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150],reverse_yaxis=False, output_file='stats_profile.png'):
-    import matplotlib.ticker as ticker
-    df = table_profile_stats(data=data, var=var, z=z, output_file=None)
+    df = tables.table_profile_stats(data=data, var=var, z=z, output_file=None)
     df = df.drop(['Std.dev', 'Max Speed Event'],axis=1)
     fig, ax = plt.subplots()
     plt.yticks(z)  # Set yticks to be the values in z
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
 
     for column in df.columns[1:]:
         plt.plot(df[column][1:],z,marker='.', label=column)
     plt.ylabel('z[m]')
     plt.xlabel('[m/s]')
-    if reverse_yaxis == True:
+    if reverse_yaxis:
         plt.gca().invert_yaxis()
     plt.legend()
     plt.grid(True)
@@ -387,15 +382,12 @@ def plot_profile_monthly_stats(
         reverse_yaxis=True, 
         output_file='table_profile_monthly_stats.png',
         include_year=True):
-    import matplotlib.pyplot as plt
-    import matplotlib.ticker as ticker
-    from cycler import cycler
 
     # Custom color cycle
     custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
     
     # Get the data
-    df = table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None, rounding=None)
+    df = tables.table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None, rounding=None)
     # Create a plot
     fig, ax = plt.subplots()
     # Set the custom color cycle
@@ -404,7 +396,7 @@ def plot_profile_monthly_stats(
     plt.yticks(z)
     
     # Set major y-ticks at intervals of max(z)/4
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(int(max(z)/4)))
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))
     
     # Only plot specified variables.
     if months == []:
@@ -434,7 +426,7 @@ def plot_profile_monthly_stats(
 
 
 def plot_tidal_levels(data, var='tide',start_time=None , end_time=None ,output_file='tidal_levels.png'):
-    df = table_tidal_levels(data=data, var=var, output_file=None)
+    df = tables.table_tidal_levels(data=data, var=var, output_file=None)
     if start_time and end_time is None:
        data = data[var]
     else:
@@ -469,13 +461,13 @@ def plot_nb_hours_below_threshold(df,var='hs',thr_arr=(np.arange(0.05,20.05,0.05
     # 2) var: a string
     # 3) thr_arr: list of thresholds (should be a lot for smooth curve)
     # 4) String with filename without extension
-    nbhr_arr=nb_hours_below_threshold(df,var,thr_arr)
+    nbhr_arr=stats.nb_hours_below_threshold(df,var,thr_arr)
     years=df.index.year.to_numpy()
     years_unique=np.unique(years)
     yr1=int(years_unique[0])
     yr2=int(years_unique[-1])
     del df,years,years_unique
-    from matplotlib.patches import Patch
+
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.fill_between(thr_arr,np.min(nbhr_arr,axis=1),np.max(nbhr_arr,axis=1),color='lightgray')
     ax.plot(thr_arr,np.mean(nbhr_arr,axis=1),linewidth=2,color='k')
@@ -486,7 +478,7 @@ def plot_nb_hours_below_threshold(df,var='hs',thr_arr=(np.arange(0.05,20.05,0.05
     ax.set_ylabel('Number of hours',fontsize=20)
     ax.tick_params(axis='both', which='major', labelsize=18)
     ax.set_title('Mean number of hours per year with '+var+' < threshold\n'+str(yr1)+'-'+str(yr2),fontsize=20)
-    legend_elements = [Patch(facecolor='lightgray', edgecolor=None, label='Min-Max range')]
+    legend_elements = [mpatches.Patch(facecolor='lightgray', edgecolor=None, label='Min-Max range')]
     ax.legend(handles=legend_elements, loc='lower right', prop={'size': 20})
     plt.savefig(output_file, dpi=150, bbox_inches='tight')
     plt.close()

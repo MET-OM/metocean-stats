@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import xarray as xr
 import scipy
 
@@ -33,7 +32,7 @@ def jonswap(f,hs,tp,gamma='fit', sigma_low=.07, sigma_high=.09):
     return sf
 
 def velocity_spectrum(f, S_w, depth, ref_depth):
-    g = 9.82
+    # g = 9.82
     h = depth 
     z = ref_depth
     #k = (1/g)*(2*np.pi/f)**2
@@ -161,18 +160,18 @@ def _interpolate_linear(fp,n):
     '''
     Linear interpolation.
     '''
-    l = len(fp)
-    x = np.linspace(0,l-1,n)
-    xp = np.arange(l)
+    L = len(fp)
+    x = np.linspace(0,L-1,n)
+    xp = np.arange(L)
     return np.interp(x,xp,fp)
     
 def _interpolate_cubic(fp,n):
     '''
     Cubic spline interpolation.
     '''
-    l = len(fp)
-    x = np.linspace(0,l-1,n)
-    xp = np.arange(l)
+    L = len(fp)
+    x = np.linspace(0,L-1,n)
+    xp = np.arange(L)
     spl = scipy.interpolate.CubicSpline(xp,fp)
     return spl(x)
 
@@ -323,7 +322,7 @@ def integrated_parameters(
     if flat_check or freq_check or dir_check:
         try:
             spec = spec.reshape(spec.shape[:-1]+(len(frequencies),len(directions)))
-        except:
+        except Exception:
             raise IndexError("Spec shape does not match frequencies and directions.")
 
     # Use argmax to find indices of largest value of each spectrum.
