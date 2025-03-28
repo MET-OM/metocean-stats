@@ -1043,7 +1043,7 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     return fig
 
 
-def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
+def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',max='worst_case',unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
     """
     This function plots the CCA profiles for a specific percentile or return period
     data: dataframe
@@ -1052,6 +1052,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
+    max: by default, the highest curve will always be the worst-case scenario 
     unit_var: is a string with the unit of the variable var, default is m/s
     unit_lev: is a string with the units of the vertical levels, default is m
     output_file: name of the figure file
@@ -1063,7 +1064,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     if not(percentile is None):
         lev,woca,cca=cca_profiles(data,var=var,month=month,percentile=percentile)
     if not(return_period is None):
-        lev,woca,cca=cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold)
+        lev,woca,cca=cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold,max=max)
     import matplotlib as mpl
     n_lines = len(lev)
     cmap = mpl.colormaps['jet_r']
