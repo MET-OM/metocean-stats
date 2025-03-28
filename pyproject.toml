@@ -18,15 +18,6 @@ readme = "README.md"
 homepage = "https://github.com/MET-OM/metocean-stats"
 documentation = "https://github.com/MET-OM/metocean-stats"
 keywords = ["metocean", "statistics", "climate", "weather"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10"
-]
 requires-python = ">=3.8"
 dependencies = [
     "numpy>=1.17",
@@ -52,9 +43,6 @@ dev = [
 [tool.setuptools]
 packages = ["metocean_stats"]
 include-package-data = true
-
-[tool.setuptools_scm]
-write_to = "metocean_stats/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
