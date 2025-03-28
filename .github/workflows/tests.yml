@@ -10,27 +10,23 @@ on:
 
 jobs:
   tests:
-    name: pytests (${{ matrix.os }}, Miniforge3)
+    name: pytests (${{ matrix.os }} - ${{ matrix.python-version }}, Miniforge3)
     runs-on: ${{ matrix.os }}-latest
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
-        os: ["ubuntu", "windows"]
-        python-version: [ '3.10', '3.11', '3.12' ]
+        os: ["ubuntu", "macos", "windows"]
+        python-version: [ '3.9', '3.10', '3.11' ]
     steps:
       - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: environment.yml
+          python-version: ${{ matrix.python-version }}
           miniforge-version: latest
           miniforge-variant: Miniforge3
-      - name: Install dependencies
-        run: |
-          conda activate test
-          python -m pip install --upgrade pip
-          pip install .[dev]
       - name: Run tests
         run: |
           conda activate test
@@ -38,9 +34,11 @@ jobs:
       - name: Build wheels
         run: |
           conda activate test
-          python -m build
+          mamba install -c conda-forge flit
+          git status
+          flit build --format sdist
       - name: Upload wheels
-        if: matrix.python-version == '3.10' && matrix.os == 'ubuntu'
+        if: matrix.python-version == '3.9' && matrix.os == 'ubuntu'
         uses: actions/upload-artifact@v4
         with:
           name: wheels
@@ -52,12 +50,15 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ tests ]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' 
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: wheels
       - uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: '3.10'
+          python-version: '3.9'
           miniforge-version: latest
           miniforge-variant: Miniforge3
       - name: Publish to PyPi
@@ -66,5 +67,5 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           pip install typing-extensions
-          pip install --upgrade build twine
+          pip install --upgrade twine
           twine upload --skip-existing *
