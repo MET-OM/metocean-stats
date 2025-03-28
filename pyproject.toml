@@ -15,8 +15,6 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-homepage = "https://github.com/MET-OM/metocean-stats"
-documentation = "https://github.com/MET-OM/metocean-stats"
 keywords = ["metocean", "statistics", "climate", "weather"]
 requires-python = ">=3.8"
 dependencies = [
@@ -33,6 +31,10 @@ dependencies = [
     "netcdf4",
     "pydap"
 ]
+
+[project.urls]
+repository = "https://github.com/MET-OM/metocean-stats"
+
 
 [project.optional-dependencies]
 dev = [
