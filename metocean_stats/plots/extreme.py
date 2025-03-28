@@ -1057,6 +1057,7 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     unit_lev: is a string with the units of the vertical levels, default is m
     output_file: name of the figure file
     with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
         print('Please specify either a percentile or a return period in years')
