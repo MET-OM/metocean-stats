@@ -311,3 +311,339 @@ def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_exte
         plt.title(title, fontsize=16)
     plt.savefig(output_file, dpi=300)
     return fig
+
+
+#####
+
+import re
+from matplotlib import colors as mcolors
+#############--------------------Extract which depths we have data from in the NORKYST800-----------------#########################
+def extract_unique_depths_from_NORKYST800(df):
+    # Get column names from the df
+    column_names = df.columns
+    depths = set()
+    
+    # Extract the different depths 
+    for col in column_names:
+        # Check if the column contain a depth in the name (for example "temp_0m")
+        match = re.search(r'(\d+\.?\d*)m$', col)  # Find the number after the underscore and before "m"
+        if match:
+            depth = match.group(0)  # Find the depth (example: '0m', '2.5m', osv.)
+            depths.add(depth)
+    depths_sorted = sorted(depths, key=lambda x: float(x.replace('m', '')))
+    # Return a list of unique values of depths in the given NORKYST800.
+    return depths_sorted
+###########--------------------------Get the wanted varible out of the NORKYST800 dataset--------------------#######################
+def get_a_chosen_variable_from_NORKYST800(df,salt,temp,u,v,magnitude):
+    """
+    - Variable will return in the shape (depth x time) 
+    """
+    df = pd.read_csv(df,comment="#",index_col=0,parse_dates=True)
+    depths = extract_unique_depths_from_NORKYST800(df)
+    num_depths = len(depths)
+    num_timesteps = len(df)
+    
+    if salt == True:
+        salinity = np.zeros((num_depths,num_timesteps))
+
+        for i, d in enumerate(depths):
+            salt = df[f'salinity_{d}'].fillna(0).values
+            salinity[i,:] = salt
+        unit="ppt"
+        return salinity, [float(d.replace('m','')) for d in depths], unit
+
+    if temp == True:
+        temperature = np.zeros((num_depths,num_timesteps))
+
+        for i, d in enumerate(depths):
+            temp = df[f'temperature_{d}'].fillna(0).values
+            temperature[i,:] = temp
+        unit="°c/celsius"
+        return temperature, [float(d.replace('m','')) for d in depths], unit
+
+    if u == True:
+        u_speeds = np.zeros((num_depths, num_timesteps))
+    
+        for i, d in enumerate(depths):
+            u = df[f'v_{d}'].fillna(0).values
+            u_speeds[i, :] = v
+        unit="m/s"
+        return u_speeds, [float(d.replace('m', '')) for d in depths], unit
+
+    if v == True:
+        v_speeds = np.zeros((num_depths, num_timesteps))
+    
+        for i, d in enumerate(depths):
+            v = df[f'v_{d}'].fillna(0).values
+            v_speeds[i, :] = v
+        unit="m/s"
+        return v_speeds, [float(d.replace('m', '')) for d in depths], unit
+        
+    if magnitude == True:
+        current_speeds = np.zeros((num_depths, num_timesteps))
+        
+        for i, d in enumerate(depths):
+            # Beregn strømstyrke √(u² + v²)
+            u = df[f'u_{d}'].fillna(0).values
+            v = df[f'v_{d}'].fillna(0).values
+            current_speeds[i, :] = np.sqrt(u**2 + v**2)
+        unit="m/s"
+        return current_speeds, [float(d.replace('m', '')) for d in depths], unit
+
+    else:
+        print('none variables were chosen')
+
+##############------------------------Choose what crossection you want----------------##############################
+def find_rounded_lat_lon_index_from_NORKYST800_url(lat_array, lon_array, lat, lon, decimals=2, tolerance=0.005):
+    lat_array_rounded = np.round(lat_array, decimals)
+    lon_array_rounded = np.round(lon_array, decimals)
+
+    # Find the index where both lat and lon are within the tolerance of the desired value
+    match = np.where((np.abs(lat_array_rounded - lat) <= tolerance) & (np.abs(lon_array_rounded - lon) <= tolerance))
+    
+    # If a match return that index
+    if match[0].size > 0:
+        y1, x1 = match[0][0], match[1][0]  # Take the first match of the given values
+        return [int(y1), int(x1)]
+    else:
+        return print(f"Try new value for the {lat} latitude and {lon} longitude point") 
+
+    
+
+def bathymetry_cross_section_in_point_longitude_with_NORKYST800_url(url, lat, lon_start,lon_end):
+    dataset = xr.open_dataset(url)
+    bathymetry_array = dataset['h'].values
+    lat_array = dataset['lat'].values  # Extract 2D array from dataset['lat']
+    lon_array = dataset['lon'].values  # Extract 2D array from dataset['lon']
+    
+    start = find_rounded_lat_lon_index_from_NORKYST800_url(lat_array, lon_array, lat, lon_start, decimals=1, tolerance=0.005)
+    end = find_rounded_lat_lon_index_from_NORKYST800_url(lat_array, lon_array, lat, lon_end, decimals=1, tolerance=0.005)
+    start = np.array(start)
+    end = np.array(end)
+    diff = end - start
+    step=np.array([int(diff[0]/diff[1]),1]) #steps may vary between -2,-3
+    coordinates = []
+    current = start.copy()
+        
+    # add the initalpoint
+    coordinates.append(current.tolist())
+
+    for i in range (1,end[1]-start[1]+1):
+        current += step
+        coordinates.append(current.tolist())
+        
+    # Konverter listen til en numpy array (hvis ønskelig)
+    coordinates_array = np.array(coordinates)
+    bath_data = []
+    for i in range(len(coordinates_array)):
+        y, x = coordinates_array[i]
+        bath_data.append(bathymetry_array[y, x])
+
+    
+    return bath_data, coordinates_array
+
+def bathymetry_cross_section_in_point_latitude_with_NORKYST800_url(url,lat_start, lat_end ,lon):
+    dataset = xr.open_dataset(url)
+    bathymetry_array = dataset['h'].values
+    lat_array = dataset['lat'].values  # Extract 2D array from dataset['lat']
+    lon_array = dataset['lon'].values  # Extract 2D array from dataset['lon']
+    start = find_rounded_lat_lon_index_from_NORKYST800_url(lat_array, lon_array, lat_start, lon, decimals=1, tolerance=0.005)
+    end = find_rounded_lat_lon_index_from_NORKYST800_url(lat_array, lon_array, lat_end, lon, decimals=1, tolerance=0.005)
+    start = np.array(start)
+    end = np.array(end)
+    diff = end-start
+    step = np.array([1,int(diff[1]/diff[0])])
+    coordinates = []
+    current = start.copy()
+
+    #add the initialpoint
+    coordinates.append(current.tolist())
+
+    for i in range (1,end[0]-start[0]+1):
+        current += step
+        coordinates.append(current.tolist())
+        
+    # Konverter listen til en numpy array (hvis ønskelig)
+    coordinates_array = np.array(coordinates)
+    bath_data = []
+    for i in range(len(coordinates_array)):
+        y, x = coordinates_array[i]
+        bath_data.append(bathymetry_array[y, x])
+
+    return bath_data, coordinates_array
+
+################---------------------PLOTS---------------------##########################
+def plot_bathymetry_cross_section(product: str = "NORKYST800",lon: float= 4,lat:float= 60.5 ,delta_lon: float = 1.0 ,delta_lat: float = 0.5):
+    """
+    - product = string, optional, default = "NORKYST800"
+    - lon = longitude to the point, default set to 4 degrees longitude
+    - lat = latitude to the point default set to 60.5 degrees latitude
+    - delta_lon = +- value, standard set to 1.0
+    - delta_lat = +- value, standard set to 0.5
+    """
+    if product == "NORKYST800":
+        url = 'https://thredds.met.no/thredds/dodsC/fou-hi/norkyst800m-1h/NorKyst-800m_ZDEPTHS_his.an.2025020700.nc'
+    else:
+        pass
+    lat_start = lat - delta_lat
+    lat_end = lat + delta_lat
+
+    lon_start = lon - delta_lon
+    lon_end = lon + delta_lon
+    
+    bath_lon,_ = bathymetry_cross_section_in_point_longitude_with_NORKYST800_url(url,lat,lon_start,lon_end)
+    bath_lat,_ = bathymetry_cross_section_in_point_latitude_with_NORKYST800_url(url,lat_start,lat_end,lon)
+
+    fig, ax1 = plt.subplots(2,1,figsize=(12,6))
+    # Distance between the plots
+    plt.subplots_adjust(hspace=0.5)
+        
+    # Calculate values on the x-axis and finding the maximum depth
+    lon_bath = np.linspace(lon_start, lon_end, len(bath_lon))
+    max_bath_depth_1 = np.max(bath_lon)
+
+    lat_bath = np.linspace(lat_start, lat_end, len(bath_lat))
+    max_bath_depth_2 = np.max(bath_lat)
+
+    #First subplot for longitude:
+
+    ax2_0 = ax1[0].twinx()
+    ax1[0].plot(lon_bath, bath_lon, color='black', linewidth=3, label="Bathymetry")
+    ax1[0].axvline(x=lon, color='red', linestyle='--', linewidth=2, label=f'Linje ved lon={lon}') #Line indicating the point you choose
+
+    ax1[0].set_xlabel("Longitude (°)")
+    ax1[0].set_ylabel("Depth (m)", color='black')
+    ax1[0].set_title("Bathymetry along the longitude")
+    ax1[0].set_ylim(max_bath_depth_1, 0)
+    ax2_0.set_ylim(max_bath_depth_1, 0)
+    ax1[0].set_xlim(lon_start,lon_end)
+    ax1[0].legend(loc='upper right')
+    ax1[0].grid(True)
+
+    #Second subplot for latitude:
+
+    ax2_1 = ax1[1].twinx()
+    ax1[1].plot(lat_bath, bath_lat, color='black', linewidth=3, label="Bathymetry")
+    ax1[1].axvline(x=lat, color='red', linestyle='--', linewidth=2, label=f'Line at lat={lat}') #Line indicating the point you choose
+    
+    ax1[1].set_xlabel("Latitude (°)")
+    ax1[1].set_ylabel("Depth (m)", color='black')
+    ax1[1].set_title("Bathymetry along the latitude")
+    ax1[1].set_ylim(max_bath_depth_2, 0)
+    ax2_1.set_ylim(max_bath_depth_2, 0)
+    ax1[1].set_xlim(lat_start,lat_end)
+    ax1[1].legend(loc='upper right')
+    ax1[1].grid(True)
+
+    ## Save and show the plot
+    plt.savefig("Bathymetry_cross_section", dpi=100, facecolor='white', bbox_inches="tight")
+    return fig 
+
+def plot_bathymetry_cross_section_with_variable_from_NORKYST800_overall(product: str = "NORKYST800", df: str = "NORKYST800", lon: float=4, lat: float = 60.5, var: str = "temperature", delta_lon:float =1, delta_lat:float=0.5):
+    """
+    product = string, optional, default = "NORKYST800"
+    df = string, csv file from where the variable is extracted, default = "NORKYST800"
+    lon= longitude to the point, default set to 4 degrees longitude
+    lat= latitude to the point default set to 60.5 degrees latitude
+    delta_lon= +- value, standard set to 1.0
+    delta_lat= +- value, standard set to 0.5
+    var = a chosen variable between 'magnitude'.'v','u','temperature' and 'salinity'
+    """
+    if product == "NORKYST800":
+        url ='https://thredds.met.no/thredds/dodsC/fou-hi/norkyst800m-1h/NorKyst-800m_ZDEPTHS_his.an.2025020700.nc'
+    else:
+        pass
+
+    if df == "NORKYST800":
+        df = "NORKYST800_test.csv"
+    else:
+        pass
+
+    if var == "magnitude":
+        variable, depths,unit= get_a_chosen_variable_from_NORKYST800(df,salt=False,temp=False,u=False,v=False,magnitude=True)
+    if var == "v":
+        variable, depths, unit= get_a_chosen_variable_from_NORKYST800(df,salt=False,temp=False,u=False,v=True,magnitude=False)
+    if var == "u":
+        variable, depths, unit =get_a_chosen_variable_from_NORKYST800(df,salt=False,temp=False,u=True,v=False,magnitude=False)
+    if var == "temperature":
+        variable, depths, unit =get_a_chosen_variable_from_NORKYST800(df,salt=False,temp=True,u=False,v=False,magnitude=False)
+    if var == "salinity":
+        variable, depths, unit =get_a_chosen_variable_from_NORKYST800(df,salt=True,temp=False,u=False,v=False,magnitude=False)
+    else:
+        return "no valid variable, try either: 'magnitude'.'v','u','temperature' or 'salinity'."        
+    
+    lat_start = lat - delta_lat
+    lat_end = lat + delta_lat
+
+    lon_start = lon - delta_lon
+    lon_end = lon + delta_lon
+    
+    bath_lon,_ = bathymetry_cross_section_in_point_longitude_with_NORKYST800_url(url,lat,lon_start,lon_end)
+    bath_lat,_ = bathymetry_cross_section_in_point_latitude_with_NORKYST800_url(url,lat_start,lat_end,lon)
+    
+    variable = np.mean(variable.copy(), axis=1, keepdims=True) 
+    fig, ax1 = plt.subplots(2,1,figsize=(12,6))
+    
+    # Distance between the plots
+    plt.subplots_adjust(hspace=0.5)
+        
+    # Calculate values on the x-axis and finding the maximum depth
+    lon_bath = np.linspace(lon_start, lon_end, len(bath_lon))
+    max_bath_depth_1 = max(bath_lon)
+
+    lat_bath = np.linspace(lat_start, lat_end, len(bath_lat))
+    max_bath_depth_2 = max(bath_lat)
+
+    ax2_0 = ax1[0].twinx()
+    
+    #First subplot for longitude:
+    Lon, Depth = np.meshgrid(lon, depths)
+    ### Variable plot ###
+    cmap = plt.cm.viridis
+    norm = mcolors.Normalize(vmin=np.min(variable), vmax=np.max(variable))
+    cf = ax2_0.imshow(variable, cmap=cmap, norm=norm, aspect='auto', extent=[lon_start, lon_end, max_bath_depth_1, 0], alpha=0.5)
+    cf.set_zorder(0)                # Make sure that it will be made before the bathymetry line
+    cbar = plt.colorbar(cf,ax=ax2_0, label=f"{var} ({unit})")
+    
+    ### Bathymetry plot ### 
+    ax1[0].plot(lon_bath, bath_lon, color='black', linewidth=3, label="Bathymetry",zorder=3)
+    ax1[0].axvline(x=lon, color='red', linestyle='--', linewidth=2, label=f'Line at lon={lon}') #Line indicating the point you choose
+
+    ### Settings ### 
+    ax1[0].set_xlabel("Longitude (°)")
+    ax1[0].set_ylabel("Depth (m)", color='black')
+    ax1[0].set_title("Bathymetry along the longitude")
+    ax1[0].set_ylim(max_bath_depth_1, 0)
+    ax2_0.set_ylim(max_bath_depth_1, 0)
+    ax1[0].set_xlim(lon_start,lon_end)
+    ax1[0].legend(loc='upper right')
+    ax1[0].grid(True)
+
+    ax2_1 = ax1[1].twinx()
+    #Second subplot for latitude:
+    Lat, Depth = np.meshgrid(lat, depths)
+    
+    ### Variable plot ###
+    cmap = plt.cm.viridis
+    norm = mcolors.Normalize(vmin=np.min(variable), vmax=np.max(variable))
+    cf = ax2_1.imshow(variable, cmap=cmap, norm=norm, aspect='auto', extent=[lat_start, lat_end, max_bath_depth_1, 0], alpha=0.5)
+    cf.set_zorder(1)                # Make sure that it will be made before the bathymetry line
+    cbar = plt.colorbar(cf,ax=ax2_1, label=f"{var} ({unit})")
+
+    ### Bathymetry plot ### 
+    ax1[1].plot(lat_bath, bath_lat, color='black', linewidth=3, label="Bathymetry",zorder=4)
+    ax1[1].axvline(x=lat, color='red', linestyle='--', linewidth=2, label=f'Line at lat={lat}') #Line indicating the point you choose
+
+    ### Settings ### 
+    ax1[1].set_xlabel("Latitude (°)")
+    ax1[1].set_ylabel("Depth (m)", color='black')
+    ax1[1].set_title("Bathymetry along the latitude")
+    ax1[1].set_ylim(max_bath_depth_2, 0)
+    ax2_1.set_ylim(max_bath_depth_2, 0)
+    ax1[1].set_xlim(lat_start,lat_end)
+    ax1[1].legend(loc='upper right')
+    ax1[1].grid(True)
+
+    ## Save and show the plot
+    plt.savefig(f"Bathymetry_cross_section_with_variable={var}.png", dpi=100, facecolor='white', bbox_inches="tight")
+    return fig
