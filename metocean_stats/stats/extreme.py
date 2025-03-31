@@ -1295,7 +1295,7 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
         })
     return contours, data_2D
 
-def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',max='worst_case'):
+def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default'):
     import sys
     """
     This function calculates the CCA profiles for a specific percentile or return period
@@ -1305,9 +1305,9 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if return_period is specified
-    max: by default, if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value (if not wanted, write 'None')
     output: list of vertical levels used, 1-d array for the worst case scenario (the percentiles or return values), the array with the profiles
     with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
     Function written by clio-met based on 'Turkstra models of current profiles by Winterstein, Haver and Nygaard (2009)'
     """
     # Select the columns of interest
@@ -1366,9 +1366,8 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
         i=0
         for dd in list_ind: # Loop over the other levels
             cca_prof[dd,d]=np.mean(prof_others[:,i],axis=0)+np.corrcoef(prof_wcd,prof_others[:,i])[0][1]*np.std(prof_others[:,i],axis=0)*((wcs[d]-np.mean(prof_wcd))/np.std(prof_wcd))
-            if max=='worst_case':
-                if cca_prof[dd,d]>wcs[dd]:
-                    cca_prof[dd,d]=wcs[dd]
+            if cca_prof[dd,d]>wcs[dd]:
+                cca_prof[dd,d]=wcs[dd]
             i=i+1
     return levels[0:nlevels],wcs[0:nlevels],cca_prof
 
