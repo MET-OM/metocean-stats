@@ -730,7 +730,7 @@ def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_
     return df
 
 
-def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',max='worst_case',output_file='table_cca_profiles.csv'):
+def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',output_file='table_cca_profiles.csv'):
     """
     This function returns a table containing the CCA profiles for a specific percentile or return period
     data: dataframe
@@ -739,9 +739,9 @@ def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,retu
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
-    max: by default, the highest curve will always be the worst-case scenario
     output_file: name of the csv file
     with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
     Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
@@ -749,7 +749,7 @@ def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,retu
     if not(percentile is None):
         lev,woca,cca=stats.cca_profiles(data,var=var,month=month,percentile=percentile)
     if not(return_period is None):
-        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold,max=max)
+        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold)
     list_ind=[]
     columns=['Depth [m]']+[d for d in lev]+['Worst case']
     table = np.zeros((len(lev),len(lev)+2))
