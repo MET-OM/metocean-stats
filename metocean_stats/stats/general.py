@@ -30,6 +30,11 @@ def calculate_scatter(data,var1, step_var1, var2, step_var2, from_origin=False, 
         By default, upper edges of bins are used as labels. Switch this to use lower bin edges instead.
     '''
 
+    data = data[[var1,var2]]
+    if np.any(np.isnan(data)):
+        print("Warning: Removing NaN rows.")
+        data = data.dropna(how="any")
+
     # Initial min and max
     xmin = data[var2].values.min()
     ymin = data[var1].values.min()
