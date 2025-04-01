@@ -133,3 +133,64 @@ def monthly_var_rose(data,
             plt.savefig(output_file, dpi=100, facecolor='white', bbox_inches='tight')
 
     return fig
+
+
+def plot_spectrum(spectrum, frequencies, directions, spec_unit, radius='frequency', log_radius=False ,output_file='Spectrum_plot.png'):
+    '''
+    Returns a plot of the given spectrum.
+    
+    Parameters
+    ----------
+    spectrum : np.ndarray
+        Should be 2D with dimensions (frequencies, directions).
+    frequencies : np.ndarray
+        1D array giving the frequencies in Hz.
+    directions : np.ndarray
+        1D array giving the directions in degrees in ascending order from 0 to 360.
+    spec_unit : string
+        Unit of the spectrum values.
+    radius : string
+        Should be 'period'/'frequency' to plot the periods/frequencies in the radial direction
+    log_radius : Boolean
+        True to get the radial axis on a logarithmic scale
+    output_file : string
+        Name of the figure file (xxx.pdf or xxx.png)
+
+    Returns
+    -------
+    Figure matplotlib
+    '''
+    # The last direction should be the same as the first
+    if directions[0]!=directions[-1]:
+        if directions[0]<360:
+            dirc=np.concatenate([directions,directions[0:1]+360])
+        else:
+            dirc=np.concatenate([directions,directions[0:1]])
+        spec=np.concatenate([spectrum[:,:],spectrum[:,0:1]],axis=1)
+
+    # Color map with 10 colors
+    cmap = mpl.cm.hot_r(np.linspace(0,1,10))
+    cmap = mpl.colors.ListedColormap(cmap)
+
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    if radius=='period':
+        c=ax.contourf(np.radians(dirc), 1/frequencies, spec, cmap=cmap)
+    elif radius=='frequency':
+        c=ax.contourf(np.radians(dirc), frequencies, spec, cmap=cmap)
+    else:
+        print('')
+    ax.grid(True)
+    if log_radius==True:
+        ax.set_rscale('log')
+    #ax.set_rlim(0,10)
+    plt.colorbar(c, label='['+spec_unit+']', pad=0.1)
+    plt.tight_layout()
+    if output_file is not None:
+        plt.savefig(output_file, dpi=200, bbox_inches='tight')
+    plt.close()
+
+    return fig
+
+
