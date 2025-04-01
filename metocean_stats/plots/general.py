@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
 import matplotlib.ticker as mticker
 import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
 from cycler import cycler
 
 from .. import stats
@@ -84,7 +85,7 @@ def plot_scatter_diagram(
     The function is written by dung-manh-nguyen, KonstantinChri, and efvik.
     """
 
-    sd = tables.calculate_scatter(data, var1, step_var1, var2, step_var2,from_origin=from_origin)
+    sd = stats.calculate_scatter(data, var1, step_var1, var2, step_var2,from_origin=from_origin)
 
     # Convert to percentage
     tbl = sd.values
@@ -127,7 +128,7 @@ def plot_scatter_diagram(
     tbl = tbl[::-1,:]
     dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
     fig,ax = plt.subplots()
-    norm = LogNorm() if log_color else None
+    norm = mcolors.LogNorm() if log_color else None
     mask = (dfout.round(significant_digits) != 0) if annot_nonzero_only else np.ones_like(dfout,dtype='bool')
     fmt = f".{significant_digits}f" if percentage_values else f'.{significant_digits}g'
     sns.heatmap(ax=ax, data=dfout.where(mask), cbar=use_cbar, cmap=cmap, fmt=fmt, norm=norm, annot=annot, square=square, linewidths=linewidths, linecolor=linecolor, **kwargs)
