@@ -606,7 +606,7 @@ def estimate_wind_speed(height1, wind_speed1, time1, height2, time2):
         f = interp1d(time_periods, wind_speed_ratios[height], kind='linear', fill_value="extrapolate")
         ratios_at_time1.append(f(time1))
         ratios_at_time2.append(f(time2))
-    
+
     # Interpolate across heights for time1 and time2
     ratio_at_height1 = interp1d(heights, ratios_at_time1, kind='linear', fill_value="extrapolate")(height1)
     ratio_at_height2 = interp1d(heights, ratios_at_time2, kind='linear', fill_value="extrapolate")(height2)
@@ -614,5 +614,17 @@ def estimate_wind_speed(height1, wind_speed1, time1, height2, time2):
     # Estimate wind speed at target height and time
     wind_speed2 = wind_speed1 * (ratio_at_height2 / ratio_at_height1)
     return wind_speed2
+
+def current_direction_calculation(u, v):
+    if u == 0 and v == 0:
+        return 0
+    angle_radian = np.arctan2(u, v)
+    angle_degree = np.degrees(angle_radian)
+    angle_degree = (angle_degree + 360) % 360
+    return np.round(angle_degree, 2)
+
+def magnitude_calculation(u,v):
+    magnitude= np.sqrt(u**2 + v**2)
+    return(magnitude)
 
 
