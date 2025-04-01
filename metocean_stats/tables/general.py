@@ -5,12 +5,10 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calendar
-from math import floor,ceil
 from pathlib import Path
 
-from ..stats.aux_funcs import *
-from ..stats.general import *
-
+from ..stats import aux_funcs
+from .. import stats
 
 def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float,number_of_events=False, output_file='scatter_diagram.csv'):
     """
@@ -21,12 +19,12 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     outputfile: name of output file with extrensition e.g., png, eps or pdf 
      """
 
-    sd = calculate_scatter(data, var1, step_var1, var2, step_var2)
-    start_date = data.index.min()
-    end_date = data.index.max() 
+    sd = stats.calculate_scatter(data, var1, step_var1, var2, step_var2)
+    # start_date = data.index.min()
+    # end_date = data.index.max() 
     # Calculate the difference in years
-    number_of_years = (end_date - start_date).days / 365.25
-    dt = (data.index.to_series().diff().dropna().dt.total_seconds() / 3600).mean()
+    # number_of_years = (end_date - start_date).days / 365.25
+    # dt = (data.index.to_series().diff().dropna().dt.total_seconds() / 3600).mean()
 
     # Convert to percentage
     tbl = sd.values
@@ -60,7 +58,7 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     rows = rows[::-1]
     tbl = tbl[::-1,:]
     
-    if number_of_events==True:
+    if number_of_events is True:
         #number of events 
         tbl = np.flip(sd.values,axis=0)
     else:
@@ -71,7 +69,7 @@ def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, 
     if output_file.suffix == '.csv':
         dfout.to_csv(output_file, index_label=var1+'/'+var2)
     elif output_file.suffix == '.png':
-        hi = sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
+        sns.heatmap(data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
         plt.ylabel(var1)
         plt.xlabel(var2)
         plt.tight_layout()
@@ -217,7 +215,7 @@ def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):
         f.write(r'\end{tabular}' + '\n')
     
     if output_file.split('.')[1] == 'csv':
-        convert_latexTab_to_csv(temp_file, output_file)
+        aux_funcs.convert_latexTab_to_csv(temp_file, output_file)
         os.remove(temp_file)
     else:
         os.rename(temp_file, output_file)
@@ -242,7 +240,7 @@ def _percentile_str_to_pd_format(percentiles):
             return mapping[name]
         else: return name
 
-    if type(percentiles)==str: return strconv(percentiles)
+    if type(percentiles) is str: return strconv(percentiles)
     else: return [strconv(p) for p in percentiles]
 
 def table_daily_percentile(data, 
@@ -339,7 +337,7 @@ def table_monthly_min_mean_max(data, var,output_file='montly_min_mean_max.txt') 
 
 
     if output_file.split('.')[1] == 'csv':
-        convert_latexTab_to_csv(temp_file, output_file)
+        aux_funcs.convert_latexTab_to_csv(temp_file, output_file)
         os.remove(temp_file)
     else:
         os.rename(temp_file, output_file)
@@ -448,7 +446,7 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
     bins = np.arange(0, data[var].max() + step_var, step_var).tolist()
     labels =  [f'<{num}' for num in [round(bin, 2) for bin in bins]]
     
-    add_direction_sector(data=data,var_dir=var_dir)
+    aux_funcs.add_direction_sector(data=data,var_dir=var_dir)
 
     # Categorize data into bins
     data[var+'-level'] = pd.cut(data[var], bins=bins, labels=labels[1:])
@@ -608,7 +606,7 @@ def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, windo
     results = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     for month in range(1, 13):
-        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=3)
+        avg_duration, p10, p50, p90 = stats.weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=3)
         results.append((p10,p50, avg_duration, p90))
     results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
     if output_file:
@@ -764,7 +762,7 @@ def table_max_min_water_level(data: pd.DataFrame, var_total_water_level: str,var
     Returns:
         Pandas DataFrame with max and min values for specified variables.
     """
-    min_pressure_surge, max_pressure_surge = pressure_surge(data,var=var_mslp)
+    min_pressure_surge, max_pressure_surge = stats.pressure_surge(data,var=var_mslp)
     var_list = [var_total_water_level, var_tide, var_surge]
     max_values = data[var_list].max()
     min_values = data[var_list].min()
@@ -788,7 +786,7 @@ def table_nb_hours_below_threshold(df,var='hs',threshold=[0.5,1,1.5,2,2.5,3,3.5,
     # 4) thresholds_chosen: list of thresholds to be included in the table
     # 5) output_file: String with filename without extension
     thr_arr=(np.arange(0.05,20.05,0.05)).tolist()
-    nbhr_arr=nb_hours_below_threshold(df,var,thr_arr)
+    nbhr_arr=stats.nb_hours_below_threshold(df,var,thr_arr)
     # Create file
     threshold=np.array(threshold)
     arr1=np.zeros((len(threshold),3))
@@ -825,7 +823,7 @@ def table_weather_window_thresholds(ds,var,threshold,op_duration=[6,12,24,48],ou
     for t in threshold:
         op1=0
         for op in op_duration:
-            arr_o[op1,t1],p1,p2,p3 = weather_window_length(ds,threshold=t,op_duration=op,timestep=timestep,month=None)
+            arr_o[op1,t1],p1,p2,p3 = stats.weather_window_length(ds,threshold=t,op_duration=op,timestep=timestep,month=None)
             op1=op1+1
             del p1,p2,p3
         t1=t1+1

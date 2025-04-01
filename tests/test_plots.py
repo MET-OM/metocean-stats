@@ -1,9 +1,10 @@
-from metocean_stats import plots, tables, stats, maps
-from metocean_stats.stats.aux_funcs import *
-from metocean_stats.plots.contours import plot_environmental_contours
-import pandas as pd
-
 import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from metocean_stats import plots
+from metocean_stats.stats.aux_funcs import readNora10File
 
 # Define TimeSeries-object for NORA3
 dirname = os.path.dirname(__file__)
@@ -310,7 +311,7 @@ def test_plot_daily_stats_wave_height_fill():
 def test_plot_daily_stats_missing_column():
     # Test with a missing column (should raise an error or handle it gracefully)
     try:
-        fig = plots.plot_daily_stats(ds, var="non_existent_column",output_file="")
+        plots.plot_daily_stats(ds, var="non_existent_column",output_file="")
         assert False, "The function did not raise an error for a missing column."
     except KeyError:
         print("test_plot_daily_stats_missing_column passed (KeyError raised as expected).")
@@ -341,7 +342,7 @@ def test_plot_monthly_stats_wave_height_fill():
 def test_plot_monthly_stats_missing_column():
     # Test with a missing column (should raise an error or handle it gracefully)
     try:
-        fig = plots.plot_monthly_stats(ds, var="non_existent_column",output_file="")
+        plots.plot_monthly_stats(ds, var="non_existent_column",output_file="")
         assert False, "The function did not raise an error for a missing column."
     except KeyError:
         print("test_plot_monthly_stats_missing_column passed (KeyError raised as expected).")

@@ -5,5 +5,4 @@ Copyright 2023, Konstantinos Christakos, MET Norway
 """
 
 from .general import *
-from .dir import *
 from .extreme import *

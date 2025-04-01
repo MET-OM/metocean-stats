@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import windrose
-import matplotlib.cm as cm
-import os
 
 def rose(data,
          var_dir,
@@ -103,7 +100,7 @@ def monthly_var_rose(data,
         dic_intensity[months[m_idx]].append(intensity.iloc[i])
         dic_direction[months[m_idx]].append(direction.iloc[i])
 
-    if single_figure==False:  
+    if single_figure is False:  
         for j in range(12):
             fig = plt.figure(figsize = (8,8))
             ax = fig.add_subplot(111, projection="windrose")
