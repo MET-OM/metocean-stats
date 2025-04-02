@@ -135,31 +135,40 @@ def monthly_var_rose(data,
     return fig
 
 
-def plot_spectrum(spectrum, frequencies, directions, spec_unit, radius='frequency', log_radius=False ,output_file='Spectrum_plot.png'):
+def plot_spectrum_2d(ds, var='SPEC', radius='frequency', log_radius=False, plot_type='contourf', dir_letters=False, output_file='Spectrum_plot.png'):
+    import sys
+    import matplotlib.ticker as mticker
     '''
     Returns a plot of the given spectrum.
     
     Parameters
     ----------
-    spectrum : np.ndarray
-        Should be 2D with dimensions (frequencies, directions).
-    frequencies : np.ndarray
-        1D array giving the frequencies in Hz.
-    directions : np.ndarray
-        1D array giving the directions in degrees in ascending order from 0 to 360.
-    spec_unit : string
-        Unit of the spectrum values.
+    ds : xarray dataset
+        Should contain variable var with two (frequencies, directions).
+    var : string
+        Name of the spectrum variable
     radius : string
         Should be 'period'/'frequency' to plot the periods/frequencies in the radial direction
     log_radius : Boolean
         True to get the radial axis on a logarithmic scale
+    plot_type : string
+        Can be 'pcolormesh' or 'contourf'
+    dir_letters : Boolean
+        Displays the directions as letters instead of degrees if True'
     output_file : string
         Name of the figure file (xxx.pdf or xxx.png)
 
     Returns
     -------
     Figure matplotlib
+
+    Function written by clio-met
     '''
+    spectrum=ds[var]
+    dims=list(spectrum.dims)
+    # Get the coordinates
+    frequencies=spectrum.coords[dims[0]].to_numpy()
+    directions=spectrum.coords[dims[1]].to_numpy()
     # The last direction should be the same as the first
     if directions[0]!=directions[-1]:
         if directions[0]<360:
@@ -176,21 +185,32 @@ def plot_spectrum(spectrum, frequencies, directions, spec_unit, radius='frequenc
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
     if radius=='period':
-        c=ax.contourf(np.radians(dirc), 1/frequencies, spec, cmap=cmap)
+        rad_data=1/frequencies
     elif radius=='frequency':
-        c=ax.contourf(np.radians(dirc), frequencies, spec, cmap=cmap)
+        rad_data=frequencies
+
+    if plot_type=='pcolormesh':
+        c=ax.pcolormesh(np.radians(dirc), rad_data, spec, cmap='hot_r', shading='auto')
+    elif plot_type=='contourf':
+        c=ax.contourf(np.radians(dirc), rad_data, spec, cmap=cmap)
     else:
-        print('')
+        print('plot_type should pcolormesh or contourf')
+        sys.exit()
+
     ax.grid(True)
     if log_radius==True:
         ax.set_rscale('log')
     #ax.set_rlim(0,10)
-    plt.colorbar(c, label='['+spec_unit+']', pad=0.1)
+    if dir_letters=='yes':
+        ticks_loc = ax.get_xticks().tolist()
+        ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+        ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
+    plt.colorbar(c, label='['+spectrum.units+']', pad=0.1)
     plt.tight_layout()
     if output_file is not None:
         plt.savefig(output_file, dpi=200, bbox_inches='tight')
     plt.close()
-
+         
     return fig
 
 
