@@ -201,7 +201,7 @@ def plot_spectrum_2d(ds, var='SPEC', radius='frequency', log_radius=False, plot_
     if log_radius==True:
         ax.set_rscale('log')
     #ax.set_rlim(0,10)
-    if dir_letters=='yes':
+    if dir_letters==True:
         ticks_loc = ax.get_xticks().tolist()
         ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
         ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
