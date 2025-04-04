@@ -196,6 +196,7 @@ def plot_multi_diagnostic_return_levels(data, var,
 
     # Initialize plot and fill in empirical return levels
     fig, ax = plt.subplots()
+    ax.margins(x=0,y=0)
 
     # Plot points (return level, return period) corresponding to
     # empirical values
@@ -209,7 +210,7 @@ def plot_multi_diagnostic_return_levels(data, var,
         #           marker="o", s=20, lw=1,
         #           facecolor="k", edgecolor="w", zorder=20)
         ax.scatter(df_emp_rl_cut['return_levels'],
-                   df_emp_rl_cut['prob_non_exceedance'],
+                   1-df_emp_rl_cut['prob_non_exceedance'],
                    marker="o", s=20, lw=1,
                    facecolor="k", edgecolor="w", zorder=20)
 
@@ -247,7 +248,7 @@ def plot_multi_diagnostic_return_levels(data, var,
             #        df_model_rl_tmp_cut.index,
             #        label=dist)
             ax.plot(df_model_rl_tmp_cut['return_levels'],
-                    df_model_rl_tmp_cut['prob_non_exceedance'],
+                    1-df_model_rl_tmp_cut['prob_non_exceedance'],
                     label=dist)
 
         elif yaxis == 'rp':
@@ -255,24 +256,19 @@ def plot_multi_diagnostic_return_levels(data, var,
                     df_model_rl_tmp.index,
                     label=dist)
 
-    plt.yscale('log')
+    ax.set_yscale('log')
+    ax.invert_yaxis()
     ax.grid(True, which="both")
 
     # Change label and ticklabels of y-axis, to display either probabilities
     # of non-exceedance or return period
     if yaxis == 'prob':
+        ticks = np.array([0,0.5,0.9,0.99,0.999,0.9999,0.99999,0.999999,0.9999999])
         ax.set_ylabel("Probability of non-exceedance")
-        #list_yticks = [1/0.9, 2, 10]\
-        #            + [10**i for i in range(2, 5) if max(periods) > 10**i]
-        #if max(periods) > max(list_yticks):
-        #    list_yticks = list_yticks + [max(periods)]
-        #ax.set_yticks(list_yticks)
-        #ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
-        list_yticks = [10**-1,10**(np.log10(0.5)),10**0]
-        list_ytickslabels = ['0.1','0.5','1']
-        ax.set_yticks(list_yticks)
-        ax.set_yticklabels(list_ytickslabels)
-        ax.set_ylim(0.05,1.02)
+        ylim = ax.get_ylim()
+        ax.set_yticks(1-ticks,ticks)
+        # This line should expand ylim to the nearest tick above.
+        ax.set_ylim(ylim[0],1-ticks[np.searchsorted(ticks,1-ylim[1])])
 
     elif yaxis == 'rp':
         ax.set_ylabel("Return period [yr]")
