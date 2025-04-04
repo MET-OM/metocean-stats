@@ -262,7 +262,7 @@ def get_empirical_return_levels(data, var, method="POT",
         extremes = get_extremes(ts=data[var],
                                 method=method,
                                 threshold=threshold)
-        rp = aux_funcs.get_return_periods(ts=data[var],
+        rp = get_return_periods(ts=data[var],
                                 extremes=extremes,
                                 extremes_method=method,
                                 extremes_type="high")
