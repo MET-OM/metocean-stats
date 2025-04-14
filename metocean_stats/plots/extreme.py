@@ -894,8 +894,9 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     return fig
 
 
-def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str,output_file='tp_for_given_hs.png'):
-    df = tables.table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, bin_width=1,output_file=False)
+def plot_tp_for_given_hs(data: pd.DataFrame, var_hs: str, var_tp: str, output_file='tp_for_given_hs.png'):
+
+    df = tables.table_tp_for_given_hs(data=data, var_hs=var_hs, var_tp=var_tp, output_file=False)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs], data[var_tp], bins=50, cmap='hot', cmin=1)
