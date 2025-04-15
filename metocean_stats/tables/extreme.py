@@ -239,19 +239,20 @@ def table_Hs_Tpl_Tph_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,10
     return df
 
 
-def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=None, output_file='table_perc_tp_for_hs.csv'):
+def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=None,max_hs=None, output_file='table_perc_tp_for_hs.csv'):
     df=data
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=[1000])
     # Create bins
-    max_hs = int(np.ceil(df[var_hs].max()))
-    min_hs = 0.1
+    if max_hs is None:
+        max_hs = int(np.ceil(df[var_hs].max()))
+
     if bin_width is None:
         bin_width = max_hs/20
     
+    min_hs = bin_width/2
     bins = np.arange(min_hs, max_hs + bin_width, bin_width)
     bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
     bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
-
     # Bin the HS values
     df[var_hs+'_bin'] = pd.cut(df[var_hs], bins=bins, labels=bin_labels, right=False)
     
@@ -301,9 +302,15 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
     return result_df
 
 
-def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_tp_for_wind.csv'):
+def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=None, max_wind=None, output_file='table_perc_tp_for_wind.csv'):
     df=data
     # Create bins
+    if max_wind is None:
+        max_wind = int(np.ceil(df[var_wind].max()))
+
+    if bin_width is None:
+        bin_width = max_wind/10
+
     min_wind = 0
     bins = np.arange(min_wind, max_wind + bin_width, bin_width)
     bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
@@ -356,7 +363,7 @@ def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_w
     return result_df
 
 def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth=50,spectrum='JONSWAP',output_file='wave_induced_current_depth200.csv'):
-    df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1, output_file=None)
+    df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1,max_hs=max_hs, output_file=None)
     df['Us(P5) [m/s]'], df['Tu(P5-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(P5-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
     df['Us(Mean) [m/s]'], df['Tu(Mean-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(Mean-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
     df['Us(P95) [m/s]'], df['Tu(P95-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(P95-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
