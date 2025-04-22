@@ -239,16 +239,20 @@ def table_Hs_Tpl_Tph_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,10
     return df
 
 
-def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1, max_hs=20, output_file='table_perc_tp_for_hs.csv'):
+def table_tp_for_given_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=None,max_hs=None, output_file='table_perc_tp_for_hs.csv'):
     df=data
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=[1000])
     # Create bins
-    min_hs = 0.5
-    max_hs = max_hs
+    if max_hs is None:
+        max_hs = int(np.ceil(df[var_hs].max()))
+
+    if bin_width is None:
+        bin_width = max_hs/20
+    
+    min_hs = bin_width/2
     bins = np.arange(min_hs, max_hs + bin_width, bin_width)
     bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
     bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins)-1)]
-
     # Bin the HS values
     df[var_hs+'_bin'] = pd.cut(df[var_hs], bins=bins, labels=bin_labels, right=False)
     
@@ -298,9 +302,15 @@ def table_tp_for_rv_hs(data: pd.DataFrame, var_hs: str,var_tp: str, bin_width=1,
     return result_df
 
 
-def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=2, max_wind=40, output_file='table_perc_tp_for_wind.csv'):
+def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_width=None, max_wind=None, output_file='table_perc_tp_for_wind.csv'):
     df=data
     # Create bins
+    if max_wind is None:
+        max_wind = int(np.ceil(df[var_wind].max()))
+
+    if bin_width is None:
+        bin_width = max_wind/10
+
     min_wind = 0
     bins = np.arange(min_wind, max_wind + bin_width, bin_width)
     bin_labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins)-1)]
@@ -353,7 +363,7 @@ def table_hs_for_given_wind(data: pd.DataFrame, var_hs: str,var_wind: str, bin_w
     return result_df
 
 def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth=50,spectrum='JONSWAP',output_file='wave_induced_current_depth200.csv'):
-    df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1, max_hs=max_hs, output_file=None)
+    df = table_tp_for_given_hs(ds, var_hs,var_tp, bin_width=1,max_hs=max_hs, output_file=None)
     df['Us(P5) [m/s]'], df['Tu(P5-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(P5-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
     df['Us(Mean) [m/s]'], df['Tu(Mean-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(Mean-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
     df['Us(P95) [m/s]'], df['Tu(P95-model) [s]'] = aux_funcs.calculate_Us_Tu(df['Hs[m]'],df['Tp(P95-model) [s]'], depth=depth, ref_depth=ref_depth,spectrum=spectrum)
@@ -730,7 +740,7 @@ def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_
     return df
 
 
-def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',max='worst_case',output_file='table_cca_profiles.csv'):
+def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',output_file='table_cca_profiles.csv'):
     """
     This function returns a table containing the CCA profiles for a specific percentile or return period
     data: dataframe
@@ -739,9 +749,9 @@ def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,retu
     percentile: is the percentile associated with the worst case scenario
     return_period: a return-period e.g., 10 for a 10-yr return period
     distrbution, method, and threshold: only used if retrun_period is specified
-    max: by default, the highest curve will always be the worst-case scenario
     output_file: name of the csv file
     with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
     Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
@@ -749,7 +759,7 @@ def table_cca_profiles(data,var='current_speed_',month=None,percentile=None,retu
     if not(percentile is None):
         lev,woca,cca=stats.cca_profiles(data,var=var,month=month,percentile=percentile)
     if not(return_period is None):
-        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold,max=max)
+        lev,woca,cca=stats.cca_profiles(data,var=var,month=month,return_period=return_period,distribution=distribution,method=method,threshold=threshold)
     list_ind=[]
     columns=['Depth [m]']+[d for d in lev]+['Worst case']
     table = np.zeros((len(lev),len(lev)+2))
