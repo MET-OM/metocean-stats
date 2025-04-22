@@ -257,12 +257,12 @@ def plot_multi_diagnostic_return_levels(data, var,
                     label=dist)
 
     ax.set_yscale('log')
-    ax.invert_yaxis()
     ax.grid(True, which="both")
 
     # Change label and ticklabels of y-axis, to display either probabilities
     # of non-exceedance or return period
     if yaxis == 'prob':
+        ax.invert_yaxis() # only invert if probability plot.
         ticks = np.array([0,0.5,0.9,0.99,0.999,0.9999,0.99999,0.999999,0.9999999])
         ax.set_ylabel("Probability of non-exceedance")
         ylim = ax.get_ylim()
