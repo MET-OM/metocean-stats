@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import virocon
-from .joint_models import JointProbabilityModel
+from .jointmodel import JointProbabilityModel
 
 # This module is no longer useful, but can eventually become an example / test.
 

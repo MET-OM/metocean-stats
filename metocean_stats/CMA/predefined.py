@@ -8,6 +8,8 @@ from virocon.predefined import (
     get_OMAE2020_V_Hs
 )
 
+from .distributions import LoNoWeDistribution
+
 __all__ = [
     # Predefined in virocon
     "get_DNVGL_Hs_Tz",
@@ -110,11 +112,11 @@ def get_LoNoWe_hs_tp():
     """
     Similar to the DNV GL RP 2017 model, but uses the combined 
     Lognormal-Weibull model in Hs (LoNoWe) rather than just weibull.
-    The model is fitted using the method of moment (MM) in scipy.
+    The model is fitted using the method of moment in scipy.
     """
 
     dist_description_hs = {
-        "distribution": virocon.LoNoWeDistribution(),
+        "distribution": LoNoWeDistribution(),
         "intervals": virocon.NumberOfIntervalsSlicer(10),
     }
 
@@ -122,12 +124,12 @@ def get_LoNoWe_hs_tp():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {"mu": _dependence_power(), 
-                       "sigma": _dependence_exp},
+                       "sigma": _dependence_exp()},
     }
 
     dist_descriptions = [dist_description_hs, dist_description_tz]
 
-    fit_descriptions = [{'method':'mm','weights':None},{'method':'mm','weights':None}]
+    fit_descriptions = [{'method':'mom','weights':None},{'method':'mom','weights':None}]
 
     semantics = {
         "names": ["Significant wave height", "Peak wave period"],

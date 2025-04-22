@@ -1,6 +1,7 @@
 import virocon
 import numpy as np
 from scipy.signal import find_peaks
+from virocon.distributions import Distribution
 
 from virocon.distributions import (
     ScipyDistribution,
@@ -27,7 +28,7 @@ __all__ = [
     "LoNoWeDistribution",
 ]
 
-class LoNoWeDistribution(virocon.Distribution):
+class LoNoWeDistribution(Distribution):
     """
     A LoNoWe distribution (Lognormal + Weibull)
 
@@ -135,12 +136,14 @@ class LoNoWeDistribution(virocon.Distribution):
 
         return sample
 
-    def _fit_mle(self, sample, method=("MLE","MLE")):
-        
-        if type(method) is str:
-            method = (method,method)
-        self.weibull._fit_mle(sample,method=method[0])
-        self.lognormal._fit_mle(sample,method=method[1])
+    def _fit_mom(self,sample):
+        self.weibull._fit_mom(sample)
+        self.lognormal._fit_mom(sample)
+        self._fit_shifting_point(sample)
+
+    def _fit_mle(self,sample):
+        self.weibull._fit_mle(sample)
+        self.lognormal._fit_mle(sample)
         self._fit_shifting_point(sample)
 
     def _fit_lsq(self, data, weights):

@@ -31,7 +31,7 @@ SOFTWARE.
 
 """
 
-from jointmodel import JointProbabilityModel
+from .jointmodel import JointProbabilityModel
 
 __all__ = [
     "JointProbabilityModel"

@@ -28,10 +28,10 @@ def _load_preset(preset):
     elif preset == 'dnvgl_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
         swap_axis = True
-    elif preset == 'omae_U_hs':
+    elif preset == 'omae_u_hs':
         dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
         swap_axis = False
-    elif preset == 'dnvgl_hs_U':
+    elif preset == 'dnvgl_hs_u':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
         swap_axis = True
     elif preset == 'windsea_hs_tp':
@@ -70,10 +70,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         A model should have been defined in predefined.py.
         Any other input arguments following the first 
         parameter will overwrite the predefined configuration.
-
+        
         Parameters
         ------------
-        model_config : str
+        preset : str
             Choose model from any predefined model.
 
              - DNVGL_Hs_Tp
@@ -100,18 +100,28 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             This determines if the produced plots should have swapped axes,
             as is common with e.g. hs tp plots.
         """
-        preset_dist,preset_fit,preset_semantics,preset_axis=_load_preset(preset)
 
-        if dist_descriptions is None:
-            dist_descriptions = preset_dist
-        if fit_descriptions is None:
-            fit_descriptions = preset_fit
-        if semantics is None:
-            semantics = preset_semantics
-        if swap_axis is None:
-            swap_axis = preset_axis
-        if intervals is not None:
-            dist_descriptions[0]["intervals"] = intervals
+        if preset:
+            preset_dist,preset_fit,preset_semantics,preset_axis=_load_preset(preset)
+            if dist_descriptions is None:
+                dist_descriptions = preset_dist
+            if fit_descriptions is None:
+                fit_descriptions = preset_fit
+            if semantics is None:
+                semantics = preset_semantics
+            if swap_axis is None:
+                swap_axis = preset_axis
+            if intervals is not None:
+                dist_descriptions[0]["intervals"] = intervals
+
+        else:
+            if dist_descriptions is None or fit_descriptions is None:
+                raise ValueError("If preset is undefined, both dist_descriptions and fit_descriptions must be provided.")
+            else:
+                if swap_axis is None:
+                    swap_axis = False
+                if intervals is not None:
+                    dist_descriptions[0]["intervals"] = intervals
         
         self.dist_descriptions = dist_descriptions
         self.fit_descriptions = fit_descriptions
@@ -163,13 +173,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         return virocon.plot_dependence_functions(self,self.semantics,axes=axes)
 
-    def plot_histograms_of_interval_distributions(self,plot_pdf=True):
+    def plot_histograms_of_interval_distributions(self,plot_pdf=True,max_cols=4):
         """
         Plot histograms for the estimated distribution in each data interval.
         """        
-        return virocon.plot_histograms_of_interval_distributions(self,self.data,self.semantics,plot_pdf=plot_pdf)
+        return virocon.plot_histograms_of_interval_distributions(self,self.data,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
 
-    def plot_2D_isodensity(self,levels:list[float]=None,ax=None):
+    def plot_2D_isodensity(self,levels:list[float]=None,ax=None,limits=None,n_grid_steps=250,cmap=None,contour_kwargs=None):
         """
         Plot isodensity lines.
 
@@ -180,12 +190,27 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         ax : matplotlib axes
             Plot on existing axes object.
         """
-        return virocon.plot_2D_isodensity(self,self.data,self.semantics,self.swap_axis,ax=ax, levels=levels)
+
+        if "LoNoWe" in str(type(self.distributions[0])):
+            raise NotImplementedError("Isodensity does not work (yet) with LoNoWe.")
+
+        return virocon.plot_2D_isodensity(
+            self,
+            sample=self.data,
+            semantics=self.semantics,
+            swap_axis=self.swap_axis,
+            limits=limits,
+            levels=levels,
+            ax=ax,
+            n_grid_steps=n_grid_steps,
+            cmap=cmap,
+            contour_kwargs=contour_kwargs)
 
     def plot_2D_contours(self,
                          periods:list[float]=[1,10,100,1000],
                          state_duration:float=1,
                          contour_method:str="IFORM",
+                         plot_kwargs=None,
                          ax=None):
         """
         Plot 2D environmental contours.
@@ -206,6 +231,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - "DirectSampling", monte carlo sampling
              - "ConstantAndExceedance"
              - "ConstantOrExceedance"
+            
+        plot_kwargs : dict
+            Any matplotlib plot keyword arguments, e.g.
+            plot_kwargs = {"color":"blue","linewidth":2,"label":"100 year"}.
         """
 
         if ax is None:
@@ -230,7 +259,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         for return_period in periods:
             alpha = virocon.calculate_alpha(state_duration,return_period)
             contour = ContourMethod(self,alpha)
-            virocon.plot_2D_contour(contour,semantics=self.semantics,swap_axis=self.swap_axis,ax=ax)
+            virocon.plot_2D_contour(contour,semantics=self.semantics,swap_axis=self.swap_axis,ax=ax,plot_kwargs=plot_kwargs)
 
         return ax
 
