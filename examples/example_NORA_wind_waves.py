@@ -33,7 +33,7 @@ if not folder.exists():
 plots.var_rose(df,var_dir=var_wind_dir,var=var_wind,method='overall',max_perc=40,decimal_places=1, units='m/s',output_file=folder /  'wind_omni.png')
 plots.var_rose(df,var_dir=var_wind_dir,var=var_wind,method='monthly',max_perc=40,decimal_places=1, units='m/s',output_file=folder /  'wind_monthly.png')
 plots.plot_directional_stats(df,var=var_wind,step_var=0.1,var_dir=var_wind_dir,title = 'W10[m/s]', output_file=folder /  'directional_wind_stats.png')
-plots.table_directional_non_exceedance(df,var=var_wind,step_var=2,var_dir=var_wind_dir,output_file=folder /  'table_wind_directional_non_exceedance.csv')
+tables.table_directional_non_exceedance(df,var=var_wind,step_var=2,var_dir=var_wind_dir,output_file=folder /  'table_wind_directional_non_exceedance.csv')
 plots.plot_monthly_stats(df,var=var_wind,title = 'Wind Speed at 10 m [m/s]', output_file=folder /  'monthly_wind_stats.png')
 tables.table_monthly_non_exceedance(df,var=var_wind,step_var=2,output_file=folder /  'table_monthly_non_exceedance.csv')
 plots.plot_prob_non_exceedance_fitted_3p_weibull(df,var=var_wind,output_file=folder /  'prob_non_exceedance_fitted_3p_weibull_wind.png')
