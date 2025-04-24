@@ -2,7 +2,7 @@ import virocon
 import numpy as np
 
 from virocon.predefined import (
-    get_DNVGL_Hs_Tz,
+    #get_DNVGL_Hs_Tz,
     get_OMAE2020_Hs_Tz,
     get_DNVGL_Hs_U,
     get_OMAE2020_V_Hs
@@ -106,6 +106,68 @@ def _dependence_exp():
         func=_exp3,
         bounds= bounds, 
         latex=latex)
+
+def get_DNVGL_Hs_Tz():
+    """
+    Get DNVGL significant wave height and wave period model.
+
+    Get the descriptions necessary to create th significant wave height
+    and wave period model as defined in DNVGL [1]_ in section 3.6.3.
+
+    Returns
+    -------
+    dist_descriptions : list of dict
+        List of dictionaries containing the dist descriptions for each dimension.
+        Can be used to create a GlobalHierarchicalModel.
+    fit_descriptions : None
+        Default fit is used so None is returned.
+        Can be passed to fit function of GlobalHierarchicalModel.
+    semantics : dict
+        Dictionary with a semantic description of the model.
+        Can be passed to plot functions.
+
+    References
+    ----------
+    .. [1] DNV GL (2017). Recommended practice DNVGL-RP-C205: Environmental
+        conditions and environmental loads.
+
+    """
+
+    # TODO docstrings with links to literature
+    # DNVGL 3.6.3
+    def _power3(x, a, b, c):
+        return a + b * x**c
+
+    def _exp3(x, a, b, c):
+        return a + b * np.exp(c * x)
+
+    bounds = [(None, None), (0, None), (None, None)]
+
+    power3 = virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$")
+    exp3 = virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
+
+    dist_description_hs = {
+        "distribution": virocon.WeibullDistribution(),
+        "intervals": virocon.NumberOfIntervalsSlicer(20,min_n_points=10), # 0.5 m is a common choice, see e.g. 10.1115/OMAE2020-18041
+    }
+
+    dist_description_tz = {
+        "distribution": virocon.LogNormalDistribution(),
+        "conditional_on": 0,
+        "parameters": {"mu": power3, "sigma": exp3},
+    }
+
+    dist_descriptions = [dist_description_hs, dist_description_tz]
+
+    fit_descriptions = [{"method": "MoM"}, None]
+
+    semantics = {
+        "names": ["Significant wave height", "Peak wave period"],
+        "symbols": ["H_s", "T_p"],
+        "units": ["m", "s"],
+    }
+
+    return dist_descriptions, fit_descriptions, semantics
 
 
 def get_LoNoWe_hs_tp():
