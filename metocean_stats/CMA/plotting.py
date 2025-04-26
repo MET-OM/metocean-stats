@@ -2,8 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 import seaborn as sns
-
-def plot_DNVGL_steepness(ax,peak_period_line=True,**kwargs):
+def plot_DNVGL_steepness(ax,peak_period_line=True,xlim=None,ylim=None,**kwargs):
     """
     Plot dnv gl RP 2017/2019 recommended steepness line, within the axis limits.
     Assumes t is x-axis, and h is y-axis.
@@ -17,18 +16,17 @@ def plot_DNVGL_steepness(ax,peak_period_line=True,**kwargs):
     **kwargs : keyword arguments
         Any matplotlib.plot() keyword arguments (color, linestyle, etc.).
     """
-    xlim = np.max([_.get_xdata().max() for _ in ax.get_lines()])
-    ylim = np.max([_.get_ydata().max() for _ in ax.get_lines()])    
 
-    # Define t and get h from steepness
-    t = np.linspace(0,xlim,10000,endpoint=True)
-    input = 'tp' if peak_period_line else 'tz'
-    h = get_DNVGL_steepness(t,input)
-    
-    # Use only values within the plot limits.
-    mask = h<ylim
-    h = h[mask]
-    t = t[mask]
+    # Get h and t.
+    wave_period_type = 'tp' if peak_period_line else 'tz'
+    if xlim is None and ylim is None:
+        xlim,ylim = 40,20
+    if ylim is not None:
+        h = np.linspace(0,ylim,10000)
+        t = get_DNVGL_steepness(h,"hs",wave_period_type)
+    elif xlim is not None:
+        t = np.linspace(0,xlim,10000)
+        h = get_DNVGL_steepness(t,wave_period_type,"hs")
 
     # These are defaults, to be overwritten by **kwargs.
     plot_params = {**{
