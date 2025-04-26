@@ -626,7 +626,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
             continue
         hs = df[var_hs].where(var_3.notnull()).dropna()
         tp = df[var_tp].where(var_3.notnull()).dropna()
-        dff = pd.DataFrame({'HS': hs, 'TP': tp, var3_name: var_3})
+        dff = pd.DataFrame({var_hs: hs, var_tp: tp, var3_name: var_3})
         a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
         t3_.append(t3)
         h3_.append(h3)
