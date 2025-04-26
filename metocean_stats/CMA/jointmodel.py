@@ -15,7 +15,6 @@ from .plotting import (
 )
 
 from .extremes import (
-    get_dependent_given_marginal,
     get_return_values,
 )
 
@@ -210,10 +209,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         -----------
         levels : list[float], optional
             List of probabilities to plot. Either this or return_values
-            can be specified. Not both.
-        points : np.ndarray
-            A list of 2D points, from which to draw isodensity contours.
-            Either this or levels may be specified. Not both.
+            can be specified.
+        return_values : np.ndarray
+            A list of marginal return values, of e.g. Hs, 
+            from which to draw the isodensity contours.
         labels : list of strings
             Labels to use in the figure legend.
         ax : matplotlib axes
@@ -226,8 +225,14 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if points is not None:
             if levels is not None:
                 raise ValueError("Only one of levels or return_values may be specified. The other must be None.")
-            if points.ndim == 1:
+            points = np.array(points)
+            if points.ndim == 0:
                 points = np.array([points])
+            if points.ndim == 1:
+                conditional = self.get_dependent_given_marginal(points)
+                points = np.array([points,conditional]).T
+            if points.ndim > 2 or points.shape[1] > 2:
+                raise ValueError("Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
             levels = self.pdf(points)
             idx = np.argsort(levels)
             levels = levels[idx]
@@ -420,6 +425,28 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ax=ax,
             **kwargs)
     
+    def get_dependent_given_marginal(
+            self,
+            given:np.ndarray,
+            percentile:np.ndarray=0.5,
+        ):
+        """
+        Function to get values of dependent/secondary variable from the joint model,
+        given specific values of the marginal/primary variable. 
+        Optionally, a percentile may be specified to get a conditional value other than the median.
+        """
+        # Check that percentile is 1 number.
+        percentile = np.squeeze(np.array(percentile))
+        if percentile.size > 1: 
+            raise ValueError("Only one percentile may be specified at a time.")
+        
+        given = np.squeeze(np.array(given))
+        if given.ndim > 1:
+            raise ValueError("Given must be a 0 or 1-dimensional array.")
+        given = np.array([given,np.zeros_like(given)]).T
+
+        return self.conditional_icdf(p=percentile,dim=1,given=given)
+
     def plot_dependent_percentiles(
             self,
             percentiles=[0.05,0.5,0.95],
@@ -457,7 +484,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         marginal = np.arange(0,np.max(self.data[:,0]),0.001)
         for i,p in enumerate(percentiles):
-            conditional = get_dependent_given_marginal(self,marginal,p)
+            conditional = self.get_dependent_given_marginal(marginal,p)
             if self.swap_axis:
                 x,y = conditional,marginal
             else:
