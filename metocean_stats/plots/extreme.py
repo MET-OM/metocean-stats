@@ -721,7 +721,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     # Fit Weibull distribution to your data and estimate parameters
     data = df.HS.values  # Your data
-    shape, loc, scale = stats.Weibull_method_of_moment(data)
+    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data)
     
     # Define return periods
     periods = np.arange(1.5873, 10000, 100) 
@@ -738,7 +738,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
         bootstrap_sample = np.random.choice(data, size=1000, replace=True)
         
         # Fit Weibull distribution to resampled data
-        shape_b, loc_b, scale_b = stats.Weibull_method_of_moment(bootstrap_sample)
+        shape_b, loc_b, scale_b = aux_funcs.Weibull_method_of_moment(bootstrap_sample)
         # Calculate return values for resampled distribution
         bootstrap_return_values.append(st.weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
     
