@@ -10,6 +10,7 @@ folder = Path(__file__).parent / 'output' / 'NORA'
 if not folder.exists():
     folder.mkdir(parents=True)
 
+#test 
 
 # Map:
 maps.plot_points_on_map(lon=[3.35,3.10], lat=[60.40,60.90],label=['NORA3','NORKYST800'],bathymetry='NORA3',output_file='map.png')
