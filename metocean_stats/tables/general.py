@@ -165,62 +165,62 @@ def table_var_sorted_by_hs(data, var, var_hs='hs', output_file='var_sorted_by_Hs
 
     return df
 
-def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):  
-    """
-    The function is written by dung-manh-nguyen and KonstantinChri.
-    this function will sort variable var e.g., hs by month and calculate percentiles 
-    data : panda series 
-    var  : variable 
-    output_file: extension .txt for latex table or .csv for csv table
-    """
+# def table_monthly_percentile(data,var,output_file='var_monthly_percentile.txt'):  
+#     """
+#     The function is written by dung-manh-nguyen and KonstantinChri.
+#     this function will sort variable var e.g., hs by month and calculate percentiles 
+#     data : panda series 
+#     var  : variable 
+#     output_file: extension .txt for latex table or .csv for csv table
+#     """
 
-    Var = data[var]
-    varName = data[var].name
-    Var_month = Var.index.month
-    M = Var_month.values
-    temp_file = output_file.split('.')[0]
+#     Var = data[var]
+#     varName = data[var].name
+#     Var_month = Var.index.month
+#     M = Var_month.values
+#     temp_file = output_file.split('.')[0]
     
-    months = calendar.month_name[1:] # eliminate the first insane one 
-    for i in range(len(months)) : 
-        months[i] = months[i][:3] # get the three first letters 
+#     months = calendar.month_name[1:] # eliminate the first insane one 
+#     for i in range(len(months)) : 
+#         months[i] = months[i][:3] # get the three first letters 
     
-    monthlyVar = {}
-    for i in range(len(months)) : 
-        monthlyVar[months[i]] = [] # create empty dictionaries to store data 
+#     monthlyVar = {}
+#     for i in range(len(months)) : 
+#         monthlyVar[months[i]] = [] # create empty dictionaries to store data 
     
     
-    for i in range(len(Var)) : 
-        m_idx = int(M[i]-1) 
-        monthlyVar[months[m_idx]].append(Var.iloc[i])  
+#     for i in range(len(Var)) : 
+#         m_idx = int(M[i]-1) 
+#         monthlyVar[months[m_idx]].append(Var.iloc[i])  
         
         
-    with open(temp_file, 'w') as f:
-        f.write(r'\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
-        f.write(r'& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
-        f.write(r'Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
-        f.write(r'\hline' + '\n')
+#     with open(temp_file, 'w') as f:
+#         f.write(r'\\begin{tabular}{l | p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm} p{1.5cm}}' + '\n')
+#         f.write(r'& \multicolumn{5}{c}{' + varName + '} \\\\' + '\n')
+#         f.write(r'Month & 5\% & 50\% & Mean & 95\% & 99\% \\\\' + '\n')
+#         f.write(r'\hline' + '\n')
     
-        for j in range(len(months)) : 
-            Var_P5 = round(np.percentile(monthlyVar[months[j]],5),1)
-            Var_P50 = round(np.percentile(monthlyVar[months[j]],50),1)
-            Var_mean = round(np.mean(monthlyVar[months[j]]),1)
-            Var_P95 = round(np.percentile(monthlyVar[months[j]],95),1)
-            Var_P99 = round(np.percentile(monthlyVar[months[j]],99),1)
-            f.write(months[j] + ' & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
+#         for j in range(len(months)) : 
+#             Var_P5 = round(np.percentile(monthlyVar[months[j]],5),1)
+#             Var_P50 = round(np.percentile(monthlyVar[months[j]],50),1)
+#             Var_mean = round(np.mean(monthlyVar[months[j]]),1)
+#             Var_P95 = round(np.percentile(monthlyVar[months[j]],95),1)
+#             Var_P99 = round(np.percentile(monthlyVar[months[j]],99),1)
+#             f.write(months[j] + ' & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
         
-        # annual row 
-        f.write('Annual & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
+#         # annual row 
+#         f.write('Annual & '+str(Var_P5)+' & '+str(Var_P50)+' & '+str(Var_mean)+' & '+str(Var_P95)+' & '+str(Var_P99)+' \\\\' + '\n')
     
-        f.write(r'\hline' + '\n')
-        f.write(r'\end{tabular}' + '\n')
+#         f.write(r'\hline' + '\n')
+#         f.write(r'\end{tabular}' + '\n')
     
-    if output_file.split('.')[1] == 'csv':
-        aux_funcs.convert_latexTab_to_csv(temp_file, output_file)
-        os.remove(temp_file)
-    else:
-        os.rename(temp_file, output_file)
+#     if output_file.split('.')[1] == 'csv':
+#         aux_funcs.convert_latexTab_to_csv(temp_file, output_file)
+#         os.remove(temp_file)
+#     else:
+#         os.rename(temp_file, output_file)
     
-    return   
+#     return   
 
 def _percentile_str_to_pd_format(percentiles):
     '''
@@ -504,6 +504,35 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
 
     return cumulative_percentage
 
+def table_monthly_percentile(data:pd.DataFrame,
+                             var:str,
+                             percentiles:list[str]=["P25","mean","P75","P99","max"],
+                             output_file="table_monthly_percentile.csv"):
+    """
+    Group dataframe by month and calculate percentiles.
+
+    Parameters
+    ------------
+    data : pd.DataFrame
+        The data containing column var, and with a datetime index.
+    var : str
+        The column to calculate percentiles of.
+    percentiles : list of strings
+        List of percentiles, e.g. P25, P50, P75, 30%, 40% etc.
+        Some others are also allowed: count (number of data points), and min, mean, max.
+    """
+    series = data[var]
+    percentiles = _percentile_str_to_pd_format(percentiles)
+    series.index = pd.to_datetime(series.index)
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec","Year"]
+    table = []
+    for m,g in series.groupby(series.index.month):
+        table.append(g.describe(percentiles=np.arange(0,1,0.01))[percentiles])
+    table.append(series.describe(percentiles=np.arange(0,1,0.01))[percentiles])
+    table = pd.DataFrame(table,month_labels)
+    if output_file != "":
+        table.to_csv(output_file)
+    return table
 
 def monthly_directional_percentiles(
         data: pd.DataFrame, 
