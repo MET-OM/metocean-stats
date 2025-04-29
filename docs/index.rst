@@ -1814,6 +1814,49 @@ Taylor diagram
 .. image:: files/Taylor_diagram.png
    :width: 500
 
+
+Error Metric Table
+--------------------------------
+
+.. code-block:: python
+   tables.table_binned_error_metric(
+      dff=[df_ref,df_comp],
+      var_bin = 'HS', 
+      var_ref='TP',
+      var_comp='TP', 
+      var_bin_size=1,
+      threshold_min=100, 
+      error_metric=['rmse','bias','mae','corr','si'],
+      output_file='binned_error_metric.csv')
+
+.. csv-table:: 
+   :header-rows: 1
+   :file: files/binned_error_metric.csv
+
+
+Error Metric Plot
+------------
+
+.. code-block:: python
+
+   plots.plot_binned_error_metric(
+      dff=[df_ref,df_comp],
+      var_bin = 'HS',
+      var_bin_unit='m', 
+      var_ref='TP',
+      var_comp='TP',
+      var_comp_unit='s', 
+      var_bin_size=0.5,
+      threshold_min=100, 
+      plot_y='bias',
+      title='Example title',
+      output_file='plot_binned_error_metric.png')
+      
+
+.. image:: files/plot_binned_error_metric.png
+   :width: 500
+
+
 Auxiliary Functions
 ===================
 
