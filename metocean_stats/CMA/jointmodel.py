@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import patches as mpatches
 
+import pyextremes
 import virocon
 import virocon.intervals
 from virocon import GlobalHierarchicalModel
@@ -12,10 +13,6 @@ from virocon import GlobalHierarchicalModel
 from .plotting import (
     plot_2D_pdf_heatmap,
     plot_DNVGL_steepness,
-)
-
-from .extremes import (
-    get_return_values,
 )
 
 from .predefined import (
@@ -141,32 +138,50 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         super().__init__(self.dist_descriptions)
 
-    def fit(self,data:np.ndarray|pd.DataFrame,
+    def fit(self,
+            data:np.ndarray|pd.DataFrame,
             var1:int|str=0,
-            var2:int|str=1):
+            var2:int|str=1,
+            var3:int|str=2,
+            ):
         """
         Fit the model to data.
 
         Parameters
         ----------
-        data : Numpy array or pandas dataframe
-            The data, shape (n_samples, n_columns)
+        data : Numpy array or pandas dataframe.
+            The data, shape (n_samples, n_columns). 
+            Pandas dataframe with datetime-index is recommended.
         var0 : int or str, default 0 (first column)
             The data column used to fit the marginal distribution.
         var1 : int or str, default 1 (second column)
             The data column used to fit the conditional distribution.
+        var2 : int or str, default 2 (third column)
+            The data column used to fit the second conditional distribution.
         """
+        # Choose as many data columns as the model has dimensions.
+        vars = list(np.array([var1,var2,var3])[:self.n_dim])
 
+        # Check input, store time index if available.
         if isinstance(data,pd.DataFrame):
-            if isinstance(var1,int):
-                var1 = data.columns[var1]
-            if isinstance(var2,int):
-                var2 = data.columns[var2]
-            data = data[[var1,var2]].values
+            try:
+                self.timeindex = pd.to_datetime(data.index)
+            except Exception as e:
+                self.timeindex = None
+                print(f"Warning: Pandas could not convert index to datetime: {e}")
+            for i,v in enumerate(vars):
+                if isinstance(v,str):
+                    if v not in data.columns:
+                        raise ValueError(f"Var {v} not found in dataframe columns {data.columns}.")
+                else:
+                    vars[i] = data.columns[v] # assume the var is an integer.
+            data = data[vars].values
+
         elif isinstance(data,np.ndarray):
-            data = data[:,[var1,var2]]
+            data = data[:,vars]
+            self.timeindex = None
         else:
-            raise TypeError(f"Expected dataframe or ndarray, got {type(data)}.")
+            raise TypeError(f"Expected pandas DataFrame or numpy ndarray, got {type(data)}.")
 
         super().fit(data,self.fit_descriptions)
         self.data = data
@@ -234,18 +249,21 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if points.ndim > 2 or points.shape[1] > 2:
                 raise ValueError("Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
             levels = self.pdf(points)
-            idx = np.argsort(levels)
-            levels = levels[idx]
 
             if labels is None:
                 sym0,sym1 = self.semantics["symbols"]
                 labels = [sym0+f"={p[0]}"+", "+sym1+f"={p[1]}" for p in points]
+
+        idx = np.argsort(levels)
+        inverse_sort_idx = np.argsort(idx)
+        levels = levels[idx]
 
         if labels is not None: 
             if isinstance(labels,str):
                 labels = [labels]
             if len(labels) != len(levels):
                 raise ValueError("Number of labels does not match number of contour levels!")
+            labels = np.array(labels)[idx]
 
         if "LoNoWe" in str(type(self.distributions[0])):
             raise NotImplementedError("Isodensity not implemented for LoNoWe.")
@@ -271,14 +289,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         for artist in new_artists:
             if "PathCollection" in str(artist): # The scatter.
                 artist.remove()
-                print("yeah")
             elif "ContourSet" in str(artist): # The contours.
                 CShandles,CSlabels = artist.legend_elements()
-                self.legend_handles += CShandles
+                self.legend_handles += list(np.array(CShandles)[inverse_sort_idx])
                 if labels is None:
-                    self.legend_labels += CSlabels
+                    self.legend_labels += list(np.array(CSlabels)[inverse_sort_idx])
                 else:
-                    self.legend_labels += labels
+                    self.legend_labels += list(labels[inverse_sort_idx])
 
         return ax
 
@@ -299,7 +316,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         periods : list[float]
             List of return periods to create contours of.
         state_duration : float
-            The average duration of each sample 
+            The average duration (hours) of each sample 
             in the data used to fit the model.
         contour_method : str
             The method of calculating a contour. One of:
@@ -425,6 +442,72 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ax=ax,
             **kwargs)
     
+    def get_marginal_return_values(self,
+                        distribution:str,
+                        return_periods:list[float],
+                        data:pd.Series = None,
+                        dim:int = 0,
+                        threshold: float = None,
+                        r = "48h",
+                        block_size = "365.244D",
+                        ):
+        """
+        Calculate marginal return values from return periods using pyextremes.
+        By default, this uses the primary variable of the data used to fit the model, but another Series can be used.
+        Either way this requires that a datetime index on the data is available.
+
+        Parameters
+        ------------
+        distribution : str
+            A distribution from scipy. Currently implemented are
+            - genpareto (POT)
+            - expon (POT)
+            - genextreme (BM)
+            - gumbel_r (BM)
+        return_periods : list of floats
+            List of return periods (in years).
+        data : pd.Series, default None 
+            The timeseries of data to analyze. If None, the internal dataset
+            which was used to fit the model will be analyzed instead.
+        dim : int, default 0
+            The variable to analyze. By default, the first dimension/column.
+            Ignored if data is given directly in the form of a pandas Series.
+        threshold : float, default None
+            Threshold value, used in POT methods (see distribution).
+        r : float 
+            Minimum length of time between peaks, used in POT methods.
+        block_size : str (datetime compatible interval), default one year.
+            The size of a block, used in BM methods (annual/monthly/daily max).
+        """
+
+
+        if data is None:
+            data = self.data[:,dim]
+            if self.timeindex is None:
+                raise ValueError("Can not get extremes: Dataset used to fit the model does not have a valid datetime index.")
+            data = pd.Series(data,index=self.timeindex)
+        else:
+            try: 
+                pd.to_datetime(data.index)
+            except:
+                raise ValueError("Can not get extremes: The data does not have a valid datetime index.")
+        
+        # Pyextremes analysis
+        model = pyextremes.EVA(data)
+        if distribution in ["genpareto","expon"]:
+            if threshold is None:
+                threshold = np.percentile(data,99)
+            model.get_extremes(method="POT",threshold=threshold,r=r)
+        elif distribution in ["genextreme","gumbel_r"] or distribution.startswith("gumbel"):
+            model.get_extremes(method="BM",block_size=block_size)
+        else:
+            raise ValueError("Distribution must be one of: [genpareto, expon, genextreme, gumbel_r].")
+        
+        model.fit_model(model="MLE",distribution=distribution)
+
+        return model.get_return_value(return_period=return_periods)[0]
+
+
     def get_dependent_given_marginal(
             self,
             given:np.ndarray,
@@ -449,15 +532,27 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def plot_dependent_percentiles(
             self,
+            ax=None,
             percentiles=[0.05,0.5,0.95],
             labels:list[str] = None,
-            ax=None,
+            limit:float = None,
             **kwargs
             ):
         """
         Plot lines describing percentiles of the dependent 
         variable of the joint distribution (e.g. Tp)
         as functions of the marginal variable (e.g. Hs).
+
+        Parameters
+        -----------
+        ax : matplotlib axes
+            Axes to plot on
+        percentiles : list[float]
+            List of percentiles.
+        labels : list of string
+            Names, for the legend.
+        limit : float, default 2x data
+            Limit in the marginal variable (e.g. Hs) for which to plot percentiles (of e.g. Tp/Tz).
         """
         percentiles = np.array(percentiles)
         
@@ -482,7 +577,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if ax is None:
             _,ax = plt.subplots()
 
-        marginal = np.arange(0,np.max(self.data[:,0]),0.001)
+        if limit is None:
+            limit = 1.5*np.max(self.data[:,0])
+        marginal = np.arange(0,limit,0.001)
+
+        # Plot percentile lines.
         for i,p in enumerate(percentiles):
             conditional = self.get_dependent_given_marginal(marginal,p)
             if self.swap_axis:
@@ -506,7 +605,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             **kwargs
             ):
         """
-        Add the DNVGL steepness line.
+        Add the DNVGL steepness line. By default, within the bounds of the data.
         
         Parameters
         ----------
@@ -525,7 +624,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
         if ylim is None:
             ylim = np.max(self.data[:,0])
-        return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,ylim=ylim,**kwargs)
+        return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
     def plot_data_scatter(self,
                           data=None,
@@ -552,6 +651,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
         if data is None:
             data = self.data
+        else:
+            data = np.array(data)
         if data.ndim == 1:
             data = np.array([data])
         if data.ndim > 2:
@@ -604,8 +705,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         if ax is None:
             _,ax = plt.subplots()
+
         if data is None:
             data = self.data
+        else:
+            data = np.array(data)
+
         if data.ndim == 1:
             data = np.array([data])
         if data.ndim > 2:
@@ -618,9 +723,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if bins is None:
             bins = [
                 np.arange(np.floor(np.min(data[:,x])),
-                          np.ceil(np.max(data[:,x])),0.1),
+                          np.ceil(np.max(data[:,x])),0.02),
                 np.arange(np.floor(np.min(data[:,y])),
-                          np.ceil(np.max(data[:,y])),0.1)
+                          np.ceil(np.max(data[:,y])),0.01)
             ]
 
         handle = ax.hist2d(data[:,x],data[:,y],norm=norm,
@@ -649,9 +754,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         self.legend_handles = []
         self.legend_labels = []
     
-    def plot_legend(self,ax):
+    def plot_legend(self,ax,**legend_kwargs):
         """
         Add legend based on stored handles and labels.
         """
-        ax.legend(handles=self.legend_handles,labels=self.legend_labels)
+        if "loc" not in legend_kwargs:
+            legend_kwargs["loc"] = "upper left"
+        ax.legend(handles=self.legend_handles,labels=self.legend_labels,**legend_kwargs)
         return ax
