@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from collections.abc import Callable
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
@@ -7,7 +8,6 @@ from matplotlib import patches as mpatches
 
 import pyextremes
 import virocon
-import virocon.intervals
 from virocon import GlobalHierarchicalModel
 
 from .plotting import (
@@ -24,31 +24,41 @@ from .predefined import (
     get_windsea_hs_tp
 )
 
-def _load_preset(preset):
-    """Load defaults from preset."""
-    preset = preset.lower()
+def _load_preset(preset:str|Callable):
+    """
+    Load distribution description, fit descriptions and semantics of the model.
+    """
+    if callable(preset):
+        dist_descriptions,fit_descriptions,semantics = preset()
+        return dist_descriptions,fit_descriptions,semantics
+    else:
+        try:
+            preset = str(preset).lower()
+        except:
+            raise TypeError(f"Invalid input: Preset should be either callable or a string, got {type(preset)}.")
+    
     if preset == 'omae_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_OMAE2020_Hs_Tz()
-        swap_axis = True
+        semantics["swap_axis"] = True
     elif preset == 'dnvgl_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
-        swap_axis = True
+        semantics["swap_axis"] = True
     elif preset == 'omae_u_hs':
         dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
-        swap_axis = False
+        semantics["swap_axis"] = False
     elif preset == 'dnvgl_hs_u':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
-        swap_axis = True
+        semantics["swap_axis"] = True
     elif preset == 'windsea_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_windsea_hs_tp()
-        swap_axis = True
+        semantics["swap_axis"] = True
     elif preset == 'lonowe_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
-        swap_axis = True
+        semantics["swap_axis"] = True
     else:
         raise ValueError(f'Preset {preset} not found.'
                             'See docstring for available presets.')
-    return dist_descriptions,fit_descriptions,semantics,swap_axis
+    return dist_descriptions,fit_descriptions,semantics
 
 
 class JointProbabilityModel(GlobalHierarchicalModel):
@@ -62,24 +72,23 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def __init__(
         self,
-        preset:str = "DNVGL_hs_tp",
+        preset:str|Callable = "DNVGL_hs_tp",
         dist_descriptions:list[dict] = None,
         fit_descriptions:list[dict] = None,
-        semantics:dict[list[str]] = None,
-        intervals:virocon.intervals.IntervalSlicer=None,
-        swap_axis:bool = None,
-
+        semantics:dict = None,
         ):
         """
         Initialize the joint conditional probability model.
-        A model should have been defined in predefined.py.
-        Any other input arguments following the first 
-        parameter will overwrite the predefined configuration.
-        
+
+        The simplest is to use a predefined model via a string.
+        If it is necessary to configure the models more closely,
+        the dist_descriptions, fit_descriptions and semantics can be input directly.
+        See predefined.py to see examples of the required format for these functions.
+
         Parameters
         ------------
-        preset : str
-            Choose model from any predefined model.
+        preset : str or Callable
+            Choose model from any predefined model with a string:
 
              - DNVGL_Hs_Tp
              - DNVGL_Hs_U
@@ -88,49 +97,42 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - LoNoWe_Hs_Tp
              - windsea_hs_tp
 
+            The preset can alternatively be a custom callable (function) that
+            returns the three parts - dist_descriptions, fit_descriptions and semantics.
+            Examples of this function are found in predefined.py.
+
         dist_descriptions : list[dict], optional
             A list of dicts describing each distribution.
         fit_descriptions : list[dict], optional
             A list of dicts describing the fitting method.
-        semantics : dict[list], optional
+        semantics : dict, optional
             Dict desribing the variables, used for plotting.
             Keys of the dict are "names","symbols","units", and each value is
             a list of two strings corresponding to the two variables.
-        intervals : virocon.intervals.IntervalSlicer, optional
-            An interval slicer (NumberOfIntervalsSlicer or WidthOfIntervalSlicer),
-            from virocon.intervals. This divides the marginal intervals into
-            intervals, which are used to fit the dependent parameters 
-            of the conditional distribution (e.g. tp).
-        swap_axis : bool, optional
-            This determines if the produced plots should have swapped axes,
-            as is common with e.g. hs tp plots.
+            Additionally, the key "swap_axis" can be used to 
+            swap the axes of 2D plots, e.g. to get Hs on the y-axis.
         """
-
         if preset:
-            preset_dist,preset_fit,preset_semantics,preset_axis=_load_preset(preset)
+            preset_dist,preset_fit,preset_semantics=_load_preset(preset)
             if dist_descriptions is None:
                 dist_descriptions = preset_dist
             if fit_descriptions is None:
                 fit_descriptions = preset_fit
             if semantics is None:
                 semantics = preset_semantics
-            if swap_axis is None:
-                swap_axis = preset_axis
-            if intervals is not None:
-                dist_descriptions[0]["intervals"] = intervals
-
         else:
             if dist_descriptions is None or fit_descriptions is None:
                 raise ValueError("If preset is undefined, both dist_descriptions and fit_descriptions must be provided.")
-            if swap_axis is None:
-                swap_axis = False
-            if intervals is not None:
-                dist_descriptions[0]["intervals"] = intervals
+            if semantics is None:
+                semantics = virocon.plotting.get_default_semantics()
         
+        if "swap_axis" not in semantics:
+            semantics["swap_axis"] = False
+
         self.dist_descriptions = dist_descriptions
         self.fit_descriptions = fit_descriptions
         self.semantics = semantics
-        self.swap_axis = swap_axis
+        self.swap_axis = semantics["swap_axis"]
 
         # Store of handles and labels, for producing a legend.
         self.legend_handles = []
@@ -139,7 +141,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         super().__init__(self.dist_descriptions)
 
     def fit(self,
-            data:np.ndarray|pd.DataFrame,
+            data:pd.DataFrame,
             var1:int|str=0,
             var2:int|str=1,
             var3:int|str=2,
@@ -149,9 +151,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         Parameters
         ----------
-        data : Numpy array or pandas dataframe.
-            The data, shape (n_samples, n_columns). 
-            Pandas dataframe with datetime-index is recommended.
+        data : pandas dataframe.
+            The data, shape (n_samples, n_columns), with a datetime-compatible index.
         var0 : int or str, default 0 (first column)
             The data column used to fit the marginal distribution.
         var1 : int or str, default 1 (second column)
@@ -159,39 +160,39 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         var2 : int or str, default 2 (third column)
             The data column used to fit the second conditional distribution.
         """
-        # Choose as many data columns as the model has dimensions.
+
+        # Check data variable
+        if not isinstance(data,pd.DataFrame):
+            raise ValueError(f"The data must be in a pandas dataframe, got {type(data)}.")
+        try:
+            data.index = pd.to_datetime(data.index)
+        except Exception as e:
+            raise ValueError("Pandas could not convert index to datetime.") from e
+
+        # Choose as many variables as the model has dimensions.
         vars = list(np.array([var1,var2,var3])[:self.n_dim])
+        for i,v in enumerate(vars):
+            if isinstance(v,str):
+                if v not in data.columns:
+                    raise ValueError(f"Var {v} not found in dataframe columns {data.columns}.")
+            else:
+                vars[i] = data.columns[v]
+        
+        # Fit model and save data.
+        data = data[vars]
+        super().fit(data.values,self.fit_descriptions)
+        self.data = data[vars]
 
-        # Check input, store time index if available.
-        if isinstance(data,pd.DataFrame):
-            try:
-                self.timeindex = pd.to_datetime(data.index)
-            except Exception as e:
-                self.timeindex = None
-                print(f"Warning: Pandas could not convert index to datetime: {e}")
-            for i,v in enumerate(vars):
-                if isinstance(v,str):
-                    if v not in data.columns:
-                        raise ValueError(f"Var {v} not found in dataframe columns {data.columns}.")
-                else:
-                    vars[i] = data.columns[v] # assume the var is an integer.
-            data = data[vars].values
-
-        elif isinstance(data,np.ndarray):
-            data = data[:,vars]
-            self.timeindex = None
-        else:
-            raise TypeError(f"Expected pandas DataFrame or numpy ndarray, got {type(data)}.")
-
-        super().fit(data,self.fit_descriptions)
-        self.data = data
-
-    def plot_marginal_quantiles(self,sample=None,axes=None):
+    def plot_marginal_quantiles(self,sample=None,axes:list=None):
         """
         Plot the theoretical (distribution) vs empirical (sample) quantiles.
         """
-        sample = self.data if sample is None else sample
-        return virocon.plot_marginal_quantiles(self,sample=self.data,semantics=self.semantics,axes=axes)
+        if sample is None: sample = self.data.values
+        elif isinstance(sample,pd.DataFrame):
+            sample = sample.values
+        
+        return virocon.plot_marginal_quantiles(self,
+            sample=sample,semantics=self.semantics,axes=axes)
 
     def plot_dependence_functions(self,axes=None):
         """
@@ -203,13 +204,14 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         Plot histograms for the estimated distribution in each data interval.
         """        
-        return virocon.plot_histograms_of_interval_distributions(self,self.data,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
+        return virocon.plot_histograms_of_interval_distributions(self,
+            self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
 
     def plot_2D_isodensity(self,
+                           ax=None,
                            levels:list[float]=None,
                            points:np.ndarray=None,
                            labels:list[str]=None,
-                           ax=None,
                            limits=None,
                            n_grid_steps=720,
                            cmap=None,
@@ -222,16 +224,29 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         Parameters:
         -----------
-        levels : list[float], optional
+        ax : matplotlib axes, optional
+            Plot on existing axes object.
+        levels : list[float]
             List of probabilities to plot. Either this or return_values
             can be specified.
-        return_values : np.ndarray
-            A list of marginal return values, of e.g. Hs, 
+        points : np.ndarray
+            A list of marginal return values, of e.g. Hs,
             from which to draw the isodensity contours.
-        labels : list of strings
+            This can also be a list of 2D points,
+            in which case they will be considered 
+            joint extremes (any point on a contour).
+        labels : list of strings, optional
             Labels to use in the figure legend.
-        ax : matplotlib axes
-            Plot on existing axes object.
+        limits : tuple
+            Plot limits, e.g. ([0,10],[0,20])
+        n_grid_steps : int, default 720
+            The resolution of the contours (higher is better).
+            Increase this number if the contours are not smooth.
+        cmap : matplotlib colormap, optional
+            E.g. "viridis", "Spectral", etc.
+        contour_kwargs : dict, optional
+            Any other keyword arguments for matplotlib.pyplot.contour().
+            Example: {"linewidths": [1,2,3], "linestyles": ["solid","dotted","dashed"]}.
         """
 
         if ax is None:
@@ -274,7 +289,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # Produce plot.
         ax = virocon.plot_2D_isodensity(
             self,
-            sample=self.data,
+            sample=self.data.values,
             semantics=self.semantics,
             swap_axis=self.swap_axis,
             limits=limits,
@@ -300,14 +315,14 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         return ax
 
 
-    def plot_2D_contours(self,
-                         periods:list[float]=[1,10,100,1000],
-                         state_duration:float=1,
-                         contour_method:str="IFORM",
-                         labels:list[str] = None,
-                         ax=None,
-                         **kwargs
-                         ):
+    def plot_contours(self,
+                      periods:list[float]=[1,10,100,1000],
+                      state_duration:float=1,
+                      contour_method:str="IFORM",
+                      labels:list[str] = None,
+                      ax=None,
+                      **kwargs
+                      ):
         """
         Plot 2D environmental contours.
 
@@ -376,14 +391,17 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             alpha = virocon.calculate_alpha(state_duration,return_period)
             contour = ContourMethod(self,alpha)
             old_artists = ax.get_children()
-            virocon.plot_2D_contour(contour,semantics=self.semantics,swap_axis=self.swap_axis,ax=ax,plot_kwargs=plot_kwargs)
+            virocon.plot_2D_contour(
+                contour,
+                semantics=self.semantics,
+                swap_axis=self.swap_axis,ax=ax,plot_kwargs=plot_kwargs)
             new_artist = list(set(ax.get_children())-set(old_artists))
             self.legend_handles += new_artist
             self.legend_labels += [labels[i]]
 
         return ax
 
-    def plot_2D_pdf_heatmap(
+    def plot_pdf_heatmap(
             self,
             limits = (25,25),
             bin_size = (1,1),
@@ -482,7 +500,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
 
         if data is None:
-            data = self.data[:,dim]
+            data = self.data.values[:,dim]
             if self.timeindex is None:
                 raise ValueError("Can not get extremes: Dataset used to fit the model does not have a valid datetime index.")
             data = pd.Series(data,index=self.timeindex)
@@ -578,7 +596,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
 
         if limit is None:
-            limit = 1.5*np.max(self.data[:,0])
+            limit = 1.5*np.max(self.data.values[:,0])
         marginal = np.arange(0,limit,0.001)
 
         # Plot percentile lines.
@@ -623,7 +641,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if ax is None:
             _,ax = plt.subplots()
         if ylim is None:
-            ylim = np.max(self.data[:,0])
+            ylim = np.max(self.data.values[:,0])
         return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
     def plot_data_scatter(self,
@@ -650,7 +668,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if ax is None:
             _,ax = plt.subplots()
         if data is None:
-            data = self.data
+            data = self.data.values
         else:
             data = np.array(data)
         if data.ndim == 1:
@@ -707,7 +725,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
 
         if data is None:
-            data = self.data
+            data = self.data.values
         else:
             data = np.array(data)
 
@@ -746,6 +764,26 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self.legend_labels.append(label)
         return ax
 
+    def get_default_semantics(self):
+        """
+        Generate default semantics.
+
+        Returns
+        -------
+        semantics: dict
+            Generated model description.
+
+        References
+        ----------
+        Slightly modified from virocon/plotting/get_default_semantics().
+        https://github.com/virocon-organization/virocon
+        """
+        return {
+            "names": [f"Variable {c}" for c in self.data.columns],
+            "symbols": [" - " for _ in range(self.n_dim)],
+            "units": [" - " for _ in range(self.n_dim)],
+            "swap_axis":False,
+        }
 
     def reset_labels(self):
         """
