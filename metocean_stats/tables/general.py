@@ -629,6 +629,12 @@ def monthly_directional_percentiles(
             month_dir_stats.columns = ["%"]+perc_cols
 
         monthly_tables[m] = month_dir_stats
+        if output_file != "":
+            if "." in output_file:
+                fname = ".".join(output_file.split(".")[:-1])+m+".csv"
+            else:
+                fname = output_file+m+".csv"
+            month_dir_stats.to_csv(fname)
     
     return monthly_tables
     
