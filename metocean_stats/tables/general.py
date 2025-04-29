@@ -497,7 +497,6 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
     # Rename the columns
     cumulative_percentage.rename(columns=rename_mapping, inplace=True)
 
-
     # Write to CSV file if output_file parameter is provided
     if output_file:
         cumulative_percentage.to_csv(output_file)
@@ -606,11 +605,14 @@ def monthly_directional_percentiles(
     # Define directional bins
     data["_dir_bin"] = pd.cut((data[var_dir]+dir_offset)%360, bins=bins, labels=labels, right=False)
 
-    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Year"]
     monthly_tables = {}
     for i,m in enumerate(month_labels):
         # Select month, group by direction, and calculate statistics for selected variable
-        monthly = data[data.index.month == i+1]
+        if i==12: # yearly
+            monthly = data
+        else:
+            monthly = data[data.index.month == i+1]
         month_dir_stats = monthly.groupby("_dir_bin",observed=True)
         month_dir_stats = month_dir_stats.describe(percentiles=all_percentiles)[var]
         month_dir_stats.loc[omni_label] = monthly[var].describe(percentiles=all_percentiles)
