@@ -18,7 +18,8 @@ __all__ = [
     "get_OMAE2020_V_Hs",
     # Custom implementation
     "get_LoNoWe_hs_tp",
-    "get_windsea_hs_tp"
+    "get_windsea_hs_tp",
+    "get_V_Hs_Tz",
 ]
 
 def semantics_hs_tp():
@@ -230,6 +231,64 @@ def get_windsea_hs_tp():
         "names": ["Significant wave height", "Peak wave period"],
         "symbols": ["H_s", "T_p"],
         "units": ["m","s"],
+    }
+
+    return dist_descriptions, fit_descriptions, semantics
+
+def get_V_Hs_Tz():
+
+    def _power3(x, a, b, c):
+        return a + b * x ** c
+
+    def _exp3(x, a, b, c):
+        return a + b * np.exp(c * x)
+
+    def _alpha3(x, a, b, c, d_of_x):
+        return (a + b * x ** c) / 2.0445 ** (1 / d_of_x(x))
+
+    def _logistics4(x, a=1, b=1, c=-1, d=1):
+        return a + b / (1 + np.exp(c * (x - d)))
+
+    bounds = [(0, None), (0, None), (None, None)]
+    logistics_bounds = [(0, None), (0, None), (None, 0), (0, None)]
+
+    power3 = virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$")
+    exp3 = virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
+    logistics4 = virocon.DependenceFunction(_logistics4, logistics_bounds,
+                                    weights=lambda x, y: y,
+                                    latex="$a + b / (1 + \exp[c * (x -d)])$")
+    alpha3 = virocon.DependenceFunction(_alpha3, bounds, d_of_x=logistics4,
+                                weights=lambda x, y: y,
+                                latex="$(a + b * x^c) / 2.0445^{1 / F()}$")
+
+    dist_description_0 = {
+        "distribution": virocon.ExponentiatedWeibullDistribution(),
+        "intervals": virocon.WidthOfIntervalSlicer(2, min_n_points=50),
+    }
+
+    dist_description_1 = {
+        "distribution": virocon.ExponentiatedWeibullDistribution(f_delta=5),
+        "intervals": virocon.WidthOfIntervalSlicer(0.5),
+        "conditional_on": 0,
+        "parameters": {"alpha": alpha3, "beta": logistics4,},
+    }
+
+    dist_description_2 = {
+        "distribution": virocon.LogNormalDistribution(),
+        "conditional_on": 1,
+        "parameters": {"mu": power3, "sigma": exp3},
+    }
+
+    dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
+
+    fit_descriptions = [{'method':'mom','weights':None},
+                        {'method':'mom','weights':None},
+                        {'method':'mom','weights':None}]
+
+    semantics = {
+        "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
+        "symbols": ["V", "H_s", "T_z"],
+        "units": ["m/s", "m", "s"],
     }
 
     return dist_descriptions, fit_descriptions, semantics
