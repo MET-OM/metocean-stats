@@ -1763,7 +1763,7 @@ Plot bathymetry based on NORKYST800 url:
                                  lon=4,
                                  lat=60.5)
 
-.. image ::files/Bathymetry_cross_section.png
+.. image:: files/Bathymetry_cross_section.png
   :width: 500
 
 Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on NORKYST800 url and csv file:
@@ -1775,7 +1775,7 @@ Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on
                                                                        lon=4,
                                                                        lat=60.5,
                                                                        var="salinity")
-.. image ::files/Bathymetry_cross_section_with_variable=salinity.png
+.. image:: files/Bathymetry_cross_section_with_variable=salinity.png
 
 Verification Functions
 ===================
