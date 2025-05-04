@@ -24,6 +24,11 @@ from .predefined import (
     get_windsea_hs_tp
 )
 
+from .contours import (
+    IFORMContour,
+    ISORMContour
+)
+
 def _load_preset(preset:str|Callable):
     """
     Load distribution description, fit descriptions and semantics of the model.
@@ -386,9 +391,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         contour_method = method.lower()
         if contour_method == "iform":
-            ContourMethod = virocon.IFORMContour
+            ContourMethod = IFORMContour
         elif contour_method == "isorm":
-            ContourMethod = virocon.ISORMContour
+            ContourMethod = ISORMContour
         elif contour_method in ["highestdensity","highestdensitycontour","hdc"]:
             ContourMethod = virocon.HighestDensityContour
         elif contour_method == ["directsampling","montecarlo"]:
