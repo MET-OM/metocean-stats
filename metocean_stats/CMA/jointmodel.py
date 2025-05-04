@@ -72,7 +72,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def __init__(
         self,
-        preset:str|Callable = "DNVGL_hs_tp",
+        model:str|Callable = "DNVGL_hs_tp",
         dist_descriptions:list[dict] = None,
         fit_descriptions:list[dict] = None,
         semantics:dict = None,
@@ -87,7 +87,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         Parameters
         ------------
-        preset : str or Callable
+        model : str or Callable
             Choose model from any predefined model with a string:
 
              - DNVGL_Hs_Tp
@@ -97,7 +97,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - LoNoWe_Hs_Tp
              - windsea_hs_tp
 
-            The preset can alternatively be a custom callable (function) that
+            This argument can alternatively be a custom callable (function) that
             returns the three parts - dist_descriptions, fit_descriptions and semantics.
             Examples of this function are found in predefined.py.
 
@@ -112,8 +112,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             Additionally, the key "swap_axis" can be used to 
             swap the axes of 2D plots, e.g. to get Hs on the y-axis.
         """
-        if preset:
-            preset_dist,preset_fit,preset_semantics=_load_preset(preset)
+        if model:
+            preset_dist,preset_fit,preset_semantics=_load_preset(model)
             if dist_descriptions is None:
                 dist_descriptions = preset_dist
             if fit_descriptions is None:
@@ -181,7 +181,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # Fit model and save data.
         data = data[vars]
         super().fit(data.values,self.fit_descriptions)
-        self.data = data[vars]
+        self.data = data
 
     def plot_marginal_quantiles(self,sample=None,axes:list=None):
         """
@@ -259,15 +259,22 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if points.ndim == 0:
                 points = np.array([points])
             if points.ndim == 1:
+                marginal_labels = True
                 conditional = self.get_dependent_given_marginal(points)
                 points = np.array([points,conditional]).T
+            elif points.ndim == 2:
+                marginal_labels = False
+
             if points.ndim > 2 or points.shape[1] > 2:
                 raise ValueError("Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
             levels = self.pdf(points)
 
             if labels is None:
                 sym0,sym1 = self.semantics["symbols"]
-                labels = [sym0+f"={p[0]}"+", "+sym1+f"={p[1]}" for p in points]
+                if marginal_labels:
+                    labels = [sym0+f"={p[0]:.1f}" for p in points]
+                else:
+                    labels = [sym0+f"={p[0]:.1f}"+", "+sym1+f"={p[1]:.1f}" for p in points]
 
         idx = np.argsort(levels)
         inverse_sort_idx = np.argsort(idx)
@@ -316,11 +323,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
 
     def plot_contours(self,
+                      ax=None,
                       periods:list[float]=[1,10,100,1000],
                       state_duration:float=1,
-                      contour_method:str="IFORM",
+                      method:str="IFORM",
                       labels:list[str] = None,
-                      ax=None,
+                      cmap="viridis_r",
                       **kwargs
                       ):
         """
@@ -345,6 +353,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         
         labels : list of str, optional
             A name for each contour.
+        cmap : matplotlib colormap
+            Colormap to color contours. Only used if c/color keyword is not in kwargs.
         kwargs : keyword arguments
             Any matplotlib plot keyword arguments, e.g.
             "color"="blue","linewidth"=[2,3,4],"label":["1 year","10 year","100 year"]}.
@@ -363,21 +373,25 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 labels = []
             if len(labels) != periods.size:
                 raise ValueError("Number of labels does not match number of return periods.")
+        if "c" not in kwargs and "color" not in kwargs:
+            if type(cmap) is str:
+                cmap = plt.get_cmap(cmap)
+            kwargs["color"] = cmap(np.linspace(0,1,len(periods)))
+
         for k,v in kwargs.items():
             if isinstance(v,str):
                 kwargs[k] = [v]*periods.size
             elif len(v) != periods.size:
                 raise ValueError(f"Keyword {k} should have length equal to number of return periods {len(periods)}.")
 
-
-        contour_method = contour_method.lower()
+        contour_method = method.lower()
         if contour_method == "iform":
             ContourMethod = virocon.IFORMContour
         elif contour_method == "isorm":
             ContourMethod = virocon.ISORMContour
-        elif contour_method == "highestdensity":
+        elif contour_method in ["highestdensity","highestdensitycontour","hdc"]:
             ContourMethod = virocon.HighestDensityContour
-        elif contour_method == "directsampling":
+        elif contour_method == ["directsampling","montecarlo"]:
             ContourMethod = virocon.DirectSamplingContour
         elif contour_method in ["constantandexceedance","and"]:
             ContourMethod = virocon.AndContour
@@ -498,12 +512,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             The size of a block, used in BM methods (annual/monthly/daily max).
         """
 
-
         if data is None:
-            data = self.data.values[:,dim]
-            if self.timeindex is None:
-                raise ValueError("Can not get extremes: Dataset used to fit the model does not have a valid datetime index.")
-            data = pd.Series(data,index=self.timeindex)
+            data = self.data.iloc[:,dim]
         else:
             try: 
                 pd.to_datetime(data.index)
@@ -514,7 +524,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         model = pyextremes.EVA(data)
         if distribution in ["genpareto","expon"]:
             if threshold is None:
-                threshold = np.percentile(data,99)
+                timedelta = data.index[-1]-data.index[0] # assuming sorted
+                if timedelta.days > (365.24*25):
+                    threshold = data.resample("YS").max().min()
+                else:
+                    threshold = np.percentile(data,99)
             model.get_extremes(method="POT",threshold=threshold,r=r)
         elif distribution in ["genextreme","gumbel_r"] or distribution.startswith("gumbel"):
             model.get_extremes(method="BM",block_size=block_size)
