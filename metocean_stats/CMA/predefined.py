@@ -19,94 +19,9 @@ __all__ = [
     # Custom implementation
     "get_LoNoWe_hs_tp",
     "get_windsea_hs_tp",
-    "get_V_Hs_Tz",
+    "get_virocon_V_Hs_Tz",
+    "get_LiGaoMoan_U_hs_tp"
 ]
-
-def semantics_hs_tp():
-    return {
-        'names': ['Significant wave height','Wave peak period'],
-        'symbols': ['H_s','T_p'],
-        'units': ['m','s']
-    }
-
-def semantics_hs_tz():
-    return {
-        "names": ["Significant wave height", "Zero-up-crossing period"],
-        "symbols": ["H_s", "T_z"],
-        "units": ["m", "s"],
-    }
-
-def _dependence_logistic():
-    '''
-    4 paramter logistic (S) curve.
-    '''
-    def _logistic(x, a=1, b=1, c=-1, d=1):
-        return a + b / (1 + np.exp(c * (x - d)))
-
-    bounds = [(0, None), (0, None), (None, 0), (0, None)]
-    def weights(x, y): return y
-    latex = "$a + b / (1 + \exp[c * (x -d)])$"
-
-    return virocon.DependenceFunction(
-        func = _logistic,
-        bounds = bounds,
-        weights = weights,
-        latex = latex
-    )
-
-def _dependence_double_logistic():
-    '''
-    Superposition of two logistic (S) curves - one increasing and one decreasing.
-    '''
-    def _double_logistic(x, a=1, b1=1, c1=-1, d1=1, b2=1, c2=-1, d2=1):
-        return a + (b1 / (1 + np.exp(c1 * (x - d1)))) - (b2 / (1 + np.exp(c2 * (x - d2))))
-
-    bounds = [(0, None), (0, None), (None, 0), (0, None),(0, None), (None, 0), (0, None)]
-    def weights(x, y): return y
-    latex = "$a + b1 / (1 + \exp[c1 * (x -d1)]) - b2 / (1 + \exp[c2 * (x -d2)])$"
-
-    return virocon.DependenceFunction(
-        func = _double_logistic,
-        bounds = bounds,
-        weights = weights,
-        latex = latex
-    )
-
-def _dependence_power():
-    '''
-    Power law. 
-    
-    From DNV GL (2017) recommended practice, 3.6.3.
-    There, it is used to describe the mu (location) parameter 
-    of the wave period lognormal distribution, as dependent on wave height.
-    '''
-    def _power(x, a, b, c):
-        return a + b * x**c
-
-    bounds = [(0, None), (0, None), (None, None)]
-    latex="$a + b * x^c$"
-    return virocon.DependenceFunction(
-        func = _power, 
-        bounds = bounds, 
-        latex = latex)
-
-def _dependence_exp():
-    '''
-    Exponential dependence. 
-    
-    From DNV GL (2017) recommended practice, 3.6.3.
-    There, it is used to describe the sigma (scale) parameter 
-    of wave period lognormal distribution, as dependent on wave height.
-    '''
-    def _exp3(x, a, b, c):
-        return a + b * np.exp(c * x)
-
-    bounds = [(0, None), (0, None), (None, None)]
-    latex="$a + b * \exp(c * x)$"
-    return virocon.DependenceFunction(
-        func=_exp3,
-        bounds= bounds, 
-        latex=latex)
 
 def get_DNVGL_Hs_Tz():
     """
@@ -134,7 +49,6 @@ def get_DNVGL_Hs_Tz():
 
     """
 
-    # TODO docstrings with links to literature
     # DNVGL 3.6.3
     def _power3(x, a, b, c):
         return a + b * x**c
@@ -144,9 +58,6 @@ def get_DNVGL_Hs_Tz():
 
     bounds = [(None, None), (0, None), (None, None)]
 
-    power3 = virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$")
-    exp3 = virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
-
     dist_description_hs = {
         "distribution": virocon.WeibullDistribution(),
         "intervals": virocon.NumberOfIntervalsSlicer(20,min_n_points=10), # 0.5 m is a common choice, see e.g. 10.1115/OMAE2020-18041
@@ -155,7 +66,10 @@ def get_DNVGL_Hs_Tz():
     dist_description_tz = {
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
-        "parameters": {"mu": power3, "sigma": exp3},
+        "parameters": {
+            "mu": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
+            "sigma": virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
+            },
     }
 
     dist_descriptions = [dist_description_hs, dist_description_tz]
@@ -178,6 +92,14 @@ def get_LoNoWe_hs_tp():
     The model is fitted using the method of moment in scipy.
     """
 
+    def _power3(x, a, b, c):
+        return a + b * x**c
+
+    def _exp3(x, a, b, c):
+        return a + b * np.exp(c * x)
+
+    bounds = [(None, None), (0, None), (None, None)]
+
     dist_description_hs = {
         "distribution": LoNoWeDistribution(),
         "intervals": virocon.NumberOfIntervalsSlicer(10),
@@ -186,13 +108,16 @@ def get_LoNoWe_hs_tp():
     dist_description_tz = {
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
-        "parameters": {"mu": _dependence_power(), 
-                       "sigma": _dependence_exp()},
+        "parameters": {
+            "mu": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
+            "sigma": virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
+            },
     }
 
     dist_descriptions = [dist_description_hs, dist_description_tz]
 
-    fit_descriptions = [{'method':'mom','weights':None},{'method':'mom','weights':None}]
+    fit_descriptions = [{'method':'mom'},
+                        {'method':'mom'}]
 
     semantics = {
         "names": ["Significant wave height", "Peak wave period"],
@@ -208,6 +133,12 @@ def get_windsea_hs_tp():
     intended for wind-sea.
     """
 
+    def _power3(x, a, b, c):
+        return a + b * x**c
+
+    bounds = [(None, None), (0, None), (None, None)]
+
+
     dist_description_hs = {
         "distribution": virocon.WeibullDistribution(),
         "intervals": virocon.NumberOfIntervalsSlicer(10),
@@ -216,8 +147,8 @@ def get_windsea_hs_tp():
         "distribution": virocon.ExponentiatedWeibullDistribution(f_delta=20),
         "conditional_on": 0,
         "parameters": {
-            "alpha": _dependence_power(),
-            "beta": _dependence_power()
+            "alpha": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
+            "beta": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
         },
     }
 
@@ -235,7 +166,7 @@ def get_windsea_hs_tp():
 
     return dist_descriptions, fit_descriptions, semantics
 
-def get_V_Hs_Tz():
+def get_virocon_V_Hs_Tz():
 
     def _power3(x, a, b, c):
         return a + b * x ** c
@@ -249,34 +180,35 @@ def get_V_Hs_Tz():
     def _logistics4(x, a=1, b=1, c=-1, d=1):
         return a + b / (1 + np.exp(c * (x - d)))
 
-    bounds = [(0, None), (0, None), (None, None)]
-    logistics_bounds = [(0, None), (0, None), (None, 0), (0, None)]
+    bounds = [(None, None), (0, None), (None, None)]
+    logistics_bounds = [(None, None), (0, None), (None, 0), (0, None)]
 
     power3 = virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$")
     exp3 = virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
-    logistics4 = virocon.DependenceFunction(_logistics4, logistics_bounds,
-                                    weights=lambda x, y: y,
-                                    latex="$a + b / (1 + \exp[c * (x -d)])$")
-    alpha3 = virocon.DependenceFunction(_alpha3, bounds, d_of_x=logistics4,
-                                weights=lambda x, y: y,
-                                latex="$(a + b * x^c) / 2.0445^{1 / F()}$")
+    logistics4 = virocon.DependenceFunction(_logistics4, logistics_bounds,weights=lambda x, y: y,latex="$a + b / (1 + \exp[c * (x -d)])$")
+    alpha3 = virocon.DependenceFunction(_alpha3, bounds, d_of_x=logistics4,weights=lambda x, y: y,latex="$(a + b * x^c) / 2.0445^{1 / F()}$")
 
     dist_description_0 = {
         "distribution": virocon.ExponentiatedWeibullDistribution(),
-        "intervals": virocon.WidthOfIntervalSlicer(2, min_n_points=50),
+        "intervals": virocon.NumberOfIntervalsSlicer(10),
     }
 
     dist_description_1 = {
         "distribution": virocon.ExponentiatedWeibullDistribution(f_delta=5),
-        "intervals": virocon.WidthOfIntervalSlicer(0.5),
+        "intervals": virocon.NumberOfIntervalsSlicer(10),
         "conditional_on": 0,
-        "parameters": {"alpha": alpha3, "beta": logistics4,},
+        "parameters": {
+            "alpha": alpha3, 
+            "beta": logistics4,
+            },
     }
 
     dist_description_2 = {
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 1,
-        "parameters": {"mu": power3, "sigma": exp3},
+        "parameters": {
+            "mu": power3, 
+            "sigma": exp3},
     }
 
     dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
@@ -284,6 +216,80 @@ def get_V_Hs_Tz():
     fit_descriptions = [{'method':'mom','weights':None},
                         {'method':'mom','weights':None},
                         {'method':'mom','weights':None}]
+
+    semantics = {
+        "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
+        "symbols": ["V", "H_s", "T_z"],
+        "units": ["m/s", "m", "s"],
+    }
+
+    return dist_descriptions, fit_descriptions, semantics
+
+def get_LiGaoMoan_U_hs_tp():
+
+    """
+    A 3D joint model for wind, wave height and period.
+
+    Notes
+    ------------
+    Li, L, Gao, Z, & Moan, T. "Joint Environmental Data at Five European Offshore Sites 
+    for Design of Combined Wind and Wave Energy Devices." Proceedings of the ASME 2013 
+    32nd International Conference on Ocean, Offshore and Arctic Engineering. 
+    Volume 8: Ocean Renewable Energy. Nantes, France. June 9–14, 2013. V008T09A006. ASME. 
+    https://doi.org/10.1115/OMAE2013-10156
+    """
+
+    def _power3(x, a=2.0, b=0.01, c=1.0):
+        return a + b * x ** c
+
+    def _exp3(x, a=0.001, b=0.1, c=-0.3):
+        return a + b * np.exp(c * x)
+
+    def _exp2(x,a=-0.1,b=10):
+        return a*np.exp(b*x)
+
+    def _power2(x,a=-0.1,b=2):
+        return a*x**b
+
+    def _linear(x,a,b):
+        return a+b*x
+
+    def _logistics4(x, a=1, b=1, c=-1, d=1):
+        return a + b / (1 + np.exp(c * (x - d)))
+
+    #logistics_bounds = [(None, None), (0, None), (None, 0), (0, None)]
+    bounds = [(None, None), (0, None), (0, None)]
+    sigma_bounds = [(None, None), (0, None), (None, 0)]
+
+    dist_description_0 = {
+        "distribution": virocon.WeibullDistribution(),
+        "intervals": virocon.NumberOfIntervalsSlicer(25,min_n_points=50),
+    }
+
+    dist_description_1 = {
+        "distribution": virocon.WeibullDistribution(f_gamma=0),
+        "intervals": virocon.NumberOfIntervalsSlicer(15,min_n_points=20),
+        "conditional_on": 0,
+        "parameters": {
+            "alpha": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
+             "beta": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"),
+             #"gamma":virocon.DependenceFunction(_linear, [(None,None),(None,None)], latex="$a + b * \exp(c * x)$")
+            },
+    }
+
+    dist_description_2 = {
+        "distribution": virocon.LogNormalDistribution(),
+        "conditional_on": 1,
+        "parameters": {
+            "mu":   virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"),
+            "sigma":virocon.DependenceFunction(_exp3,   sigma_bounds, latex="$a + b * \exp(c * x)$")},
+    }
+
+    dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
+
+    fit_descriptions = [{'method':"mle"},
+                        {'method':"mle"},
+                        {'method':"mle"}]
 
     semantics = {
         "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
