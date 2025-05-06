@@ -361,14 +361,14 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
     plt.close()
     return fig
 
-def plot_binned_error_metric(dff,var_bin, var_bin_unit, var_ref, var_comp,var_comp_unit, var_bin_size, threshold_min=100, plot_y='bias',title='Example title',output_file='plot_binned_error_metric.csv'):
+def plot_binned_error_metric(data,var_bin, var_bin_unit, var_ref, var_comp,var_comp_unit, var_bin_size, threshold_min=100, plot_y='bias',title='Example title',output_file='plot_binned_error_metric.csv'):
     """
     Plots the error/statistic (plot_y), chosen by the user, between two datasets. 
-    dff: the ref-data set needs to be be the first dataset before the comp(s)-dataset(s). 
+    data: dataframe containing the total dataset. Cannot include variables with same name. 
     var_bin: the variable the data should be binned into. This is the variable that will be on the x-axis.
     var_bin_unit: unit of var_bin
     var_ref: the ref-variable
-    var_comp: the comp-variable
+    var_comp: the comp-variable. Since the data set can contain multiple dataset that the user want to compare to the ref, multiple var_comp can be sent in,e.g. var_comp=['TP_1','TP_2'] 
     var_comp_unit: the unit of var_comp
     var_bin_size: the bin size of the var_bin
     threshold_min: if the length of the dataset found within the given bin_size is less than the threshold, this data is not considered in the calculations.
@@ -376,9 +376,14 @@ def plot_binned_error_metric(dff,var_bin, var_bin_unit, var_ref, var_comp,var_co
     output_file: name of the output table, e.g. 'binned_error_metric.csv'
     """
     fig = plt.figure(figsize=(8,6))
-    ds = tables.table_binned_error_metric(dff,var_bin, var_ref,var_comp, var_bin_size,threshold_min, error_metric=plot_y, output_file=False)
+    ds = tables.table_binned_error_metric(data,var_bin, var_ref,var_comp, var_bin_size,threshold_min, error_metric=plot_y, output_file=False)
+    
+    if len(var_comp)>1:
+        name = var_comp
+        plt.plot(ds[var_bin+'_bin'],ds[plot_y],label=name) 
+    else:
+        plt.plot(ds[var_bin+'_bin'],ds[plot_y]) 
 
-    plt.plot(ds[var_bin+'_bin'],ds[plot_y])
     if plot_y=='rmse' or plot_y=='bias': 
         plt.hlines(y=0,xmin=0,xmax=np.max(ds[var_bin+'_bin']),colors='k',linestyles='--')
     elif plot_y=='corr':
@@ -388,12 +393,17 @@ def plot_binned_error_metric(dff,var_bin, var_bin_unit, var_ref, var_comp,var_co
 
     plt.xlabel('Measured {} ({})'.format(str(var_bin),str(var_bin_unit)))
 
+   # var_comp_only = var_comp[0].split('_')[0]
     if plot_y=='rmse' or plot_y=='mae': 
-        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.upper()),str(var_comp),str(var_ref),str(var_comp_unit)))
+#        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.upper()),str(var_comp[0]),str(var_ref),str(var_comp_unit)))
+        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.upper()),str(var_ref),str(var_ref),str(var_comp_unit)))
     elif plot_y=='si':
-        plt.ylabel('{} of {}_ref vs {}_comp ({})'.format(str(plot_y.upper()),str(var_comp),str(var_ref),str(var_comp_unit)))
+#        plt.ylabel('{} of {}_ref vs {}_comp ({})'.format(str(plot_y.upper()),str(var_ref),str(var_comp[0]),str(var_comp_unit)))
+        plt.ylabel('{} of {}_ref vs {}_comp ({})'.format(str(plot_y.upper()),str(var_ref),str(var_ref),str(var_comp_unit)))
     else:
-        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.capitalize()),str(var_comp),str(var_ref),str(var_comp_unit)))
+#        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.capitalize()),str(var_comp[0]),str(var_ref),str(var_comp_unit)))
+        plt.ylabel('{} of {}_comp vs {}_ref ({})'.format(str(plot_y.capitalize()),str(var_ref),str(var_ref),str(var_comp_unit)))
+
 
     plt.title(title)
     plt.legend(loc='upper right')
@@ -401,6 +411,6 @@ def plot_binned_error_metric(dff,var_bin, var_bin_unit, var_ref, var_comp,var_co
 
     if output_file:
         plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
-
+        
     plt.close()
     return fig

@@ -1820,10 +1820,10 @@ Error Metric Table
 
 .. code-block:: python
    tables.table_binned_error_metric(
-      dff=[df_ref,df_comp],
-      var_bin = 'HS', 
+      data=df,
+      var_bin='HS', 
       var_ref='TP',
-      var_comp='TP', 
+      var_comp=['TP_1'], 
       var_bin_size=1,
       threshold_min=100, 
       error_metric=['rmse','bias','mae','corr','si'],
@@ -1840,11 +1840,11 @@ Error Metric Plot
 .. code-block:: python
 
    plots.plot_binned_error_metric(
-      dff=[df_ref,df_comp],
-      var_bin = 'HS',
+      data=df,
+      var_bin='HS',
       var_bin_unit='m', 
       var_ref='TP',
-      var_comp='TP',
+      var_comp=['TP_1'],
       var_comp_unit='s', 
       var_bin_size=0.5,
       threshold_min=100, 
