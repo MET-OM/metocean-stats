@@ -9,6 +9,7 @@ from matplotlib import patches as mpatches
 import pyextremes
 import virocon
 from virocon import GlobalHierarchicalModel
+from virocon.plotting import _get_n_axes
 
 from .plotting import (
     plot_2D_pdf_heatmap,
@@ -26,7 +27,9 @@ from .predefined import (
 
 from .contours import (
     IFORMContour,
-    ISORMContour
+    ISORMContour,
+    get_contour,
+    sort_contour,
 )
 
 def _load_preset(preset:str|Callable):
@@ -70,17 +73,15 @@ class JointProbabilityModel(GlobalHierarchicalModel):
     """
     This is a wrapper for virocon's GlobalHierarchicalModel,
     which adds to those methods and attributes by also
-    storing the data and metadata such as semantics.
-    This makes it more convenient and allows some
-    higher-level operations.
+    storing the fitting data and metadata.
     """
 
     def __init__(
-        self,
-        model:str|Callable = "DNVGL_hs_tp",
-        dist_descriptions:list[dict] = None,
-        fit_descriptions:list[dict] = None,
-        semantics:dict = None,
+            self,
+            model:str|Callable = "DNVGL_hs_tp",
+            dist_descriptions:list[dict] = None,
+            fit_descriptions:list[dict] = None,
+            semantics:dict = None,
         ):
         """
         Initialize the joint conditional probability model.
@@ -129,7 +130,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if dist_descriptions is None or fit_descriptions is None:
                 raise ValueError("If preset is undefined, both dist_descriptions and fit_descriptions must be provided.")
             if semantics is None:
-                semantics = virocon.plotting.get_default_semantics()
+                semantics = self.get_default_semantics()
         
         if "swap_axis" not in semantics:
             semantics["swap_axis"] = False
@@ -145,7 +146,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         super().__init__(self.dist_descriptions)
 
-    def fit(self,
+    def fit(
+            self,
             data:pd.DataFrame,
             var1:int|str=0,
             var2:int|str=1,
@@ -212,16 +214,17 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         return virocon.plot_histograms_of_interval_distributions(self,
             self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
 
-    def plot_2D_isodensity(self,
-                           ax=None,
-                           levels:list[float]=None,
-                           points:np.ndarray=None,
-                           labels:list[str]=None,
-                           limits=None,
-                           n_grid_steps=720,
-                           cmap=None,
-                           contour_kwargs=None,
-                           ):
+    def plot_isodensity_contours(
+            self,
+            ax=None,
+            levels:list[float]=None,
+            points:np.ndarray=None,
+            labels:list[str]=None,
+            limits=None,
+            n_grid_steps=720,
+            cmap=None,
+            contour_kwargs=None,
+            ):
         """
         Plot isodensity (constant probability density) 2D contours.
         Contours can be specified either through a density directly,
@@ -327,15 +330,16 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         return ax
 
 
-    def plot_contours(self,
-                      ax=None,
-                      periods:list[float]=[1,10,100,1000],
-                      state_duration:float=1,
-                      method:str="IFORM",
-                      labels:list[str] = None,
-                      cmap="viridis_r",
-                      **kwargs
-                      ):
+    def plot_contours(
+            self,
+            ax=None,
+            periods:list[float]=[1,10,100,1000],
+            state_duration:float=1,
+            method:str="IFORM",
+            labels:list[str] = None,
+            cmap="viridis_r",
+            **kwargs
+            ):
         """
         Plot 2D environmental contours.
 
@@ -389,26 +393,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             elif len(v) != periods.size:
                 raise ValueError(f"Keyword {k} should have length equal to number of return periods {len(periods)}.")
 
-        contour_method = method.lower()
-        if contour_method == "iform":
-            ContourMethod = IFORMContour
-        elif contour_method == "isorm":
-            ContourMethod = ISORMContour
-        elif contour_method in ["highestdensity","highestdensitycontour","hdc"]:
-            ContourMethod = virocon.HighestDensityContour
-        elif contour_method == ["directsampling","montecarlo"]:
-            ContourMethod = virocon.DirectSamplingContour
-        elif contour_method in ["constantandexceedance","and"]:
-            ContourMethod = virocon.AndContour
-        elif contour_method in ["constantorexceedance","or"]:
-            ContourMethod = virocon.OrContour
-        else:
-            raise ValueError(f"Unknown contour method: {contour_method}")            
-
         for i,return_period in enumerate(periods):
             plot_kwargs = {k:v[i] for k,v in kwargs.items()}
-            alpha = virocon.calculate_alpha(state_duration,return_period)
-            contour = ContourMethod(self,alpha)
+            contour = get_contour(self,return_period=return_period,state_duration=state_duration,
+                                  method=method,point_distribution="equal")
             old_artists = ax.get_children()
             virocon.plot_2D_contour(
                 contour,
@@ -422,6 +410,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def plot_pdf_heatmap(
             self,
+            ax=None,
             limits = (25,25),
             bin_size = (1,1),
             bin_samples = (10,10),
@@ -431,7 +420,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             marginal_values = True,
             log_norm = True,
             color_vmin = 1e-10,
-            ax=None,
             **kwargs
         ):
         """
@@ -479,15 +467,16 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ax=ax,
             **kwargs)
     
-    def get_marginal_return_values(self,
-                        distribution:str,
-                        return_periods:list[float],
-                        data:pd.Series = None,
-                        dim:int = 0,
-                        threshold: float = None,
-                        r = "48h",
-                        block_size = "365.244D",
-                        ):
+    def get_marginal_return_values(
+            self,
+            distribution:str,
+            return_periods:list[float],
+            data:pd.Series = None,
+            dim:int = 0,
+            threshold: float = None,
+            r = "48h",
+            block_size = "365.244D",
+            ):
         """
         Calculate marginal return values from return periods using pyextremes.
         By default, this uses the primary variable of the data used to fit the model, but another Series can be used.
@@ -635,8 +624,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def plot_DNVGL_steepness_criterion(
             self,
-            use_peak_wave_period = True,
             ax=None,
+            use_peak_wave_period = True,
             ylim = None,
             xlim = None,
             **kwargs
@@ -663,11 +652,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ylim = np.max(self.data.values[:,0])
         return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
-    def plot_data_scatter(self,
-                          data=None,
-                          ax=None,
-                          label:str=None,
-                          **kwargs):
+    def plot_data_scatter(
+            self,
+            ax=None,
+        data=None,
+            label:str=None,
+            **kwargs):
         """
         Plot data as a scatter plot.
 
@@ -704,14 +694,15 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self.legend_labels.append(label)
         return ax
 
-    def plot_data_density(self,
-                          ax=None,
-                          data=None,
-                          bins=None,
-                          label:str=None,
-                          norm=LogNorm(),
-                          density=True,
-                          **kwargs):
+    def plot_data_density(
+            self,
+            ax=None,
+            data=None,
+            bins=None,
+            label:str=None,
+            norm=LogNorm(),
+            density=True,
+            **kwargs):
         """
         Plot data as a density plot.
 
@@ -783,6 +774,225 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self.legend_labels.append(label)
         return ax
 
+
+    def plot_3D_contour(
+            self,
+            ax=None,
+            return_period:float=100,
+            state_duration:float=1,
+            method:str="IFORM",
+            surface_plot=False,
+            n_samples = 360,
+            label:str=None,
+            **kwargs
+            ):
+        """
+        Plot a 3-dimensional environmental contour.
+
+        Parameters
+        -----------
+        return_period : float
+            The return period (in years).
+        state_duration : float
+            The average duration (hours) of each sample 
+            in the data used to fit the model.
+        method : str
+            The method of calculating a contour. One of:
+
+             - "IFORM", the inverse first-order method
+             - "ISORM", the inverse second-order method
+             - "HighestDensity"
+             - "DirectSampling", monte carlo sampling
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+        surface_plot : bool, default False
+            Plot contour as a continuous surface.
+        labels : list of str, optional
+            A name for each contour.
+        kwargs : keyword arguments
+            Keyword arguments will go to either ax.plot_surface or ax.scatter.
+            depending on the setting of surface_plot parameter.
+        """
+
+        if ax is None:
+            _,ax = plt.subplots(subplot_kw={"projection":"3d"})
+        elif not isinstance(ax,plt.Axes):
+            raise TypeError(f"The axis must be matplotlib axes object, got {type(ax)}.")
+        elif "3d" not in ax.name:
+            raise ValueError(f"The axis argument must be 3D, got {ax.name}.")
+
+        if surface_plot:
+            x,y,z = get_contour(self,return_period=return_period,state_duration=state_duration,
+                                method=method,point_distribution="gridded",n_samples=n_samples)
+            handle = ax.plot_surface(x,y,z,**kwargs)
+        else:
+            contour = get_contour(self,return_period=return_period,state_duration=state_duration,
+                                  method=method,point_distribution="equal", n_samples=n_samples)
+            x,y,z = contour.coordinates.T
+            handle = ax.scatter(x,y,z,**kwargs)
+        
+        if label is not None:
+            self.legend_handles.append(handle)
+            self.legend_labels.append(label)
+
+        return ax
+
+    def plot_3D_contour_slices(
+            self,
+            ax:list[plt.Axes]=None,
+            subplots=True,
+            return_period:float=100,
+            state_duration:float=1,
+            method:str="IFORM",
+            slice_dim:int = 0,
+            slice_values:list[float]=[1,2,3],
+            slice_width:float = 0.01,
+            n_samples = int(1e6),
+            scatter_plot = False,
+            labels:str=None,
+            cmap=None,
+            **kwargs
+            ):
+        """
+        Generate a 3-dimensional point-cloud contour, and plot 2D slices of it.
+
+        Parameters
+        -----------
+        ax : matplotlib axes (for one contour slice) or list of axes.
+            The axes to plot on. These should be in 2D projection.
+        subplots : bool, default True
+            Whether to plot on subplots, or a single axes.
+            Only used if axes are not given directly.
+        return_period : float
+            The return period (years) which the contour should represent.
+        state_duration : float
+            The duration (hours) of each event in the initial data.
+        method : str
+            Method for calculating the contour.
+             - "IFORM", the inverse first-order method
+             - "ISORM", the inverse second-order method
+             - "HighestDensity"
+             - "DirectSampling", monte carlo sampling
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+            
+        slice_dim : int
+            The variable/dimension to cut through.
+        slice_values : list of floats
+            The values of the dimension to cut at.
+        slice_width : float
+            The width of each slice. See notes below for how to adjust this number.
+        n_samples : int
+            The number of contour points on the original 3D contour.
+            The 2D contours are cut from this. See notes for how to adjust this number.
+        scatter_plot : bool, default False
+            If True, the points are plotted as a scatter plot, instead of a line.
+            Can be useful to check if the contour is well-defined.
+        labels : list[str]
+            A label for each contour level. If using subplots, 
+            these labels will become subplot-titles instead of being added to legend entries.
+        cmap : matplotlib colormap
+            Used when plotting in a single figure, ignored for subplots (use color kwarg instead.)
+        **kwargs : keyword arguments
+            Keyword arguments will be passed to matplotlib.
+
+        Notes
+        ------
+        Algorithm:
+        1. Generate a full 3D contour of points using the specified contour method
+        2. Slice the contour in the given dimension, value(s) and interval.
+        3. Drop the dimension to get a collection of 2D points.
+        4. Draw a closed contour using a greedy travelling salesman approach.
+
+        Tips for a nice contour:
+         * If the contour is jagged/zigzag-like, there are too many points, and/or the width of the slice is too large.
+         * If there are noticeable straight lines and corners, there are too few points.
+        """
+        # Check input
+        slice_values = np.array(slice_values)
+        if slice_values.ndim == 0:
+            slice_values = np.array([slice_values])
+
+        # Check or create axes
+        if ax is None:
+            ax = _get_n_axes(len(slice_values))[1] if subplots else plt.subplots()[1]
+        if hasattr(ax,"__len__"):
+            ax = np.array(ax).ravel()
+            subplots = True
+        else:
+            subplots = False
+        # Check labels    
+        if labels is None:
+            labels = [r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
+                      f" = {v} {self.semantics["units"][slice_dim]}" for v in slice_values]
+        elif subplots and not np.array(labels).size == len(slice_values):
+            raise ValueError("The number of labels does not match number of slices.")
+        
+        # Check colors
+        if "c" not in kwargs and "color" not in kwargs:
+            if cmap is None:
+                cmap = "viridis"
+            if type(cmap) is str:
+                cmap = plt.get_cmap(cmap)
+            kwargs["color"] = cmap(slice_values/np.max(slice_values))
+
+        # Check remaining kwargs
+        for k,v in kwargs.items():
+            if isinstance(v,str):
+                kwargs[k] = [v]*slice_values.size
+            elif len(v) != slice_values.size:
+                raise ValueError(f"Keyword {k} should have length equal to number of slices {len(slice_values)}.")
+
+        # Which dimension's semantics that should be plotted on which axis (x,y,z)
+        if slice_dim == 0:
+            axis_labels = (2,1) if self.swap_axis else (1,2)
+        if slice_dim == 1:
+            axis_labels = (0,2)
+        if slice_dim == 2:
+            axis_labels = (0,1)
+
+        contour = get_contour(self,return_period=return_period,state_duration=state_duration,
+                              method=method,point_distribution="random",n_samples=n_samples)
+
+
+
+        for i,level in enumerate(slice_values):
+            coords = contour.coordinates
+            coords = coords[np.abs(coords[:,slice_dim]-level)<slice_width]
+            if len(coords)==0:
+                print("Warning: Found no contour points at level {level}+-{slice_width}. Stopping.")
+                break
+            coords = np.delete(coords,slice_dim,axis=1)
+            coords = sort_contour(coords)
+
+            if self.swap_axis:
+                y,x = coords.T
+            else:
+                x,y = coords.T
+
+            axi = ax[i] if subplots else ax
+
+            plot_kwargs = {k:v[i] for k,v in kwargs.items()}
+            if scatter_plot:
+                handle = axi.scatter(x,y,**plot_kwargs)
+            else:
+                handle = axi.plot(x,y,**plot_kwargs)[0]
+
+            if subplots:
+                self.plot_semantics(ax=axi,*axis_labels)
+                if labels is not None:
+                    axi.set_title(labels[i])
+            else:
+                if labels is not None:
+                    self.legend_handles.append(handle)
+                    self.legend_labels.append(labels[i])
+
+        if not subplots:
+            self.plot_semantics(ax,*axis_labels)
+
+        return ax
+
+
     def get_default_semantics(self):
         """
         Generate default semantics.
@@ -803,6 +1013,48 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             "units": [" - " for _ in range(self.n_dim)],
             "swap_axis":False,
         }
+
+    def plot_semantics(self,ax=None,x=None,y=None,z=None):
+        """
+        Plot model semantics on matplotlib axis.
+        By default, all semantics are plotted.
+        
+        Parameters
+        ----------
+        ax : matplotlib axis
+            Axis to add semantics to.
+        x : int
+            Semantics for x-axis.
+        y : int
+            Semantics for y-axis.
+        z : int
+            Semantics for z-axis.
+        """
+        if x is None and y is None and z is None:
+            if self.n_dim == 2:
+                x,y = (1,0) if self.swap_axis else (0,1)
+            if self.n_dim == 3:
+                x,y,z = (0,2,1) if self.swap_axis else (0,1,2)
+
+        if ax is None:
+            if self.n_dim == 3:
+                _,ax = plt.subplots(subplot_kw={"projection":"3d"})
+            else:
+                _,ax = plt.subplots()
+
+        names = self.semantics["names"]
+        symbols = self.semantics["symbols"]
+        units = self.semantics["units"]
+        labels = [f"{names[d]},"+r" $\it{"+f"{symbols[d]}"+r"}$"+f" ({units[d]})" for d in np.arange(self.n_dim)]
+
+        if x is not None:
+            ax.set_xlabel(labels[x])
+        if y is not None:
+            ax.set_ylabel(labels[y])
+        if z is not None:
+            ax.set_zlabel(labels[z])
+
+        return ax
 
     def reset_labels(self):
         """
