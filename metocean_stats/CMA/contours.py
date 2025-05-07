@@ -1,5 +1,7 @@
+import virocon
 from virocon.contours import Contour
 from virocon import GlobalHierarchicalModel, TransformedModel
+from scipy.spatial.distance import cdist
 import numpy as np
 import scipy.stats as sts
 """
@@ -12,49 +14,175 @@ to work with until changes can eventually be merged there.
 __all__ = [
     "IFORMContour",
     "ISORMContour",
+    "get_contour",
+    "sort_contour"
 ]
 
-class NSphere:
+def get_contour(
+        model:GlobalHierarchicalModel,
+        return_period:float=100,
+        state_duration:float=1,
+        method:str="IFORM",
+        point_distribution="equal",
+        n_samples = 360,
+        **kwargs
+        ):
+    """
+    Get one contour object from virocon.
 
-    def __init__(self, dim, n_samples, distribute_evenly=False):
-        """
-        Parameters
-        ----------
-        dim : int
-            The number of dimensions. (i.e. the n in n-sphere plus 1)
-        n_samples : int
-            The number of points to distribute on the n-sphere.
-        distribute_evenly : bool, default True
-            Use N-dimensional spacing algorithm to distribute points evenly on the sphere.
+    Parameters
+    ----------
+    model : GHM
+        The joint model.
+    return_period : float
+        The return period in years
+    state_duration : float
+        The state duration in hours
+    method : str
+        The contour method.
+    point_distribution : str, default "equal"
+        How to distribute points on the sphere:
+        "equal", "gridded", or "random".
+    n_samples : int, default 360
+        Number of points on the contour.
+    """
+    # Check point distribution
+    point_distribution = point_distribution.lower()
+    if point_distribution not in ["equal","gridded","random"]:
+        raise ValueError("Unknown points distribution.")
+    if point_distribution == "gridded" and model.n_dim != 3:
+        raise ValueError("Gridded point distribution is only meaningful for a 3-dimensional model.")
 
-        """
-        self.dim = dim
-        self.n_samples = n_samples
-        if distribute_evenly is True: raise NotImplementedError("Use virocon for even spacing algorithm.")
-        self.unit_sphere_points = self._random_unit_sphere_points()
+    # Check contour method
+    contour_method = method.lower()
+    if contour_method == "iform":
+        ContourMethod = IFORMContour
+    elif contour_method == "isorm":
+        ContourMethod = ISORMContour
+    elif point_distribution == "gridded":
+        raise ValueError("Gridded/surface contour only possible with IFORM or ISORM.")
+    elif contour_method in ["highestdensity","highestdensitycontour","hdc"]:
+        ContourMethod = virocon.HighestDensityContour
+    elif contour_method == ["directsampling","montecarlo"]:
+        ContourMethod = virocon.DirectSamplingContour
+    elif contour_method in ["constantandexceedance","and"]:
+        ContourMethod = virocon.AndContour
+    elif contour_method in ["constantorexceedance","or"]:
+        ContourMethod = virocon.OrContour
+    else:
+        raise ValueError(f"Unknown contour method: {contour_method}")            
 
-    def _random_unit_sphere_points(self):
-        """
-        Generates equally distributed points on the sphere's surface.
+    # Calculate alpha and contour
+    alpha = virocon.calculate_alpha(state_duration,return_period)
+    contour = ContourMethod(model,alpha,n_points=n_samples,point_distribution=point_distribution)
 
-        Note
-        ----
-        Used algorithm:
+    # Return either reshaped xyz for gridded, otherwise just the contour.
+    if point_distribution == "gridded":
+        return np.array(contour.coordinates).reshape(n_samples,n_samples,3).transpose([2,0,1])
+    return contour
 
-        - Use a N(0,1) standard normal distribution to generate cartesian coordinate vectors.
-        - Normalize the vectors to length 1.
-        - The points then are uniformly distributed on the sphere's surface.
+def sort_contour(contour):
+    """
+    Sort a 2D contour by a greedy approach of iteratively
+    adding the nearest point to the list.
+    Requires that points are "nice", i.e., not very noisy.
+    Due to the nature of the algorithm the output will be different length:
+    The first point is added to the end, and some points may be skipped.
+    Thanks to ChatGPT.
+        
+    Parameters
+    ------------
+        contour : np.ndarray
+            (N, 2) array of unordered 2D points, which make up a closed contour.
+    """
+    N = len(contour)
+    
+    # Compute the pairwise distance matrix (Euclidean distances)
+    dist_matrix = cdist(contour, contour, metric='euclidean')
 
-        """
-        # create pseudorandom number generator with seed for reproducability
-        prng = np.random.RandomState(seed=43)
-        #  draw normally distributed samples
-        rand_points = prng.normal(size=(self.n_samples, self.dim))
-        # calculate lengths of vectors
-        radii = np.linalg.norm(rand_points, axis=1, keepdims=True)
-        # normalize
-        return rand_points / radii
+    # To keep track of visited points
+    visited = np.zeros(N, dtype=bool)
+    
+    # Start with the first point
+    visited[0] = True
+    ordered_indices = [0]
+    
+    # Loop through the points to create the tour
+    for i in range(1, N+1):
+        last_idx = ordered_indices[-1]
+        unvisited_idxs = np.where(~visited)[0]  # Find unvisited points
+        
+        # Get the distances from the last point to all unvisited points
+        distances_to_unvisited = dist_matrix[last_idx, unvisited_idxs]
+        
+        # Find the index of the nearest unvisited point
+        nearest_idx = unvisited_idxs[np.argmin(distances_to_unvisited)]
+        
+        # Mark the nearest point as visited
+        visited[nearest_idx] = True
+        
+        # Add the nearest point to the ordered indices
+        ordered_indices.append(nearest_idx)
 
+        if i==N//2: # Unvisit start, to be able to add it at the end.
+            visited[0] = False
+
+        # Eventually we should arrive back at the start.
+        if nearest_idx == 0:
+            return contour[ordered_indices]
+
+def get_random_unit_sphere_points(n_dim,n_samples):
+    """
+    Generates equally distributed points on the sphere's surface.
+
+    Note
+    ----
+    Used algorithm:
+
+    - Use a N(0,1) standard normal distribution to generate cartesian coordinate vectors.
+    - Normalize the vectors to length 1.
+    - The points then are uniformly distributed on the sphere's surface.
+
+    """
+    # create pseudorandom number generator with seed for reproducability
+    prng = np.random.RandomState(seed=43)
+    #  draw normally distributed samples
+    rand_points = prng.normal(size=(n_samples, n_dim))
+    # calculate lengths of vectors
+    radii = np.linalg.norm(rand_points, axis=1, keepdims=True)
+    # normalize
+    return rand_points / radii
+
+def get_3D_gridded_unit_sphere_points(primary_dim,n_polar,n_azimuthal):
+    """
+    Generates gridded unit sphere points.
+
+    Parameters
+    ----------
+    primary_dim : int
+        The dimension to align the unit sphere poles after.
+    n_polar : int
+        Number of circles along the primary dimension.
+    n_azimuthal : int
+        Number of points on each circle.
+    """
+
+    theta = np.linspace(0,2*np.pi,n_azimuthal)
+    phi = np.linspace(0,np.pi,n_polar)
+
+    x = np.outer(np.cos(theta),np.sin(phi))
+    y = np.outer(np.sin(theta),np.sin(phi))
+    z = np.outer(np.ones_like(theta),np.cos(phi))
+
+    # Rotate axes to match primary dimension
+    if primary_dim == 0:
+        return z,x,y
+    elif primary_dim == 1:
+        return y,z,x
+    elif primary_dim == 2:
+        return x,y,z
+    else:
+        raise ValueError(f"primary_dim must be an integer in [0,1,2], got {primary_dim}.")
 
 
 class IFORMContour(Contour):
@@ -91,7 +219,7 @@ class IFORMContour(Contour):
 
     """
 
-    def __init__(self, model, alpha, n_points=180, distribute_evenly = None):
+    def __init__(self, model, alpha, n_points=180, point_distribution="random"):
         allowed_model_types = (GlobalHierarchicalModel, TransformedModel)
         if isinstance(model, allowed_model_types):
             self.model = model
@@ -101,10 +229,7 @@ class IFORMContour(Contour):
             )
         self.alpha = alpha
         self.n_points = n_points
-
-        if distribute_evenly is None:
-            distribute_evenly = True if n_points > 1000 else False
-        self.distribute_evenly = bool(distribute_evenly)
+        self.point_distribution = point_distribution
 
         super().__init__()
 
@@ -135,18 +260,21 @@ class IFORMContour(Contour):
         beta = sts.norm.ppf(1 - self.alpha)
         self.beta = beta
 
-        # TODO Update NSphere to handle n_dim case with order
         # Create sphere
         if n_dim == 2:
             _phi = np.linspace(0, 2 * np.pi, num=n_points, endpoint=False)
             _x = np.cos(_phi)
             _y = np.sin(_phi)
-            _circle = np.stack((_x, _y), axis=1)
-            sphere_points = beta * _circle
-
-        else:
-            sphere = NSphere(dim=n_dim, n_samples=n_points, distribute_evenly = self.distribute_evenly)
-            sphere_points = beta * sphere.unit_sphere_points
+            unit_sphere_points = np.stack((_x, _y), axis=1)
+        elif self.point_distribution == "equal":
+            from virocon._nsphere import NSphere
+            sphere = NSphere(self.model.n_dim,self.n_points)
+            unit_sphere_points = sphere.unit_sphere_points
+        elif self.point_distribution == "random":
+            unit_sphere_points = get_random_unit_sphere_points(n_dim=self.model.n_dim,n_samples=self.n_points)
+        elif self.point_distribution == "gridded":
+            unit_sphere_points = get_3D_gridded_unit_sphere_points(primary_dim=0,n_polar=self.n_points,n_azimuthal=self.n_points)
+        sphere_points = beta * unit_sphere_points
 
         # Get probabilities for coordinates
         norm_cdf = sts.norm.cdf(sphere_points)
@@ -243,17 +371,17 @@ class ISORMContour(Contour):
         # reference see equation 20 in Chai and Leira (2018).
         beta = np.sqrt(sts.chi2.ppf(1 - self.alpha, n_dim))
 
-        # Create sphere.
+        # Create sphere
         if n_dim == 2:
             _phi = np.linspace(0, 2 * np.pi, num=n_points, endpoint=False)
             _x = np.cos(_phi)
             _y = np.sin(_phi)
-            _circle = np.stack((_x, _y)).T
-            sphere_points = beta * _circle
-
-        else:
-            sphere = NSphere(dim=n_dim, n_samples=n_points, distribute_evenly=self.distribute_evenly)
-            sphere_points = beta * sphere.unit_sphere_points
+            unit_sphere_points = np.stack((_x, _y), axis=1)
+        elif self.point_distribution == "random":
+            unit_sphere_points = get_random_unit_sphere_points(n_dim=self.model.n_dim,n_samples=self.n_points)
+        elif self.point_distribution == "gridded":
+            unit_sphere_points = get_3D_gridded_unit_sphere_points(primary_dim=0,n_polar=self.n_points,n_azimuthal=2*self.n_points)
+        sphere_points = beta * unit_sphere_points
 
         # Get probabilities for coordinates of shape.
         norm_cdf_per_dimension = [

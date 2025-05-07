@@ -295,6 +295,7 @@ def get_LiGaoMoan_U_hs_tp():
         "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
         "symbols": ["V", "H_s", "T_z"],
         "units": ["m/s", "m", "s"],
+        "swap_axis":True
     }
 
     return dist_descriptions, fit_descriptions, semantics
