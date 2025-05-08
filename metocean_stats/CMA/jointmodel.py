@@ -533,28 +533,50 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         return model.get_return_value(return_period=return_periods)[0]
 
-
     def get_dependent_given_marginal(
             self,
             given:np.ndarray,
             percentile:np.ndarray=0.5,
+            dim = 1,
         ):
         """
-        Function to get values of dependent/secondary variable from the joint model,
-        given specific values of the marginal/primary variable. 
-        Optionally, a percentile may be specified to get a conditional value other than the median.
-        """
-        # Check that percentile is 1 number.
-        percentile = np.squeeze(np.array(percentile))
-        if percentile.size > 1: 
-            raise ValueError("Only one percentile may be specified at a time.")
-        
-        given = np.squeeze(np.array(given))
-        if given.ndim > 1:
-            raise ValueError("Given must be a 0 or 1-dimensional array.")
-        given = np.array([given,np.zeros_like(given)]).T
+        Given values of dimension A, get any percentile of
+        a dependent dimension B, where B is dependent on A.
 
-        return self.conditional_icdf(p=percentile,dim=1,given=given)
+        For example: Given Hs=2, get the 0.5 percentile of Tp.
+
+        Parameters
+        ----------
+        given : list of floats
+            List of known values.
+        percentile : float
+            Percentile (0 to 1).
+        dim : int
+            The dimension from which you want to get values.
+        """
+        # Check percentile
+        percentile = np.squeeze(percentile)
+        if np.array(percentile).size > 1: 
+            raise ValueError("Only one percentile may be specified at a time.")
+        elif percentile>=1 or percentile<=0:
+            raise ValueError("Percentile should be between 0 and 1.")
+    
+        # Shape given into required (samples, n_dim) format.
+        input_dim = self.conditional_on[dim]
+        if input_dim is None:
+            raise ValueError(f"Chosen dim {dim} is marginal, not dependent.")
+        given = np.squeeze(given)
+        if given.ndim > 1:
+            raise ValueError("Given should be a 1D list of known values.")
+        elif given.ndim == 0: # one number
+            given = np.array([given])
+
+        if given.ndim == 1: # list of numbers
+            temp = np.zeros(shape=(len(given),self.n_dim))
+            temp[:,input_dim] = given
+            given = temp
+
+        return self.conditional_icdf(p=percentile,dim=dim,given=given)
 
     def plot_dependent_percentiles(
             self,
@@ -992,6 +1014,146 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         return ax
 
+    def plot_3D_isodensity_contour_slice(
+            self,
+            ax:plt.Axes=None,
+            density_levels:float=None,
+            marginal_values:float=None,
+            slice_dim:int = 0,
+            slice_value:float=5,
+            grid_steps = 1000,
+            limits: list[tuple]=None,
+            invalid_density_policy="drop",
+            labels:str=None,
+            cmap=None,
+            **kwargs
+            ):
+        """
+        Using the pdf of the 3D model, create a 2D slice at a given dimension value.
+        This function can plot several densities but only one dimension value.
+        Alternatively, instead of densities, a list of marginal values may be given,
+        e.g. wind for a wind-hs-tp model.
+
+        Parameters
+        -----------
+        ax : matplotlib axes or list of axes.
+            The axes to plot on. These should be in 2D projection.
+        density_levels : list[float]
+            Probability density level(s).
+        marginal_values : list[float]
+            Values of the marginal, primary variable of the model, e.g., wind. 
+            These are used to get conditional values of the other variables, e.g., hs and tp.
+            Finally, the 3D points are used to sample the pdf to get the densities.
+        slice_dim : int
+            The variable/dimension to cut through.
+        slice_value : float
+            Variable value to cut at.
+        grid_steps : int
+            How precicely the model pdf is sampled in each dimension.
+        limits : list of 2 tuples of 2 floats, optional
+            Two tuples defining upper and lower limits of pdf sampling,
+            for the two remaining dimensions.
+            If not given, they will be guessed based on the data (2x max).
+        invalid_density_policy : str, default "drop"
+            What to do with densities that are outside the scope of the sampled pdf,
+            i.e., smaller than pdf.min() or larger than pdf.max(). Options:
+             - "drop" drops these contours from the legend, default.
+             - "ignore" to keep in legend
+             - "raise" to raise error, good if this is unexpected.
+        label : str
+            A label.
+        **kwargs : keyword arguments
+            Keyword arguments will be passed to matplotlib's ax.contour().
+        """
+
+        if np.array(limits).size == 1:
+            limits = 3 if limits is None else limits
+            lim_lower = np.minimum([0,0,0],self.data.min().to_numpy())
+            limits = np.array([lim_lower,self.data.max().to_numpy()*limits]).T
+        elif np.array(limits).shape != (3,2):
+            raise ValueError("Limits should be shape (3,2)"
+                             " corresponding to lower and upper"
+                             " limits per dimension.")
+        limits = np.sort(limits,axis=1)
+
+        # Create query with shape (samples x 3) and sample pdf
+        gridpoints = [
+            np.linspace(limits[0,0],limits[0,1],grid_steps),
+            np.linspace(limits[1,0],limits[1,1],grid_steps),
+            np.linspace(limits[2,0],limits[2,1],grid_steps)
+        ]
+        gridpoints[slice_dim] = slice_value # 3xN
+        gridpoints = np.squeeze(np.meshgrid(*gridpoints,indexing="ij")) # 3xNxN
+        X,Y = np.delete(gridpoints,slice_dim,0) # NxN,NxN
+        gridpoints = gridpoints.reshape(3,-1).T # 3xN**2
+        Z = self.pdf(gridpoints).reshape([grid_steps,grid_steps]) # NxN
+
+        # Check density levels
+        if density_levels is None:
+            density_levels = np.power(10.,np.arange(-30,0,5))
+        else:
+            density_levels = np.array(density_levels)
+            if density_levels.ndim == 0:
+                density_levels = np.array([density_levels])
+            level_sort = np.argsort(density_levels)
+            density_levels = density_levels[level_sort]
+
+        # Set labels
+        if labels is None:
+            labels = np.array([f"p = {d:.0e}" for d in density_levels])
+        elif np.array(labels).size != density_levels.size:
+            print(density_levels)
+            print(labels)
+            raise ValueError("Number of labels does not match levels.")
+        else:
+            labels = np.array(labels)[level_sort]
+
+        # Check or create axes
+        if ax is None:
+            _,ax = plt.subplots()
+
+        # Check colors
+        if "c" not in kwargs and "color" not in kwargs:
+            if cmap is None:
+                cmap = "viridis"
+            if type(cmap) is str:
+                cmap = plt.get_cmap(cmap)
+            kwargs["colors"] = cmap(np.linspace(0,1,len(density_levels)))
+
+        # Which dimension's semantics that should be plotted on which axis (x,y,z)
+        if slice_dim == 0:
+            if self.swap_axis:
+                axis_labels = (2,1)
+                X,Y = Y,X
+            else:
+                axis_labels = (1,2)
+        if slice_dim == 1:
+            axis_labels = (0,2)
+        if slice_dim == 2:
+            axis_labels = (0,1)
+
+        valid_density = (density_levels>=Z.min()) & (density_levels<=Z.max())
+        if np.any(~valid_density):
+            if invalid_density_policy == "raise":
+                raise ValueError(f"Probability density {density_levels[valid_density]} "
+                                 f"is outside pdf limits [{Z.min(), Z.max()}].")
+            elif invalid_density_policy == "drop":
+                labels = labels[valid_density]
+                density_levels = density_levels[valid_density]
+
+        CS = ax.contour(X,Y,Z,levels=density_levels,**kwargs)
+        handles,_ = CS.legend_elements()
+        self.plot_semantics(ax,*axis_labels)
+
+        if not hasattr(ax,"__len__"):
+            ax.set_title(r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
+                f" = {slice_value} {self.semantics["units"][slice_dim]}")
+
+        self.legend_handles += handles
+        #valid = [True if d>Z.min() and d<Z.max() else False for d in density_levels]
+        self.legend_labels += list(labels)
+
+        return ax
 
     def get_default_semantics(self):
         """
