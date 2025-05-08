@@ -218,8 +218,8 @@ def get_virocon_V_Hs_Tz():
                         {'method':'mom','weights':None}]
 
     semantics = {
-        "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
-        "symbols": ["V", "H_s", "T_z"],
+        "names": ["Wind speed", "Significant wave height", "Peak wave period"],
+        "symbols": ["V", "H_s", "T_p"],
         "units": ["m/s", "m", "s"],
     }
 
@@ -292,8 +292,8 @@ def get_LiGaoMoan_U_hs_tp():
                         {'method':"mle"}]
 
     semantics = {
-        "names": ["Wind speed", "Significant wave height", "Zero-up-crossing period"],
-        "symbols": ["V", "H_s", "T_z"],
+        "names": ["Wind speed", "Significant wave height", "Peak wave period"],
+        "symbols": ["V", "H_s", "T_p"],
         "units": ["m/s", "m", "s"],
         "swap_axis":True
     }
