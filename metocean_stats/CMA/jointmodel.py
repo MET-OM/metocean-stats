@@ -1088,6 +1088,18 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         gridpoints = gridpoints.reshape(3,-1).T # 3xN**2
         Z = self.pdf(gridpoints).reshape([grid_steps,grid_steps]) # NxN
 
+        # Check marginal_values
+        if density_levels is not None and marginal_values is not None:
+            raise ValueError("Density_levels and marginal_values cannot both be defined.")
+        if marginal_values is not None:
+            marginal_dim = np.squeeze(np.where(np.array(self.conditional_on)==None))
+            secondary_dim = np.squeeze(np.where(np.array(self.conditional_on)==marginal_dim))
+            tertiary_dim = np.squeeze(np.where(np.array(self.conditional_on)==secondary_dim))
+            secondary_values = self.get_dependent_given_marginal(marginal_values,dim=secondary_dim)
+            tertiary_values = self.get_dependent_given_marginal(secondary_values,dim=tertiary_dim)
+            points_3D = np.array([marginal_values,secondary_values,tertiary_values]).T
+            density_levels = self.pdf(points_3D)
+
         # Check density levels
         if density_levels is None:
             density_levels = np.power(10.,np.arange(-30,0,5))
@@ -1108,7 +1120,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         else:
             labels = np.array(labels)[level_sort]
 
-        # Check or create axes
+        # Check axes
         if ax is None:
             _,ax = plt.subplots()
 
@@ -1132,6 +1144,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if slice_dim == 2:
             axis_labels = (0,1)
 
+        # Check if requested density levels exist on sampled pdf and act accordingly
         valid_density = (density_levels>=Z.min()) & (density_levels<=Z.max())
         if np.any(~valid_density):
             if invalid_density_policy == "raise":
@@ -1141,13 +1154,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 labels = labels[valid_density]
                 density_levels = density_levels[valid_density]
 
+        # Plot contour
         CS = ax.contour(X,Y,Z,levels=density_levels,**kwargs)
         handles,_ = CS.legend_elements()
         self.plot_semantics(ax,*axis_labels)
 
-        if not hasattr(ax,"__len__"):
-            ax.set_title(r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
-                f" = {slice_value} {self.semantics["units"][slice_dim]}")
+        ax.set_title(r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
+            f" = {slice_value} {self.semantics["units"][slice_dim]}")
 
         self.legend_handles += handles
         #valid = [True if d>Z.min() and d<Z.max() else False for d in density_levels]
