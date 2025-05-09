@@ -571,7 +571,7 @@ def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timest
     Modified by clio-met
     """
     month_ts = df.index.month
-    if (len(vars)!=len(threshold))
+    if (len(vars)!=len(threshold)):
         print('Error: vars must be the same length as threshold')
         print(sys.exit())
     if len(vars)==1:
