@@ -239,23 +239,14 @@ def get_LiGaoMoan_U_hs_tp():
     https://doi.org/10.1115/OMAE2013-10156
     """
 
-    def _power3(x, a=2.0, b=0.01, c=1.0):
-        return a + b * x ** c
-
-    def _exp3(x, a=0.001, b=0.1, c=-0.3):
-        return a + b * np.exp(c * x)
-
-    def _exp2(x,a=-0.1,b=10):
-        return a*np.exp(b*x)
-
-    def _power2(x,a=-0.1,b=2):
-        return a*x**b
-
-    def _linear(x,a,b):
-        return a+b*x
-
-    def _logistics4(x, a=1, b=1, c=-1, d=1):
-        return a + b / (1 + np.exp(c * (x - d)))
+    def _alpha(x, a1=2.0, a2=0.01, a3=1.0):
+        return a1 + a2 * x ** a3
+    def _beta(x, b1=2.0, b2=0.01, b3=1.0):
+        return b1 + b2 * x ** b3
+    def _mu(x, c1=2.0, c2=0.01, c3=1.0):
+        return c1 + c2 * x ** c3
+    def _sigma(x, d1=0.001, d2=0.1, d3=-0.3):
+        return d1 + d2 * np.exp(d3 * x)
 
     #logistics_bounds = [(None, None), (0, None), (None, 0), (0, None)]
     bounds = [(None, None), (0, None), (0, None)]
@@ -271,8 +262,8 @@ def get_LiGaoMoan_U_hs_tp():
         "intervals": virocon.NumberOfIntervalsSlicer(15,min_n_points=20),
         "conditional_on": 0,
         "parameters": {
-            "alpha": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
-             "beta": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"),
+            "alpha": virocon.DependenceFunction(_alpha, bounds, latex="$a1 + a2 * x^a3$"), 
+             "beta": virocon.DependenceFunction(_beta, bounds, latex="$b1 + b2 * x^b3$"),
              #"gamma":virocon.DependenceFunction(_linear, [(None,None),(None,None)], latex="$a + b * \exp(c * x)$")
             },
     }
@@ -281,8 +272,8 @@ def get_LiGaoMoan_U_hs_tp():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 1,
         "parameters": {
-            "mu":   virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"),
-            "sigma":virocon.DependenceFunction(_exp3,   sigma_bounds, latex="$a + b * \exp(c * x)$")},
+            "mu":   virocon.DependenceFunction(_mu, bounds, latex="$c1 + c2 * x^c3$"),
+            "sigma":virocon.DependenceFunction(_sigma,   sigma_bounds, latex="$d1 + d2 * \exp(d3 * x)$")},
     }
 
     dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]

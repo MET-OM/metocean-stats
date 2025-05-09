@@ -26,8 +26,6 @@ from .predefined import (
 )
 
 from .contours import (
-    IFORMContour,
-    ISORMContour,
     get_contour,
     sort_contour,
 )
@@ -1092,6 +1090,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if density_levels is not None and marginal_values is not None:
             raise ValueError("Density_levels and marginal_values cannot both be defined.")
         if marginal_values is not None:
+            if np.array(marginal_values).size == 1:
+                marginal_values = np.array([marginal_values])
             marginal_dim = np.squeeze(np.where(np.array(self.conditional_on)==None))
             secondary_dim = np.squeeze(np.where(np.array(self.conditional_on)==marginal_dim))
             tertiary_dim = np.squeeze(np.where(np.array(self.conditional_on)==secondary_dim))
@@ -1114,8 +1114,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if labels is None:
             labels = np.array([f"p = {d:.0e}" for d in density_levels])
         elif np.array(labels).size != density_levels.size:
-            print(density_levels)
-            print(labels)
             raise ValueError("Number of labels does not match levels.")
         else:
             labels = np.array(labels)[level_sort]
@@ -1163,10 +1161,110 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             f" = {slice_value} {self.semantics["units"][slice_dim]}")
 
         self.legend_handles += handles
-        #valid = [True if d>Z.min() and d<Z.max() else False for d in density_levels]
         self.legend_labels += list(labels)
 
         return ax
+
+
+
+    def plot_3D_isodensity_contour(
+            self,
+            ax:plt.Axes=None,
+            density_level:float=None,
+            marginal_value:float=None,
+            slice_dim:int = 0,
+            slice_values:int|list[float]=20,
+            grid_steps = 1000,
+            contour_points = 100,
+            limits:list[tuple]=None,
+            cmap=None,
+            **kwargs
+            ):
+        """
+        3D contour based on isodensity. 
+        Principle: Create slices of pdf, get 2D isodensity contour line
+        for each slice, and connect them to get a 3D surface contour.
+
+        Parameters
+        -----------
+        ax : matplotlib axes
+            3D axes.
+        density_level : float
+            A probability density level. Either this or marginal_value can be set.
+        marginal_value : float
+            A value of the marginal, primary variable of the model, e.g., wind. 
+            Used to get conditional values of the other variables, e.g., hs and tp.
+            The 3D point is used to sample the pdf to get the density.
+        slice_dim : int, default 0
+            The variable/dimension to cut through.
+        slice_values : int or list of float, optional
+            Number of slices (resolution) in the cut dimension. Similar to grid_steps but more costly.
+            Alternatively - a list of values.
+        grid_steps : int, optional
+            How precicely the model pdf is sampled in the two other dimensions.
+        contour_points : int, optional
+            Number of points on each of the 2D contours interpolated from the isodensity lines.
+        limits : list of 3 tuples of 2 floats, optional
+            Three tuples defining limits of pdf sampling and slicing.
+            Effectively sets the limits of the plot, and the contour.
+        **kwargs : keyword arguments
+            Keyword arguments will be passed to matplotlib's ax.plot_surface().
+        """
+        # Check density
+        if density_level is None and marginal_value is None:
+            raise ValueError("Either density_level or marginal_value must be set.")
+        if np.array(density_level).size!=1 or np.array(marginal_value).size!=1:
+            raise ValueError("For the 3D contour, only one density or marginal value may be chosen.")
+
+        # Check limits
+        if np.array(limits).size == 1: # includes None
+            limits = 3 if limits is None else limits
+            lim_lower = np.minimum([0,0,0],self.data.min().to_numpy())
+            limits = np.array([lim_lower,self.data.max().to_numpy()*limits]).T
+            if marginal_value is not None:
+                limits[slice_dim] = [limits[slice_dim][0],marginal_value]
+        elif np.array(limits).shape != (3,2):
+            raise ValueError("Limits should be shape (3,2)"
+                             " corresponding to lower and upper"
+                             " limits per dimension.")
+        limits = np.sort(limits,axis=1)
+
+        # Not very efficient but it works
+        fig,contours = plt.subplots()
+        if not hasattr(slice_values,"__len__"):
+            slice_values = np.linspace(0.1,limits[slice_dim][1],slice_values)
+        for slice_value in slice_values:
+            self.plot_3D_isodensity_contour_slice(
+                ax=contours,density_levels=density_level,marginal_values=marginal_value,
+                slice_dim=slice_dim,slice_value=slice_value,grid_steps=grid_steps,limits=limits)
+        plt.close(fig)
+
+        # Extract and interpolate contours to grid
+        contours = [c for c in contours.get_children() if "QuadContourSet" in str(c)]
+        X = np.zeros(shape=(len(contours),contour_points))
+        Y = np.zeros(shape=(len(contours),contour_points))
+        Z = np.zeros(shape=(len(contours),contour_points))
+        for i,c in enumerate(contours):
+            if c.allsegs: 
+                x,y = c.allsegs[0][0].T
+                xi = np.linspace(0,len(x),contour_points)
+                xp = np.arange(len(x))
+                X[i] = np.interp(xi,xp,x)
+                yi = np.linspace(0,len(x),contour_points)
+                yp = np.arange(len(y))
+                Y[i] = np.interp(yi,yp,y)
+                Z[i] = np.ones(contour_points)*slice_values[i]
+            else:
+                X[i] = None
+                Y[i] = None
+                Z[i] = None
+
+        fig,ax = plt.subplots(subplot_kw={"projection":"3d"})
+        ax.plot_surface(Z,X,Y,**kwargs)
+        self.plot_semantics(ax=ax)
+
+        return ax
+
 
     def get_default_semantics(self):
         """
@@ -1230,6 +1328,72 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ax.set_zlabel(labels[z])
 
         return ax
+
+    def parameters(self,complete=False):
+        """
+        Get a dictionary containing the value of all parameters, including within dependency functions.
+
+        Parameters
+        ----------
+        complete : bool, default False
+             - If True, a pandas dataframe is returned containing a complete description of each value.
+             - If False, a dictionary is returned, where the keys are distribution parameters if the 
+                distribution is marginal, or dependency parameter if the distribution is dependent.
+                It is useful if the goal is to just compare parameters between fits.
+                It requires that all parameters, including dependencies, are uniquely named, to not overwrite entries.
+                For example, if you have two dependency functions with parameters a1,a2,a3, refactor one to b1,b2,b3.
+        """
+        parameters = [] if complete else {}
+        for i,dis in enumerate(self.distributions):
+            # Check dependency functions
+            if self.conditional_on[i] is not None:
+                for param,conditional in dis.conditional_parameters.items():
+                    for p,v in conditional.parameters.items():
+                        if complete:
+                            parameters.append({
+                                "Distribution":type(dis.distribution).__name__.removesuffix("Distribution"),
+                                "Variable":self.semantics["symbols"][i],
+                                "Distribution parameter":param,
+                                "Dependent on":self.semantics["symbols"][self.conditional_on[i]],
+                                "Dependency function":conditional.latex.replace("$",""),
+                                "Dependency parameter":p,
+                                "Value":v})
+                        else:
+                            key = p
+                            if key in parameters:
+                                raise KeyError(f"Parameter {key} is not uniquely defined.")
+                            parameters[key]=v
+            # Check marginal distributions as well as fixed parameters of conditional distributions
+            if self.conditional_on[i] is None:
+                fixed_params = dis.parameters.items()
+                dist_type = type(dis)
+            elif complete:
+                fixed_params = dis.fixed_parameters.items()
+                dist_type = type(dis.distribution)
+            else: # don't include fixed parameters in the short parameter summary.
+                fixed_params = {}
+            for param,value in fixed_params:
+                if complete:
+                    parameters.append({
+                        "Distribution":dist_type.__name__.removesuffix("Distribution"),
+                        "Variable":self.semantics["symbols"][i],
+                        "Distribution parameter":param,
+                        "Dependent on":None if self.conditional_on[i] is None else "Fixed",
+                        "Dependency function":None,
+                        "Dependency parameter":None,
+                        "Value":value})
+                else:
+                    key = param
+                    if key in parameters:
+                        raise ValueError(f"Parameter {key} is not uniquely defined.")
+                    parameters[key]=value
+        return pd.DataFrame(parameters) if complete else parameters
+
+    def __str__(self):
+        """
+        Printout of the model.
+        """
+        return self.parameters(complete=True)
 
     def reset_labels(self):
         """
