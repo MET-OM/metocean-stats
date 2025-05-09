@@ -615,6 +615,22 @@ def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, windo
     
     return results_df
 
+def table_monthly_weather_window_MutlipleVariables(data: pd.DataFrame, var: str, threshold: float, window_size=12,output_file: str = None):
+    # var should be a list of variables and threshold should be a list of thresholds
+    # more outputs than table_monthly_weather_window
+    # Written by clio-met
+    results = []
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    for month in range(1, 13):
+        avg_duration, p10, p50, p90, p95, max = stats.weather_window_length_MutlipleVariables(data,vars=var,threshold=threshold,op_duration=window_size,timestep=3,month=month)
+        results.append((avg_duration, p10, p50, p90, p95, max))
+    results_df = pd.DataFrame(results, columns=['Mean', 'P10', 'P50', 'P90', 'P95', 'Max'], index=months).T.round(1)
+    if output_file:
+        # Save results to CSV
+        results_df.to_csv('monthly_weather_window_results_mv.csv')
+    
+    return results_df
+
 def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=None, output_file='table_profile_stats.csv'):
     # Initialize an empty list to store the results
     results = []
