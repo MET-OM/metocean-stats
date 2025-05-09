@@ -351,6 +351,44 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
 #     return df2 
 
 
+def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+    # var is a list of variables (max 3) as well as thresholds (one for each variable)
+    results_df = stats.calculate_monthly_weather_window_MultipleVariables(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
+    # Plot the results
+    fig, ax = plt.subplots(figsize=(12, 6))
+    results_df.T.plot(marker='o')
+    lines = results_df.T.plot(marker='o')
+    plt.title(str(var)+' < '+str(threshold)+' for ' + str(window_size)+' hours')
+    plt.xlabel('Month')
+    plt.ylabel('Duration [days]')
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    
+    if add_table:
+        # Get legend colors and labels
+        legend_colors = [line.get_color() for line in lines.get_lines()]
+        # Add the table of results_df under the plot
+        plt.xticks([])
+        plt.xlabel('')
+        plt.legend('',frameon=False)
+        cell_text = []
+        for row in range(len(results_df)):
+            cell_text.append(results_df.iloc[row].values)
+        table = plt.table(cellText=cell_text, colLabels=results_df.columns, rowLabels=results_df.index, loc='bottom')
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 1.5)
+        # Make the blue color value
+        cell_dict = table.get_celld()
+        for i in range(1,len(legend_colors)+1):
+            cell_dict[(i, -1)].set_facecolor(legend_colors[i-1])
+    plt.tight_layout()
+    if output_file != "": plt.savefig(output_file)
+
+    return fig, table
+
+
 def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150],reverse_yaxis=False, output_file='stats_profile.png'):
     df = tables.table_profile_stats(data=data, var=var, z=z, output_file=None)
     df = df.drop(['Std.dev', 'Max Speed Event'],axis=1)
