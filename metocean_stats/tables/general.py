@@ -628,7 +628,6 @@ def table_monthly_weather_window_MutlipleVariables(data: pd.DataFrame, var: str,
     if output_file:
         # Save results to CSV
         results_df.to_csv('monthly_weather_window_results_mv.csv')
-    
     return results_df
 
 def table_profile_stats(data: pd.DataFrame, var: str, z=[10, 20, 30], var_dir=None, output_file='table_profile_stats.csv'):
