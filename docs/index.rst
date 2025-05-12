@@ -372,6 +372,7 @@ Monthly Weather Window Multiple Variables Plot
        threshold=[12.35,2,8], 
        window_size=62,
        timestep=3,
+       add_table=True,
        output_file='NORA10_monthly_weather_window_mv_plot.png'
    )
 
