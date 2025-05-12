@@ -420,36 +420,6 @@ def scatter(df,var1,var2,location,regression_line,qqplot=True):
     return fig
 
 
-
-
-def calculate_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
-    results = []
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    for month in range(1, 13):
-        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],threshold=threshold,op_duration=window_size,timestep=3,month=month)
-        results.append((p10,p50, avg_duration, p90))
-    results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
-    if output_file:
-        # Save results to CSV
-        results_df.to_csv('monthly_weather_window_results.csv')
-    
-    return results_df
-
-def calculate_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=5, window_size=12,timesteps=3, output_file: str = None):
-    # Added by clio-met
-    results = []
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    for month in range(1, 13):
-        avg_duration, p10, p50, p90, p95, max = weather_window_length(time_series=data[var],threshold=threshold,op_duration=window_size,timestep=timestep,month=month)
-        results.append(( avg_duration,p10,p50,p90,p95,max))
-    results_df = pd.DataFrame(results, columns=['Mean', 'P10', 'P50', 'P90', 'P95,' 'Max'], index=months).T.round(1)
-    if output_file:
-        # Save results to CSV
-        results_df.to_csv('monthly_weather_window_results.csv')
-    
-    return results_df
-
-
 def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12):
     """
     Calculate the mean and percentiles of consecutive periods where a variable
