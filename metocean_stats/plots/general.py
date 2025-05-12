@@ -293,8 +293,8 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
     if output_file != "": plt.savefig(output_file)
     return fig
 
-def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
-    results_df = stats.calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size)
+def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestesp=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+    results_df = stats.calculate_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
     results_df.T.plot(marker='o')
@@ -351,14 +351,19 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
 #     return df2 
 
 
-def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=[5], window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     # var is a list of variables (max 3) as well as thresholds (one for each variable)
-    results_df = stats.calculate_monthly_weather_window_MultipleVariables(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
+    results_df = tables.table_monthly_weather_window_MultipleVariables(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
     results_df.T.plot(marker='o')
     lines = results_df.T.plot(marker='o')
-    plt.title(str(var)+' < '+str(threshold)+' for ' + str(window_size)+' hours')
+    title=[]
+    for i in range(len(var)):
+        title.append(var[i]+' < '+str(threshold[i]))
+    title=', '.join(title)
+    title=title+' for ' + str(window_size)+' hours'
+    plt.title(title)
     plt.xlabel('Month')
     plt.ylabel('Duration [days]')
     plt.legend()
