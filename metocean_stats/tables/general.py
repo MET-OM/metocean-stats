@@ -602,11 +602,11 @@ def monthly_directional_percentiles(
     return monthly_tables
     
 
-def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
+def table_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestep=3, output_file: str = None):
     results = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     for month in range(1, 13):
-        avg_duration, p10, p50, p90 = stats.weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=3)
+        avg_duration, p10, p50, p90 = stats.weather_window_length(time_series=data[var],month=month ,threshold=threshold,op_duration=window_size,timestep=timestep)
         results.append((p10,p50, avg_duration, p90))
     results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
     if output_file:
