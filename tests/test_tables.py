@@ -422,6 +422,16 @@ def test_table_weather_window_thresholds(ds=ds):
         pass
     else:
         raise ValueError("Shape is not correct")
+
+def test_table_monthly_weather_window_mv(ds=ds):
+    output_file = 'table_ww_threshold.csv'
+    df = tables.table_monthly_weather_window_MultipleVariables(ds,var=['HS','TP'],threshold=[2,8],op_duration=24,timestep=3,output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (6, 12):
+        pass
+    else:
+        raise ValueError("Shape is not correct")
     
 def test_table_daily_percentile_basic():
     # Test the basic functionality with wind speed data (W10)
