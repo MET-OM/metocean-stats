@@ -353,11 +353,29 @@ Monthly Weather Window Plot
        df, 
        var='HS', 
        threshold=4, 
-       window_size=12, 
+       window_size=12,
+       timestep=3,
        output_file='NORA10_monthly_weather_window4_12_plot.png'
    )
 
 .. image:: files/NORA10_monthly_weather_window4_12_plot.png
+   :width: 500
+
+Monthly Weather Window Multiple Variables Plot
+----------------------------------------------
+
+.. code-block:: python
+
+   plots.plot_monthly_weather_window_MultipleVariables(
+       df, 
+       var=['W10','HS','TP'], 
+       threshold=[12.35,2,8], 
+       window_size=62,
+       timestep=3,
+       output_file='NORA10_monthly_weather_window_mv_plot.png'
+   )
+
+.. image:: files/NORA10_monthly_weather_window_mv_plot.png
    :width: 500
 
 Number Of Hours Per Year Below A Threshold Plot
