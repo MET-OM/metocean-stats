@@ -353,6 +353,7 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
 
 def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=[5], window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     # var is a list of variables (max 3) as well as thresholds (one for each variable)
+    # adjusted by clio-met
     results_df = tables.table_monthly_weather_window_MultipleVariables(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
