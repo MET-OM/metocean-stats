@@ -344,20 +344,22 @@ Joint Distribution Hs-Tp Multi Plot with binned Var3
 .. image:: files/Hs.Tp.joint.distribution.multi.binned.var3.png
    :width: 500
 
-Monthly Weather Window Plot
----------------------------
+Monthly Weather Window Multiple Variables Plot (Waiting time in Days)
+----------------------------------------------
 
 .. code-block:: python
 
    plots.plot_monthly_weather_window(
        df, 
-       var='HS', 
-       threshold=4, 
-       window_size=12, 
-       output_file='NORA10_monthly_weather_window4_12_plot.png'
+       var=['W10','HS','TP'], 
+       threshold=[12.35,2,8], 
+       window_size=62,
+       timestep=3,
+       add_table=True,
+       output_file='NORA10_monthly_weather_window_mv_plot.png'
    )
 
-.. image:: files/NORA10_monthly_weather_window4_12_plot.png
+.. image:: files/NORA10_monthly_weather_window_mv_plot.png
    :width: 500
 
 Number Of Hours Per Year Below A Threshold Plot
