@@ -67,7 +67,7 @@ def test_plot_joint_distribution_Hs_Tp(ds=ds):
 
 def test_plot_monthly_weather_window(ds=ds):
     output_file = 'test_monthly_weather_window_mv.png'
-    fig, table = plots.plot_monthly_weather_window_MultipleVariables(ds, var=['HS','TP'], threshold=[2,8], timestep=3, window_size=12, output_file=output_file)
+    fig, table = plots.plot_monthly_weather_window(ds, var=['HS','TP'], threshold=[2,8], timestep=3, window_size=12, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if table._loc == 17:
