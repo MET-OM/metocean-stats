@@ -293,7 +293,7 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
     if output_file != "": plt.savefig(output_file)
     return fig
 
-def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestesp=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     results_df = tables.table_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
