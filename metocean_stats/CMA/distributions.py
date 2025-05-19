@@ -1,9 +1,9 @@
 import virocon
 import numpy as np
 from scipy.signal import find_peaks
-from virocon.distributions import Distribution
 
 from virocon.distributions import (
+    Distribution,
     ScipyDistribution,
     NormalDistribution,
     WeibullDistribution,
@@ -167,3 +167,11 @@ class LoNoWeDistribution(Distribution):
 
     def __repr__(self):
         return f"\n < {self.shifting_point:.3f}: {str(self.lognormal)}, \n > {self.shifting_point:.3f}: {str(self.weibull)} \n"
+
+class GeneralizedNormalDistribution(ScipyDistribution):
+    """
+    A generalization of the normal distribution which adds a shape parameter beta.
+    This is a symmetric distribution to model data which is similar to normal, 
+    but has e.g. heavier or lighter tails.
+    """
+    scipy_dist_name = "gennorm"
