@@ -605,7 +605,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         
         # Set default style.
         if labels is None:
-            labels = [f"{self.semantics["symbols"][1]} - {int(100*p)}%" for p in percentiles]
+            labels = [f"{self.semantics['symbols'][1]} - {int(100*p)}%" for p in percentiles]
         elif np.array(labels).size != percentiles.size:
             raise ValueError("Number of labels does not fit the number of percentiles.")
         if "color" not in kwargs and "c" not in kwargs:
@@ -944,8 +944,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             subplots = False
         # Check labels    
         if labels is None:
-            labels = [r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
-                      f" = {v} {self.semantics["units"][slice_dim]}" for v in slice_values]
+            labels = [r" $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+                      f" = {v} {self.semantics['units'][slice_dim]}" for v in slice_values]
         elif subplots and not np.array(labels).size == len(slice_values):
             raise ValueError("The number of labels does not match number of slices.")
         
@@ -1162,8 +1162,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         handles,_ = CS.legend_elements()
         self.plot_semantics(ax,*axis_labels)
 
-        ax.set_title(r" $\it{"+f"{self.semantics["symbols"][slice_dim]}"+r"}$"+
-            f" = {slice_value} {self.semantics["units"][slice_dim]}")
+        ax.set_title(r" $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+            f" = {slice_value} {self.semantics['units'][slice_dim]}")
 
         self.legend_handles += handles
         self.legend_labels += list(labels)
@@ -1322,9 +1322,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         def _label(dim):
             label = ""
-            if names:   label += f"{self.semantics["names"][dim]}"
-            if symbols: label += r" $\it{"+f"{self.semantics["symbols"][dim]}"+r"}$"
-            if units:   label += f" ({self.semantics["units"][dim]})"
+            if names:   label += f"{self.semantics['names'][dim]}"
+            if symbols: label += r" $\it{"+f"{self.semantics['symbols'][dim]}"+r"}$"
+            if units:   label += f" ({self.semantics['units'][dim]})"
             return label
 
         if x is not None:
