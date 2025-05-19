@@ -1,15 +1,41 @@
+"""
+Procedures relating to environmental contours.
+
+The IFORM and ISORM procedures are slighly modified from virocon, under the following licence:
+
+-----------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2017-2021 virocon developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
+"""
+
 import virocon
 from virocon.contours import Contour
 from virocon import GlobalHierarchicalModel, TransformedModel
 from scipy.spatial.distance import cdist
 import numpy as np
 import scipy.stats as sts
-"""
-Classes for environmental contours.
-
-This is a temporary simplification of the virocon respective module, 
-to work with until changes can eventually be merged there.
-"""
 
 __all__ = [
     "IFORMContour",
@@ -83,17 +109,14 @@ def get_contour(
 
 def sort_contour(contour):
     """
-    Sort a 2D contour by a greedy approach of iteratively
-    adding the nearest point to the list.
-    Requires that points are "nice", i.e., not very noisy.
-    Due to the nature of the algorithm the output will be different length:
-    The first point is added to the end, and some points may be skipped.
+    Sort a 2D contour by a greedy approach of iteratively adding the nearest point to the list.
+    This will not work at all if the points are not too noisy or too many, so always check the result.
     Thanks to ChatGPT.
         
     Parameters
     ------------
         contour : np.ndarray
-            (N, 2) array of unordered 2D points, which make up a closed contour.
+            (N, 2) array of 2D points, which together constitute a closed contour.
     """
     N = len(contour)
     
@@ -342,14 +365,11 @@ class ISORMContour(Contour):
 
     """
 
-    def __init__(self, model, alpha, n_points=180, distribute_evenly=None):
+    def __init__(self, model, alpha, n_points=180, point_distribution="random"):
         self.model = model
         self.alpha = alpha
         self.n_points = n_points
-
-        if distribute_evenly is None:
-            distribute_evenly = True if n_points > 1000 else False
-        self.distribute_evenly = bool(distribute_evenly)
+        self.point_distribution = point_distribution
 
         super().__init__()
 
@@ -377,10 +397,14 @@ class ISORMContour(Contour):
             _x = np.cos(_phi)
             _y = np.sin(_phi)
             unit_sphere_points = np.stack((_x, _y), axis=1)
+        elif self.point_distribution == "equal":
+            from virocon._nsphere import NSphere
+            sphere = NSphere(self.model.n_dim,self.n_points)
+            unit_sphere_points = sphere.unit_sphere_points
         elif self.point_distribution == "random":
             unit_sphere_points = get_random_unit_sphere_points(n_dim=self.model.n_dim,n_samples=self.n_points)
         elif self.point_distribution == "gridded":
-            unit_sphere_points = get_3D_gridded_unit_sphere_points(primary_dim=0,n_polar=self.n_points,n_azimuthal=2*self.n_points)
+            unit_sphere_points = get_3D_gridded_unit_sphere_points(primary_dim=0,n_polar=self.n_points,n_azimuthal=self.n_points)
         sphere_points = beta * unit_sphere_points
 
         # Get probabilities for coordinates of shape.
