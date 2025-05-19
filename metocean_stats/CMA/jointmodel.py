@@ -22,7 +22,6 @@ from .predefined import (
     get_OMAE2020_Hs_Tz,
     get_OMAE2020_V_Hs,
     get_LoNoWe_hs_tp,
-    get_windsea_hs_tp
 )
 
 from .contours import (
@@ -54,9 +53,6 @@ def _load_preset(preset:str|Callable):
         semantics["swap_axis"] = False
     elif preset == 'dnvgl_hs_u':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
-        semantics["swap_axis"] = True
-    elif preset == 'windsea_hs_tp':
-        dist_descriptions,fit_descriptions,semantics = get_windsea_hs_tp()
         semantics["swap_axis"] = True
     elif preset == 'lonowe_hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
@@ -142,6 +138,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         self.legend_handles = []
         self.legend_labels = []
 
+        self.data = pd.DataFrame()
+
         super().__init__(self.dist_descriptions)
 
     def fit(
@@ -185,10 +183,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         
         # Fit model and save data.
         data = data[vars]
-        super().fit(data.values,self.fit_descriptions)
         self.data = data
 
-    def plot_marginal_quantiles(self,sample=None,axes:list=None):
+        super().fit(data.values,self.fit_descriptions)
+
+    def plot_marginal_quantiles(self,axes:list=None,sample=None):
         """
         Plot the theoretical (distribution) vs empirical (sample) quantiles.
         """
@@ -203,6 +202,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         Plot the dependence functions of the conditional parameters.
         """
+        if axes is not None:
+            axes = np.array(axes).ravel()
         return virocon.plot_dependence_functions(self,self.semantics,axes=axes)
 
     def plot_histograms_of_interval_distributions(self,plot_pdf=True,max_cols=4):
@@ -228,7 +229,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         Contours can be specified either through a density directly,
         or by choosing any 2D point of origin.
 
-        Parameters:
+        Parameters
         -----------
         ax : matplotlib axes, optional
             Plot on existing axes object.
@@ -980,12 +981,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             coords = contour.coordinates
             coords = coords[np.abs(coords[:,slice_dim]-level)<slice_width]
             if len(coords)==0:
-                print("Warning: Found no contour points at level {level}+-{slice_width}. Stopping.")
-                break
+                print(f"Warning: Found no contour points at level {level}+-{slice_width}. Skipped.")
+                continue
             coords = np.delete(coords,slice_dim,axis=1)
             coords = sort_contour(coords)
 
-            if self.swap_axis:
+            if self.swap_axis and slice_dim==0:
                 y,x = coords.T
             else:
                 x,y = coords.T
@@ -999,7 +1000,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 handle = axi.plot(x,y,**plot_kwargs)[0]
 
             if subplots:
-                self.plot_semantics(ax=axi,*axis_labels)
+                self.plot_semantics(axi,*axis_labels)
                 if labels is not None:
                     axi.set_title(labels[i])
             else:
@@ -1073,7 +1074,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                              " corresponding to lower and upper"
                              " limits per dimension.")
         limits = np.sort(limits,axis=1)
-
         # Create query with shape (samples x 3) and sample pdf
         gridpoints = [
             np.linspace(limits[0,0],limits[0,1],grid_steps),
@@ -1085,6 +1085,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         X,Y = np.delete(gridpoints,slice_dim,0) # NxN,NxN
         gridpoints = gridpoints.reshape(3,-1).T # 3xN**2
         Z = self.pdf(gridpoints).reshape([grid_steps,grid_steps]) # NxN
+        if np.any(np.isnan(Z)):
+            print("WARNING: Found NaN values in pdf, these are set to 0. "\
+                  "This is usually due to sampling limits being outside " \
+                  "the domain of the model (distributions or dep. funcs).")
+        Z = np.nan_to_num(Z)
 
         # Check marginal_values
         if density_levels is not None and marginal_values is not None:
@@ -1164,8 +1169,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         self.legend_labels += list(labels)
 
         return ax
-
-
 
     def plot_3D_isodensity_contour(
             self,
@@ -1259,7 +1262,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 Y[i] = None
                 Z[i] = None
 
-        fig,ax = plt.subplots(subplot_kw={"projection":"3d"})
+        if ax is None:
+            _,ax = plt.subplots(subplot_kw={"projection":"3d"})
         ax.plot_surface(Z,X,Y,**kwargs)
         self.plot_semantics(ax=ax)
 
@@ -1287,7 +1291,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             "swap_axis":False,
         }
 
-    def plot_semantics(self,ax=None,x=None,y=None,z=None):
+    def plot_semantics(self,ax=None,x=None,y=None,z=None, names=True, symbols=True, units=True):
         """
         Plot model semantics on matplotlib axis.
         By default, all semantics are plotted.
@@ -1307,7 +1311,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if self.n_dim == 2:
                 x,y = (1,0) if self.swap_axis else (0,1)
             if self.n_dim == 3:
-                x,y,z = (0,2,1) if self.swap_axis else (0,1,2)
+                #x,y,z = (0,2,1) if self.swap_axis else 
+                x,y,z = (0,1,2)
 
         if ax is None:
             if self.n_dim == 3:
@@ -1315,27 +1320,29 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             else:
                 _,ax = plt.subplots()
 
-        names = self.semantics["names"]
-        symbols = self.semantics["symbols"]
-        units = self.semantics["units"]
-        labels = [f"{names[d]},"+r" $\it{"+f"{symbols[d]}"+r"}$"+f" ({units[d]})" for d in np.arange(self.n_dim)]
+        def _label(dim):
+            label = ""
+            if names:   label += f"{self.semantics["names"][dim]}"
+            if symbols: label += r" $\it{"+f"{self.semantics["symbols"][dim]}"+r"}$"
+            if units:   label += f" ({self.semantics["units"][dim]})"
+            return label
 
         if x is not None:
-            ax.set_xlabel(labels[x])
+            ax.set_xlabel(_label(x))
         if y is not None:
-            ax.set_ylabel(labels[y])
+            ax.set_ylabel(_label(y))
         if z is not None:
-            ax.set_zlabel(labels[z])
+            ax.set_zlabel(_label(z))
 
         return ax
 
-    def parameters(self,complete=False):
+    def parameters(self,complete=True):
         """
         Get a dictionary containing the value of all parameters, including within dependency functions.
 
         Parameters
         ----------
-        complete : bool, default False
+        complete : bool, default True
              - If True, a pandas dataframe is returned containing a complete description of each value.
              - If False, a dictionary is returned, where the keys are distribution parameters if the 
                 distribution is marginal, or dependency parameter if the distribution is dependent.
@@ -1350,12 +1357,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 for param,conditional in dis.conditional_parameters.items():
                     for p,v in conditional.parameters.items():
                         if complete:
+                            eq = conditional.latex # dependency function
                             parameters.append({
                                 "Distribution":type(dis.distribution).__name__.removesuffix("Distribution"),
                                 "Variable":self.semantics["symbols"][i],
                                 "Distribution parameter":param,
                                 "Dependent on":self.semantics["symbols"][self.conditional_on[i]],
-                                "Dependency function":conditional.latex.replace("$",""),
+                                "Dependency function":"Missing" if eq is None else eq.replace("$",""),
                                 "Dependency parameter":p,
                                 "Value":v})
                         else:
@@ -1378,9 +1386,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                         "Distribution":dist_type.__name__.removesuffix("Distribution"),
                         "Variable":self.semantics["symbols"][i],
                         "Distribution parameter":param,
-                        "Dependent on":None if self.conditional_on[i] is None else "Fixed",
-                        "Dependency function":None,
-                        "Dependency parameter":None,
+                        "Dependent on":"-" if self.conditional_on[i] is None else "Fixed",
+                        "Dependency function":"-",
+                        "Dependency parameter":"-",
                         "Value":value})
                 else:
                     key = param
