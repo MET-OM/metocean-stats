@@ -602,10 +602,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             Limit in the marginal variable (e.g. Hs) for which to plot percentiles (of e.g. Tp/Tz).
         """
         percentiles = np.array(percentiles)
-        
         # Set default style.
         if labels is None:
-            labels = [f"{self.semantics['symbols'][1]} - {int(100*p)}%" for p in percentiles]
+            labels = [f"{self.semantics['symbols'][1]} - {100*p:g}%" for p in percentiles]
         elif np.array(labels).size != percentiles.size:
             raise ValueError("Number of labels does not fit the number of percentiles.")
         if "color" not in kwargs and "c" not in kwargs:
@@ -722,7 +721,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             bins=None,
             label:str=None,
             norm=LogNorm(),
-            density=True,
+            density=False,
             **kwargs):
         """
         Plot data as a density plot.
@@ -747,8 +746,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             no label is used.
         norm : matplotlib colornorm, default LogNorm
             The color representation of density/histogram values.
-        density : bool, default True
-            If True, becomes a density plot (sum 1). If false, a histogram..
+        density : bool, optional
+            If True, becomes a density plot (sum 1). If false, a histogram.
         **kwargs : keyword arguments
             These will be passed to the hist2d plot function.
         """
@@ -955,7 +954,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 cmap = "viridis"
             if type(cmap) is str:
                 cmap = plt.get_cmap(cmap)
-            kwargs["color"] = cmap(slice_values/np.max(slice_values))
+            kwargs["color"] = cmap(np.abs(slice_values)/np.max(np.abs(slice_values)))
 
         # Check remaining kwargs
         for k,v in kwargs.items():
@@ -1223,7 +1222,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if np.array(limits).size == 1: # includes None
             limits = 3 if limits is None else limits
             lim_lower = np.minimum([0,0,0],self.data.min().to_numpy())
-            limits = np.array([lim_lower,self.data.max().to_numpy()*limits]).T
+            limits = np.array([lim_lower*limits,self.data.max().to_numpy()*limits]).T
             if marginal_value is not None:
                 limits[slice_dim] = [limits[slice_dim][0],marginal_value]
         elif np.array(limits).shape != (3,2):
@@ -1235,7 +1234,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # Not very efficient but it works
         fig,contours = plt.subplots()
         if not hasattr(slice_values,"__len__"):
-            slice_values = np.linspace(0.1,limits[slice_dim][1],slice_values)
+            slice_values = np.linspace(limits[slice_dim][0],limits[slice_dim][1],slice_values)
         for slice_value in slice_values:
             self.plot_3D_isodensity_contour_slice(
                 ax=contours,density_levels=density_level,marginal_values=marginal_value,
