@@ -379,7 +379,7 @@ def test_plot_cca_profile():
 
 def test_plot_binned_error_metric():
     output_file = 'plot_binned_error_metric.png'
-    fig = plots.plot_binned_error_metric(dff=[ds,ds],var_bin = 'HS',var_bin_unit='m', var_ref='TP',var_comp='TP',var_comp_unit='s', var_bin_size=0.5,threshold_min=100, plot_y='bias',title='Example title',output_file=output_file)
+    fig = plots.plot_binned_error_metric(ds,var_bin = 'HS',var_bin_unit='m', var_ref='TP',var_comp='TP',var_comp_unit='s', var_bin_size=0.5,threshold_min=100, plot_y='bias',title='Example title',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if fig.dpi == 100.0:
