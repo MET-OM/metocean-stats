@@ -88,7 +88,6 @@ def table_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dis
 
 def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', units='m',adjustment='NORSOK',method='default', threshold='default',output_file='directional_extremes_weibull.csv'):
     params, return_periods, sector_prob,  threshold_values, num_events_per_year = stats.directional_extremes(data=data, var=var, var_dir=var_dir, periods=periods,distribution=distribution, adjustment=adjustment, method=method, threshold=threshold)    
-
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
     # Initialize lists to store table data
     sector_prob = ['%'] + [round(value, 2) for value in sector_prob] + [100.00]
@@ -96,7 +95,7 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
     scale = [units] + [round(scale, 3) if isinstance(scale, (int, float)) else scale for _, _, scale in params]
     location = [units] + [round(loc, 2) if isinstance(loc, (int, float)) else loc for _, loc, _ in params]
     shape = ['-' if (isinstance(element, (list, np.ndarray)) and len(element) == 0) else element for element in shape]  
-
+    
     # Create the table data dictionary
     table_data = {
         'Direction sector': dir,
@@ -105,12 +104,12 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
         'Scale': scale,
         'Location': location,
     }
-
+    
     if threshold_values:
         table_data['Threshold'] = [units] + [round(x, 2) for x in threshold_values]
     if num_events_per_year:
         table_data['Events'] = ['1/year'] + [round(x, 1) for x in num_events_per_year]
-    
+     
     return_periods = return_periods.T.tolist()
     # Fill in return values for each period
     for i, period in enumerate(periods):
@@ -119,7 +118,7 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
     df = pd.DataFrame(table_data)
     if output_file:
         df.to_csv(output_file)
-
+    
     return df
 
 def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_reurn_values.csv'):
@@ -160,10 +159,10 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp
         df.to_csv(output_file,index=False)
 
     return df
-    
+
+
 def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
     weibull_params, return_periods, sector_prob, threshold_values, num_events_per_year = stats.directional_extremes(data=data, var=var_hs, var_dir=var_dir, periods=periods,distribution='Weibull3P_MOM', adjustment=adjustment)
-
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']    
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
     # Initialize lists to store table data
@@ -171,32 +170,35 @@ def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',va
     rv_hs = np.zeros((13,len(periods)))
     rv_tp = np.zeros((13,len(periods)))
     dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
-
     aux_funcs.add_direction_sector(data=data,var_dir=var_dir)
     k=0
     for dir in range(0,360,30):
         k=k+1
         sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods,adjustment=adjustment)
-        for i in range(len(periods)):
-            rv_hs[k-1,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
-            rv_tp[k-1,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
-
+        if len(sector_data)>160:
+        #if len(sector_data)>0:
+            a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods,adjustment=adjustment)
+            for i in range(len(periods)):
+                rv_hs[k-1,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+                rv_tp[k-1,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
+        else:
+            rv_hs[k-1,:]=np.nan
+            rv_tp[k-1,:]=np.nan
     #append annual
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods,adjustment=None)
     for i in range(len(periods)):
+        #print('hs_'+str(periods[i]),hs_tpl_tph['hs_'+str(periods[i])].max())
         rv_hs[12,i] = round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
         rv_tp[12,i] = round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
 
     # Define the threshold values (annual values) for each column
     thresholds_hs = rv_hs[12,:]
     thresholds_tp = rv_tp[12,:]
-
+    print(thresholds_hs)
     # Replace values in each column that exceed the thresholds
     for col in range(rv_hs.shape[1]):
         rv_hs[:, col] = np.minimum(rv_hs[:, col], thresholds_hs[col])
         rv_tp[:, col] = np.minimum(rv_tp[:, col], thresholds_tp[col])
-
     # Create the table data dictionary
     table_data = {
         'Direction': dir_label,
@@ -401,19 +403,20 @@ def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, per
         df.loc[i,'H_max/Hs'] = df.loc[i,'H_max[m]']/ df.loc[i,'Hs[m]']
 
     if output_file:
-        df[['Return period [years]','Hs[m]', 'H_max/Hs','H_max[m]','Crest heigh[m]','T_Hmax(P5-model) [s]','T_Hmax(Mean-model) [s]','T_Hmax(P95-model) [s]']].round(2).to_csv(output_file,index=False)
+        df[['Return period [years]','Hs[m]', 'H_max/Hs','H_max[m]','Crest height[m]','T_Hmax(P5-model) [s]','T_Hmax(Mean-model) [s]','T_Hmax(P95-model) [s]']].round(2).to_csv(output_file,index=False)
     
     return df
 
 def table_directional_Hmax_return_periods(ds, var_hs='HS', var_tp='TP', var_dir='DIRM', periods=[1, 10, 100, 10000], adjustment='NORSOK', output_file='table_dir_Hmax_return_values.csv'):
     df = table_directional_joint_distribution_Hs_Tp_return_values(ds, var_hs=var_hs, var_tp=var_tp, var_dir=var_dir, periods=periods, adjustment=adjustment, output_file=None)
+    print(df)
     hs_columns = [col for col in df.columns if col.startswith('Hs')]
     tp_columns = [col for col in df.columns if col.startswith('Tp')]
     hmax_columns = [col.replace('Hs[m]', 'Hmax[m]') for col in df.columns if col.startswith('Hs[m]')]
-
+    
     if not hs_columns or not tp_columns:
         raise ValueError("Hs or Tp columns are missing or empty in the dataframe.")
-
+    
     df[hmax_columns] = np.nan
     
     # Joint distribution calculation
@@ -427,14 +430,19 @@ def table_directional_Hmax_return_periods(ds, var_hs='HS', var_tp='TP', var_dir=
         df[f'T_Hmax(P5-model) [s] [{periods[i]} years]'] = 0.9 * P5_model[hs_columns[i]]
         df[f'T_Hmax(Mean-model) [s] [{periods[i]} years]'] = 0.9 * Mean_model[hs_columns[i]]
         df[f'T_Hmax(P95-model) [s] [{periods[i]} years]'] = 0.9 * P95_model[hs_columns[i]]
-    
+     
     tHmax_columns = [col for col in df.columns if col.startswith('T_Hmax')]
     
     # Estimate Hmax
     for i in range(len(hmax_columns)):
         for j in range(df.shape[0]):
             df.loc[j, hmax_columns[i]] = stats.estimate_Hmax(df.loc[j, hs_columns[i]], df.loc[j, tp_columns[i]], twindow=3, k=1.0)
-    
+
+    # Replace values in each column that exceed the thresholds
+    for i in range(len(hmax_columns)):
+        omni=df.loc[12, hmax_columns[i]]
+        df.loc[df[hmax_columns[i]] > omni, hmax_columns[i]] = omni
+
     # Output to file if specified
     if output_file:
         selected_columns = ['Direction'] + hmax_columns + tHmax_columns

@@ -798,7 +798,7 @@ def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 1
     fig, ax = plt.subplots()
     for i in periods:
         plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years')
-        
+    
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Direction',fontsize=15)
     plt.legend()
