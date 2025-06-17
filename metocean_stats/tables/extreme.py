@@ -392,12 +392,12 @@ def table_Hmax_crest_return_periods(ds,var_hs='HS', var_tp = 'TP',depth=200, per
     df['T_Hmax(P5-model) [s]'] =  0.9 * df['Tp(P5-model) [s]'] # according to Goda (1988)
     df['T_Hmax(Mean-model) [s]'] =  0.9 * df['Tp(Mean-model) [s]'] # according to Goda (1988)
     df['T_Hmax(P95-model) [s]'] =  0.9 * df['Tp(P95-model) [s]'] # according to Goda (1988)
-    df['Crest heigh[m]'] = np.nan
+    df['Crest height[m]'] = np.nan
     df['H_max[m]'] = np.nan
     df['H_max/Hs'] = np.nan
     for i in range(df.shape[0]):
-        df.loc[i,'Crest heigh[m]'] = stats.estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'T_Hmax(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
-        #df.loc[i,'Crest heigh[m]'] = estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'Tp(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
+        df.loc[i,'Crest height[m]'] = stats.estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'T_Hmax(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
+        #df.loc[i,'Crest height[m]'] = estimate_forristal_maxCrest(df.loc[i,'Hs[m]'],df.loc[i,'Tp(Mean-model) [s]'],depth=depth, twindow=time_step, sea_state=sea_state)
         df.loc[i,'H_max[m]'] = stats.estimate_Hmax(df.loc[i,'Hs[m]'], df.loc[i,'T_Hmax(Mean-model) [s]'], twindow=3, k=1.0)
         #df.loc[i,'H_max[m]'] = estimate_Hmax(df.loc[i,'Hs[m]'], df.loc[i,'Tp(Mean-model) [s]'], twindow=3, k=1.0)
         df.loc[i,'H_max/Hs'] = df.loc[i,'H_max[m]']/ df.loc[i,'Hs[m]']
@@ -714,11 +714,11 @@ def table_extreme_total_water_level(data: pd.DataFrame, var_hs='HS',var_tp = 'TP
     df = table_Hmax_crest_return_periods(data,var_hs=var_hs, var_tp =var_tp,depth=depth, periods=periods, sea_state = 'short-crested', output_file=None)
     df['Tidal level(HAT)[m]'] = data[var_tide].max()
     shape, loc, scale, df['Storm surge[m]'] = stats.RVE_ALL(data,var=var_surge,periods=periods,distribution='GEV',method='default',threshold='default')
-    df['Total water level[m]'] = df['Crest heigh[m]'] + df['Storm surge[m]'] + df['Tidal level(HAT)[m]']
+    df['Total water level[m]'] = df['Crest height[m]'] + df['Storm surge[m]'] + df['Tidal level(HAT)[m]']
 
     # Create a new dataframe with the results
     if output_file:
-        df[['Return period [years]', 'Storm surge[m]','Tidal level(HAT)[m]','Crest heigh[m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
+        df[['Return period [years]', 'Storm surge[m]','Tidal level(HAT)[m]','Crest height[m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
     return df
 
 
@@ -741,10 +741,10 @@ def table_storm_surge_for_rv_hs(data: pd.DataFrame, var_hs='HS',var_tp='TP',var_
     df['S(P5-model) [m]'] =  df['S(Mean-model) [m]'] - 1.65*df['S(std-model) [m]']
     df['S(P95-model) [m]'] = df['S(Mean-model) [m]'] + 1.65*df['S(std-model) [m]']
 
-    df['Total water level[m]'] = df['Crest heigh[m]'] + df['S(P95-model) [m]'] + df['Tidal level(HAT)[m]']
+    df['Total water level[m]'] = df['Crest height[m]'] + df['S(P95-model) [m]'] + df['Tidal level(HAT)[m]']
 
     if output_file:
-        df[['Return period [years]', 'Hs[m]','Crest heigh[m]','Tidal level(HAT)[m]','S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
+        df[['Return period [years]', 'Hs[m]','Crest height[m]','Tidal level(HAT)[m]','S(P5-model) [m]','S(Mean-model) [m]','S(P95-model) [m]','Total water level[m]']].round(2).to_csv(output_file,index=False)
     return df
 
 
