@@ -138,6 +138,112 @@ def plot_points_on_map(lon:list[float]|float,
     plt.close()
     return fig
 
+# Function to plot several points and one main on a map wth LambertConformal projection
+def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png',lon_lim=(),lat_lim=()):
+    '''
+    Plot a set of longitude and latitude on a map, with bathymetry and land features. 
+    
+    Arguments
+    ---------
+    lon : float or list
+        longitude(s) to plot
+    lat : float or list
+        latitude(s) to plot
+    label : str or list of str
+        names corresponding to points
+    bathymetry : str
+        Bathymetry source data. Currently, only NORA3 is supported.
+    output_file : str
+        Output image file name.
+    lon_lim : list
+        Longitude boundaries. Default: input data longitude +- 5.
+    lat_lim : list
+        Latitude boundaries. Default: input data latitude +- 3.
+    
+    Returns
+    -------
+    fig : matplotlib figure object
+
+    Modified version of function plot_points_on_map by clio-met
+    '''
+    
+    lon_list = lon if isinstance(lon, (list, tuple)) else [lon]
+    lat_list = lat if isinstance(lat, (list, tuple)) else [lat]
+    label_list = label if isinstance(label, (list, tuple)) else [label]
+
+    if bathymetry == 'NORA3':
+        ds = xr.open_dataset('https://thredds.met.no/thredds/dodsC/windsurfer/mywavewam3km_files/2022/12/20221231_MyWam3km_hindcast.nc')
+        standard_lon, standard_lat, _ = maps.get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type='rotated_pole')
+        depth = ds['model_depth'].values
+    else:
+        pass
+
+    # Set limits based on plotted points only if no lon/lat limits specified
+    if lat_lim == ():
+        lat_min, lat_max = max(min(lat_list) - 3, -90), min(max(lat_list) + 3, 90)
+    else:
+        lat_min, lat_max = lat_lim
+    if lon_lim == ():
+        lon_min, lon_max = max(min(lon_list) - 5, -180), min(max(lon_list) + 5, 180)
+    else:
+        lon_min, lon_max = lon_lim
+
+    # Central longitude
+    c_l=lon_min+(lon_max-lon_min)/2
+
+    # Markers customization
+    nl=len(label)-1
+    if nl>14:
+        print('The number of points to plot should be < 14')
+        return
+    colors=['k']*nl+['r']
+    markers_symb=['+','D','x','s','o','^','*','v','d','<','p','>','h']
+    markers=markers_symb[0:nl]+['o']
+    markerfacecolors=["None"]*nl+['r']
+    markersize=[10]*nl+[8]
+
+    # Plotting
+    fig = plt.figure(figsize=(10, 8))
+    ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=c_l))
+    i=0
+    for lon, lat, lab in zip(lon_list, lat_list, label_list):
+        ax.plot(lon, lat, marker=markers[i], markersize=markersize[i], markerfacecolor=markerfacecolors[i], linewidth=0, markeredgecolor=colors[i], label=lab, transform=ccrs.PlateCarree())
+        i=i+1
+
+    ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    coast = cfeature.NaturalEarthFeature(category='physical', name='coastline', scale='10m', edgecolor='lightgrey', facecolor='darkkhaki')
+    ax.add_feature(coast)
+
+    if bathymetry == 'NORA3':
+        mask_extent = (
+            (standard_lon >= lon_min) & (standard_lon <= lon_max) &
+            (standard_lat >= lat_min) & (standard_lat <= lat_max)
+        )
+        depth_extent = np.ma.masked_where(~mask_extent, depth)
+        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=30,
+                           cmap='binary', transform=ccrs.PlateCarree())
+        cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.6)
+        cbar.set_label('Depth [m]')
+    else:
+        pass
+
+    gl = ax.gridlines(draw_labels=True,x_inline=False,y_inline=False)
+    gl.right_labels=False
+    gl.left_labels=True
+    gl.top_labels=False
+    gl.bottom_labels=True
+    gl.rotate_labels=False
+    gl.xlabel_style = {'size': 14}
+    gl.ylabel_style = {'size': 14}
+    ax.legend(loc='upper left',fontsize='x-large')
+
+    plt.tight_layout()
+    if output_file != "":
+        plt.savefig(output_file)
+    plt.close()
+    return fig
+
+
 # Function to plot extreme wave map
 def plot_extreme_wave_map(return_period=50, product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wave_map.png'):
     if product == 'NORA3':
