@@ -1731,7 +1731,7 @@ Plot extreme wind at 10 m height based on NORA3 data:
 .. image:: files/extreme_wind_map10m.png
   :width: 500
 
-Plot extreme wind at 100 m height based on NORA3 data:
+Hexbin visualization of extreme wind at 100m height based on NORA3 data:
 
 .. code-block:: python
 
@@ -1739,10 +1739,29 @@ Plot extreme wind at 100 m height based on NORA3 data:
                          product='NORA3',
                          z=100, 
                          title='100-yr return values Wind at 100 m (NORA3)', 
-                         set_extent = [0,30,52,73])
+                         set_extent = [0,30,52,73],
+                         method = 'hexbin',
+                         )
 
 
-.. image:: files/extreme_wind_map100m.png
+.. image:: files/wind_100yrs_100m_hexbin.png
+  :width: 500
+
+Contour visualization of extreme wind at 100m height based on NORA3 data:
+
+.. code-block:: python
+
+   plot_extreme_wind_map(return_period=100, 
+                         product='NORA3',
+                         z=100, 
+                         title='100-yr return values Wind at 100 m (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         method = 'contour',
+                         cutoff_contour = 50
+                         )
+
+
+.. image:: files/wind_100yrs_100m_contour.png
   :width: 500
 
 Plot extreme surface current based on NORA3 (Norkyst2400) data:
