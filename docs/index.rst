@@ -1756,7 +1756,7 @@ Plot extreme surface current based on NORA3 (Norkyst2400) data:
                          set_extent = [0,30,52,73])
 
 
-.. image:: files/current_100yrs_surface.png
+.. image:: files/current_100yrs_sea_surface.png
   :width: 500
 
 Plot mean 2-m air temperature based on NORA3 data:
