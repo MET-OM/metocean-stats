@@ -1745,6 +1745,20 @@ Plot extreme wind at 100 m height based on NORA3 data:
 .. image:: files/extreme_wind_map100m.png
   :width: 500
 
+Plot extreme surface current based on NORA3 (Norkyst2400) data:
+
+.. code-block:: python
+
+   plot_extreme_current_map(return_period=100, 
+                         product='NORA3',
+                         z='surface', 
+                         title='100-yr return values Current at surface (NORA3)', 
+                         set_extent = [0,30,52,73])
+
+
+.. image:: files/current_100yrs_surface.png
+  :width: 500
+
 Plot mean 2-m air temperature based on NORA3 data:
 
 .. code-block:: python
