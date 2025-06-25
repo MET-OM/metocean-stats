@@ -4,6 +4,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 
 # Helper function to handle projection and coordinate transformation
 def get_transformed_coordinates(ds, lon_var, lat_var, projection_type='rotated_pole'):
@@ -253,105 +254,103 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
 
 
 # Function to plot extreme wave map
-def plot_extreme_wave_map(file ='CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc', product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', method='hexbin', cutoff_contour = 50):
-    """
-    Plots an extreme wind speed map based on the specified return level and dataset.
+def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wave_map.png', method='hexbin', percentile_contour = 50):
+    '''
+    Plots a map of extreme significant wave height for a given return period using the specified dataset and visualization method.
 
     Parameters:
-    - return_period: int, optional, default=50
-        The return period in years (e.g., 50 years) for the extreme wind speed.
-    - product: str, optional, default='NORA3'
-        The dataset to use for the wind speed data. Currently only 'NORA3' is supported.
-    - title: str, optional, default='empty title'
-        The title to display on the map.
-    - set_extent: list, optional, default=[0, 30, 52, 73]
-        The map extent specified as [lon_min, lon_max, lat_min, lat_max].
-    - output_file: str, optional, default='extreme_wind_map.png'
-        The filename to save the plot.
-    - method : str
-        Visualization method for the data. Choose one of the following:
-            - 'hexbin' : Displays the data using a hexagonal grid with color shading.
-            - 'contour' : Displays the data using contour lines.
-    - cutoff_contour : int or str  
-            Percentile cutoff for drawing contours:
-                - 50 plots the top 50% of values.
-                - 66.6 plots the top 33.4%.
-                - 'min' includes all values from the minimum.
+    ----------
+    - return_period : int, optional, default=100
+        The return period in years for calculating the extreme current speeds. Choose between 50 or 100 years.
+    - product : str, optional, default='NORA3'
+        The dataset to use for current speed data. Currently, only 'NORA3' is supported.
+    - title : str, optional, default='empty title'
+        The title to display on the map plot.
+    - set_extent : list of float, optional, default=[0, 30, 52, 73]
+        The geographical extent of the map in the format [lon_min, lon_max, lat_min, lat_max].
+    - output_file : str, optional, default='extreme_wave_map.png'
+        The path and filename for saving the generated plot.
+    - method : str, optional, default='hexbin'
+        Visualization method to use. Options:
+            - 'hexbin'  : Plot data using a hexagonal binning with color shading.
+            - 'contour' : Plot data using filled contours and highlighted contour lines.
+    - percentile_contour : int or str, optional, default=50
+        Threshold for drawing highlighted contour lines and labels:
+            - Integer : Plots the top percentage of values (e.g., 50 plots top 50%).
+            - 'min'   : Includes all values from the minimum.
 
     Returns:
-    - fig: matplotlib.figure.Figure
-        The figure object containing the plot.
-    """    
+    -------
+    - fig : matplotlib.figure.Figure
+        The figure object containing the generated map plot.
+    '''    
     if product == 'NORA3':
-
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc)
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/{file}')
-        ds = xr.open_dataset(file)
-        lon, lat, _ = get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type= 'rotated_pole') 
-        standard_lon, standard_lat = ds['rlon'].values, ds['rlat'].values 
-        hs_flat = ds['hs'].values.flatten()
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc')
         
     else:
         print(product, 'is not available')
         return
     
-    cmap = 'afmhot_r'
+    # Transform coordinates based on rotated pole projection
+    lon, lat, _ = get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type= 'rotated_pole') 
+    standard_lon, standard_lat = ds['rlon'].values, ds['rlat'].values 
+    
+    data = xr.DataArray(ds['hs'], dims=ds['hs'].dims, coords=ds['hs'].coords)
+    data_flat = ds['hs'].values.flatten()
 
-    mask = ~np.isnan(hs_flat)
-    hs_flat = hs_flat[mask]
+    # Remove NaN values
+    mask = ~np.isnan(data_flat)
+    data_flat = data_flat[mask]
     lon_flat = lon.flatten()[mask]
     lat_flat = lat.flatten()[mask]
 
+    # Figure and map
     fig = plt.figure(figsize=(9, 10))
     ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=15))
     ax.coastlines(resolution='10m', zorder=3)
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
+    ax.add_feature(cfeature.LAND, facecolor='white', zorder=2)
+    cmap = 'afmhot_r'
 
     if method == 'hexbin':
-        hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap='coolwarm', vmin=0, vmax=25, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+        hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=180, cmap=cmap, vmin=np.min(data_flat), vmax=np.max(data_flat), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
         cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
         cb.set_label(ds['hs'].attrs.get('standard_name', 'hs') + ' [' + ds['hs'].attrs.get('units', 'm') + ']', fontsize=14)
 
-    elif method == 'contour':
-   
-        hs = xr.DataArray(ds['hs'], dims=ds['hs'].dims, coords=ds['hs'].coords) # Convert back to xarray
-        max_val = np.max(hs)
-        min_val = np.min(hs)
+    elif method == 'contour': 
+        max_val = np.max(data)
+        min_val = np.min(data)
 
-        # Calculating dynamic step size for contour and contourf
+        # Dynamic level spacing
         value_range = int(max_val - min_val)
-        step_contour = int(value_range / 10)       # integer step for contours
-        step_contourf = int(value_range / 20)       # integer step for contoursf (colormap)
-           
-        # Define the cutoff percentile for contour visualization
-        # cutoff_contour = 50     # Display contours for the top 50% of values; use 'min' to start from the lowest values
+        step_contour = int(value_range / 10)       
+        step_contourf = int(value_range / 20)     
     
-        # Sets the starting threshold for contour lines and labels — controls whether all levels or only the highest levels are plotted
-        start_contour = int(np.nanmin(hs) if cutoff_contour == 'min' else np.nanpercentile(hs, cutoff_contour)) # Selects min value or percentile based on choosen parameter
+        # Starting contour level
+        start_contour = int(np.nanmin(data) if percentile_contour == 'min' else np.nanpercentile(data, percentile_contour)) 
+        start_contour = start_contour - 1 if start_contour % 2 != 0 else start_contour  # ensure even
+        start_contourf = int(np.nanmin(data)) - 1 if int(np.nanmin(data)) % 2 != 0 else int(np.nanmin(data))
 
-        # Ensure starting threshold is an even number by subtracting/adding 1 if it's odd
-        start_contour = start_contour - 1 if start_contour % 2 != 0 else start_contour 
-        step_contour = step_contour + 1 if step_contour % 2 != 0 else step_contour 
-        start_contourf = int(np.nanmin(hs)) - 1 if int(np.nanmin(hs)) % 2 != 0 else int(np.nanmin(hs))
-
-        # Generate contour and label levels starting from their respective start values,
-        # spaced by the step sizes, and extended to ensure the maximum data value is included.
-        levels_contour = np.arange(start_contour, int(np.max(hs)+step_contour*2), step_contour)
-        levels_contourf = np.arange(start_contourf,int(np.max(hs)+step_contourf*2),step_contourf)
+        levels_contour = np.arange(start_contour, int(np.max(data)+step_contour*2), step_contour)
+        levels_contourf = np.arange(start_contourf,int(np.max(data)+step_contourf*2),step_contourf)
 
         print('Levels contour:', levels_contour)
         print('Levels contourf:', levels_contourf)
 
+        # Rotated projection
         rotated_pole = ccrs.RotatedPole(
             pole_latitude=ds.projection_ob_tran.grid_north_pole_latitude,
             pole_longitude=ds.projection_ob_tran.grid_north_pole_longitude
         )   
 
-        cm = plt.contourf(standard_lon, standard_lat, hs,levels=levels_contourf, transform=rotated_pole,cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =int(max_val))
+        # Filled contour
+        cm = plt.contourf(standard_lon, standard_lat, data,levels=levels_contourf, transform=rotated_pole,cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =int(max_val))
         cb = plt.colorbar(cm, label=ds['hs'].attrs.get('standard_name', 'hs') + ' [' + ds['hs'].attrs.get('units', 'm') + ']', ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
-
-        cs = ax.contour(standard_lon, standard_lat, hs, levels=levels_contour, transform=rotated_pole,cmap=cmap, zorder=1, vmin = 0, vmax = int(max_val))
+        # Line contour
+        cs = ax.contour(standard_lon, standard_lat, data, levels=levels_contour, transform=rotated_pole,cmap=cmap, zorder=1, vmin = 0, vmax = int(max_val))
         ax.clabel(cs, levels = levels_contour, inline=False, fontsize=16, fmt='%d', colors='black')
+    
+    # Map extent and gridlines
     ax.set_extent(set_extent, crs=ccrs.PlateCarree())
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
     gl.right_labels = False
@@ -367,87 +366,72 @@ def plot_extreme_wave_map(file ='CF_Return_Levels_3hourly_WindSpeed_6heights_199
 
 
 # Function to plot extreme wind map
-def plot_extreme_wind_map(return_period=50, file ='CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc', product='NORA3', z=0, title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', method='hexbin', cutoff_contour=50):
-    """
-    Plots an extreme wind speed map based on the specified return level and dataset.
+def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', method='hexbin', percentile_contour=50):
+    '''
+    Plots a map of extreme wind speeds for a given return period using the specified dataset and visualization method.
 
     Parameters:
-    - return_period: int, optional, default=50
-        The return period in years (e.g., 50 years) for the extreme wind speed.
+    - return_period: int, optional, default=100
+        The return period in years for the extreme wind speed. Choose between 50 or 100 years.
     - product: str, optional, default='NORA3'
         The dataset to use for the wind speed data. Currently only 'NORA3' is supported.
+    - z : int, optional, default=100
+        Height level (in meters above ground) at which the wind speed is evaluated. Choose between 10, 25, 50, 100, 150, 200 or 300.
     - title: str, optional, default='empty title'
         The title to display on the map.
     - set_extent: list, optional, default=[0, 30, 52, 73]
         The map extent specified as [lon_min, lon_max, lat_min, lat_max].
     - output_file: str, optional, default='extreme_wind_map.png'
         The filename to save the plot.
-    - method : str
-        Visualization method for the data. Choose one of the following:
-            - 'hexbin' : Displays the data using a hexagonal grid with color shading.
-            - 'contour' : Displays the data using contour lines.
-    - cmap : str
-        The colormap indicating wind speeds.
+    - method : str, optional, default='hexbin'
+        Visualization method to use. Options:
+            - 'hexbin'  : Plot data using a hexagonal binning with color shading.
+            - 'contour' : Plot data using filled contours and highlighted contour lines.
+    - percentile_contour : int or str, optional, default=50
+        Threshold for drawing highlighted contour lines and labels:
+            - Integer : Plots the top percentage of values (e.g., 50 plots top 50%).
+            - 'min'   : Includes all values from the minimum.
 
 
     Returns:
     - fig: matplotlib.figure.Figure
         The figure object containing the plot.
-    """    
-
-    # Added package
-    from scipy.ndimage import gaussian_filter
+    '''    
 
     if product == 'NORA3':
-        x = 'x'
-        y = 'y'
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc)
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/{file}')
-        ds = xr.open_dataset(file)
-        # ds = xr.open_dataset('CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc')
-        standard_lon, standard_lat, _ = get_transformed_coordinates(ds, x, y, projection_type='lambert_conformal')
-        hs_flat = ds['wind_speed'].sel(z=z).values.flatten()
-        # hs_flat = ds['wind_speed'][0].values.flatten()
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period{return_period}yr.nc')
+
     else:
         print(product, 'is not available')
         return
+    
+    # Transformed coordinates
+    standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'x', 'y', projection_type='lambert_conformal')
 
-    mask = ~np.isnan(hs_flat)
-    hs_flat = hs_flat[mask]
+    data = ds['wind_speed'].sel(z=z)
+    data = Gaussian_filter(data, 1.5)
+
+    # Remove NaN values
+    data_flat = ds['wind_speed'].sel(z=z).values.flatten()
+    mask = ~np.isnan(data_flat)
+    data_flat = data_flat[mask]
     lon_flat = standard_lon.flatten()[mask]
     lat_flat = standard_lat.flatten()[mask]
-
-    hs = ds['wind_speed'].sel(z=z)
-
-    # Filtering the data with NaN handling
-    nan_mask = np.isnan(hs)
-    hs_filled = np.copy(hs)
-    hs_filled[nan_mask] = 0
-
-    weights = (~nan_mask).astype(float)  # Create weights ( 1 where data is valid, 0 where NaN)
-    
-    smoothed_hs = gaussian_filter(hs_filled, sigma = 1.5)  # Gaussian filter to data and weights
-    smoothed_weights = gaussian_filter(weights, sigma=1.5)
-    
-    result = smoothed_hs/smoothed_weights  # Normalize to ignore NaNs in the average
-    result[smoothed_weights==0] = np.nan   # Reassign NaNs where no weight
-
-    hs = xr.DataArray(result, dims=hs.dims, coords=hs.coords) # Convert back to xarray
 
     # Finding max value in specified area
     lon_min, lon_max, lat_min, lat_max = set_extent
 
     mask = (
-            (standard_lon >= lon_min) & (standard_lon <= lon_max) &
-            (standard_lat >= lat_min) & (standard_lat <= lat_max)
+            (standard_lon >= lon_min-5) & (standard_lon <= lon_max+5) &    # Add ±5° to bounds to include all values shown on Lambert map.
+            (standard_lat >= lat_min-5) & (standard_lat <= lat_max+5)
         )
     
-    hs_area = hs.where(mask)
+    wind_area = data.where(mask)
 
-    max_val = np.round(hs_area.max().item())
-    min_val = np.round(hs_area.min().item())
+    max_val = int(wind_area.max().item())
+    min_val = int(wind_area.min().item())
 
-    # Set up map with coastlines and country borders
+    # Figure and map
     fig = plt.figure(figsize=(9, 10))
     ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=15))
     ax.coastlines(resolution='10m', zorder=3)
@@ -455,47 +439,37 @@ def plot_extreme_wind_map(return_period=50, file ='CF_Return_Levels_3hourly_Wind
     cmap='afmhot_r'
 
     if method == 'hexbin':
-        hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=min_val, vmax=max_val, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+        hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=180, cmap=cmap, vmin=min_val, vmax=max_val, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
         cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
         cb.set_label(ds['wind_speed'].attrs.get('standard_name', 'wind speed') + ' [' + ds['wind_speed'].attrs.get('units', 'm/s') + ']', fontsize=14)
 
     elif method == 'contour':
-       
-        # Calculating dynamic step size for contour and contourf
+        # Dynamic level spacing
         value_range = int(max_val - min_val)
-        step_contour = np.max([int(value_range / 10), 4])       # integer step for contours
-        step_contourf = np.max([int(value_range / 20), 2])       # integer step for contoursf (colormap)
-           
-        # Define the cutoff percentile for contour visualization
-        # cutoff_contour = 50     # Display contours for the top 50% of values; use 'min' to start from the lowest values
+        step_contour = np.max([int(value_range / 10), 4])                           # Step size for contour lines; minimum of 4 to avoid overly fine intervals
+        step_contour = step_contour + 1 if step_contour % 2 != 0 else step_contour  # ensure even
+        step_contourf = np.max([int(value_range / 20), 2])                          # Step size for filled contours (colormap); minimum of 2 for clarity
     
-        # Sets the starting threshold for contour lines and labels — controls whether all levels or only the highest levels are plotted
-        start_contour = int(np.nanmin(hs) if cutoff_contour == 'min' else np.nanpercentile(hs, cutoff_contour)) # Selects min value or percentile based on choosen parameter
+        # Starting contour level
+        start_contour = int(np.min(data) if percentile_contour == 'min' else np.percentile(data, percentile_contour)) 
+        start_contour = start_contour - 1 if start_contour % 2 != 0 else start_contour  #ensure even
+        start_contourf = int(np.min(data)) - 1 if int(np.min(data)) % 2 != 0 else int(np.min(data))
 
-        # Ensure starting threshold is an even number by subtracting/adding 1 if it's odd
-        start_contour = start_contour - 1 if start_contour % 2 != 0 else start_contour 
-        step_contour = step_contour + 1 if step_contour % 2 != 0 else step_contour 
-        start_contourf = int(np.nanmin(hs)) - 1 if int(np.nanmin(hs)) % 2 != 0 else int(np.nanmin(hs))
+        levels_contour = np.arange(start_contour, int(max_val+step_contour), step_contour)
+        levels_contourf = np.arange(start_contourf,int(max_val+step_contourf),step_contourf)
 
-        # Generate contour and label levels starting from their respective start values,
-        # spaced by the step sizes, and extended to ensure the maximum data value is included.
-        levels_contour = np.arange(start_contour, int(np.max(hs)+step_contour*2), step_contour)
-        levels_contourf = np.arange(start_contourf,int(np.max(hs)+step_contourf*2),step_contourf)
-
-        # Removes values that are over the maximum
-        max_level_contour = max_val if max_val in levels_contour else levels_contour[np.searchsorted(levels_contour, max_val, side='right')]
-        max_level_contourf = max_val if max_val in levels_contourf else levels_contourf[np.searchsorted(levels_contourf, max_val, side='right')]
-        levels_contour = levels_contour[levels_contour <= max_level_contour]
-        levels_contourf = levels_contourf[levels_contourf <= max_level_contourf]
         print('Levels contour:', levels_contour)
         print('Levels contourf:', levels_contourf)
 
-        cm = plt.contourf(standard_lon, standard_lat, hs,levels=levels_contourf, transform=ccrs.PlateCarree(),cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =int(max_val))
+        # Filled contour
+        cm = plt.contourf(standard_lon, standard_lat, data,levels=levels_contourf, transform=ccrs.PlateCarree(),cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =int(max_val))
         cb = plt.colorbar(cm, label=ds['wind_speed'].attrs.get('standard_name', 'wind speed') + ' [' + ds['wind_speed'].attrs.get('units', 'm') + ']', ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
 
-        cs = ax.contour(standard_lon, standard_lat, hs, levels=levels_contour, transform=ccrs.PlateCarree(),cmap=cmap, zorder=1, vmin = 0, vmax = int(max_val))
+        # Line contour
+        cs = ax.contour(standard_lon, standard_lat, data, levels=levels_contour, transform=ccrs.PlateCarree(),cmap=cmap, zorder=1, vmin = 0, vmax = int(max_val))
         ax.clabel(cs, levels = levels_contour, inline=False, fontsize=16, fmt='%d', colors='white')
 
+    # Map extent and grid lines
     ax.set_extent(set_extent, crs=ccrs.PlateCarree())
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
     gl.right_labels = False
@@ -510,124 +484,100 @@ def plot_extreme_wind_map(return_period=50, file ='CF_Return_Levels_3hourly_Wind
     return fig
 
 # Function to plot extreme current map
-def plot_extreme_current_map(file ='CF_Return_Levels_3hourly_WindSpeed_6heights_1991_2020_zlev_period100yr.nc', product='NORA3',z='surface', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', method='hexbin', cmap='Reds'):
+def plot_extreme_current_map(return_period=100, z='surface', distribution='gumbel', product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_current_map.png', method='hexbin', percentile_contour=50):
     '''
-    Plots an extreme current speed map based on the specified return level and dataset.
+    Plots a map of extreme current speeds for a given return period using the specified dataset and visualization method.
 
     Parameters:
-    - return_period: int, optional, default=50
-        The return period in years (e.g., 50 years) for the extreme wind speed.
-    - product: str, optional, default='NORA3'
-        The dataset to use for the wind speed data. Currently only 'NORA3' is supported.
-    - title: str, optional, default='empty title'
-        The title to display on the map.
-    - set_extent: list, optional, default=[0, 30, 52, 73]
-        The map extent specified as [lon_min, lon_max, lat_min, lat_max].
-    - output_file: str, optional, default='extreme_wind_map.png'
-        The filename to save the plot.
-    - method : str
-        Visualization method for the data. Choose one of the following:
-            - 'hexbin' : Displays the data using a hexagonal grid with color shading.
-            - 'contour' : Displays the data using contour lines.
-    - cmap : str
-        The colormap indicating wind speeds.
-
+    - return_period : int, optional, default=100
+        The return period in years (e.g., 100 years) for calculating the extreme current speeds. Choose between 25, 50 or 100 years.
+    - z : str, optional, default='surface'
+        The depth level at which the current speed is analyzed. Choose between 'surface' or 'seafloor'.
+    - distribution : str, optional, default='gumbel'
+        Statistical distribution used to model the extreme values. Options:
+            - 'gumbel'       : Gumbel distribution.
+            - 'genextreme'   : Generalized Extreme Value (GEV) distribution.
+    - product : str, optional, default='NORA3'
+        The dataset to use for current speed data. Currently, only 'NORA3' is supported.
+    - title : str, optional, default='empty title'
+        The title to display on the map plot.
+    - set_extent : list of float, optional, default=[0, 30, 52, 73]
+        The geographical extent of the map in the format [lon_min, lon_max, lat_min, lat_max].
+    - output_file : str, optional, default='extreme_current_map.png'
+        The path and filename for saving the generated plot.
+    - method : str, optional, default='hexbin'
+        Visualization method to use. Options:
+            - 'hexbin'  : Plot data using a hexagonal binning with color shading.
+            - 'contour' : Plot data using filled contours and highlighted contour lines.
+    - percentile_contour : int or str, optional, default=50
+        Threshold for drawing highlighted contour lines and labels:
+            - Integer : Plots the top percentage of values (e.g., 50 plots top 50%).
+            - 'min'   : Includes all values from the minimum.
 
     Returns:
-    - fig: matplotlib.figure.Figure
-        The figure object containing the plot.
+    - fig : matplotlib.figure.Figure
+        The figure object containing the generated map plot.
     '''
 
-    # Added package
-    from scipy.ndimage import gaussian_filter
-
     if product == 'NORA3':
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc)
-        # ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/{file}')
-        ds = xr.open_dataset(file)
-        if z=='surface':
-            parameter = 'genextreme_surface_100year'
-        elif z=='seafloor':
-             parameter = 'genextreme_seafloor_100year'           
-        hs_flat = ds[parameter].values.flatten()
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/catalog/nora3_subset_stats/ocean/norkyst2400_annual_maxima_rve.nc')
         
     else:
         print(product, 'is not available')
         return
 
-    mask = ~np.isnan(hs_flat)
-    hs_flat = hs_flat[mask]
+    parameter = f'{distribution}_{z}_{return_period}year' 
+    data = xr.DataArray(ds[parameter])
+    standard_lon = xr.DataArray(ds['lon'])
+    standard_lat = xr.DataArray(ds['lat'])
+
+    # Flatten values and remove NaN
+    data_flat = ds[parameter].values.flatten()
+    mask = ~np.isnan(data_flat)
+    data_flat = data_flat[mask]
     lon_flat = ds['lon'].values.flatten()[mask]
     lat_flat = ds['lat'].values.flatten()[mask]
 
+    # Figure and map
     fig = plt.figure(figsize=(9, 10))
     ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=15))
     ax.coastlines(resolution='10m', zorder=3)
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
+    ax.add_feature(cfeature.LAND, facecolor='white', zorder=2)
+    cmap='afmhot_r'
 
     if method == 'hexbin':
-        hb = ax.hexbin(lon_flat, lat_flat, C=hs_flat, gridsize=180, cmap=cmap, vmin=int(np.nanmin(hs_flat)), vmax=int(np.nanmax(hs_flat)), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
-        ax.add_feature(cfeature.LAND, color='darkkhaki', zorder=2)
+        hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=80, cmap=cmap, vmin=int(np.min(data_flat)), vmax=int(np.max(data_flat)), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
         cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
-        cb.set_label(ds[parameter].attrs.get('standard_name', 'wind speed') + ' [' + ds[parameter].attrs.get('units', 'm/s') + ']', fontsize=14)
+        cb.set_label(ds[parameter].attrs.get('standard_name', 'Current speed') + ' [' + ds[parameter].attrs.get('units', 'm/s') + ']', fontsize=14)
 
     elif method == 'contour':
-        
-        hs = xr.DataArray(ds[parameter])
-        standard_lon = xr.DataArray(ds['lon'])
-        standard_lat = xr.DataArray(ds['lat'])
+        # Filter the data and handle the NaN values
+        data = Gaussian_filter(data, 1.5)
 
-        # Filtering the data with NaN handling
-        nan_mask = np.isnan(hs)
-        hs_filled = np.copy(hs)
-        hs_filled[nan_mask] = 0
-
-        weights = (~nan_mask).astype(float)  # Create weights ( 1 where data is valid, 0 where NaN)
-        
-        smoothed_hs = gaussian_filter(hs_filled, sigma = 1.5)  # Gaussian filter to data and weights
-        smoothed_weights = gaussian_filter(weights, sigma=1.5)
-        
-        result = smoothed_hs/smoothed_weights  # Normalize to ignore NaNs in the average
-        result[smoothed_weights==0] = np.nan   # Reassign NaNs where no weight
-
-        hs = xr.DataArray(result, dims=hs.dims, coords=hs.coords) # Convert back to xarray
-
-        print('max:', round(np.nanmax(hs),2))
-        print('min', round(np.nanmin(hs)),2)
-
-        # Calculating dynamic step size for contour and contourf
-        value_range = round(np.nanmax(hs) - np.nanmin(hs),2)
-        step_contour = round(value_range / 10,1) or 0.2               # integer step for contours
-        step_contourf = 0.05
-           
-        # Define the cutoff percentile for contour visualization
-        cutoff_contour = 50     # Display contours for the top 50% of values; use 'min' to start from the lowest values
+        # Step spacing
+        step_contour = np.round(np.max(data) / 7,1)      
+        step_contourf = 0.05                                
     
-        # Sets the starting threshold for contour lines and labels — controls whether all levels or only the highest levels are plotted
-        start_contour = round(np.nanmin(hs) if cutoff_contour == 'min' else np.nanpercentile(hs, cutoff_contour),1) # Selects min value or percentile based on choosen parameter
-        start_contourf = np.min(hs)
+        # Starting contour level
+        start_contour = np.round(np.min(data) if percentile_contour == 'min' else np.nanpercentile(data, percentile_contour),1) 
+        start_contourf = np.min(data)
         
-        # Generate contour and label levels starting from their respective start values,
-        # spaced by the step sizes, and extended to ensure the maximum data value is included.
-        max_val = np.nanmax(hs)
+        max_val = np.max(data)
         levels_contour = np.round(np.arange(start_contour, max_val + step_contour, step_contour),1)
         levels_contourf = np.round(np.arange(start_contourf, max_val + step_contourf, step_contourf),2)
 
-        # Removes values that are over the maximum
-        max_level_contour = max_val if max_val in levels_contour else levels_contour[np.searchsorted(levels_contour, max_val, side='right')]
-        max_level_contourf = max_val if max_val in levels_contourf else levels_contourf[np.searchsorted(levels_contourf, max_val, side='right')]
-        levels_contour = levels_contour[levels_contour <= max_level_contour]
-        levels_contourf = levels_contourf[levels_contourf <= max_level_contourf]
         print('Levels contour:', levels_contour)
         print('Levels contourf:', levels_contourf)
-        print()
 
-        cm = plt.contourf(standard_lon, standard_lat, hs,levels=levels_contourf, transform=ccrs.PlateCarree(),cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =max_val)
+        # Filled contour
+        cm = plt.contourf(standard_lon, standard_lat, data,levels=levels_contourf, transform=ccrs.PlateCarree(),cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =max_val)
         cb = plt.colorbar(cm, label=ds[parameter].attrs.get('standard_name', 'Current speed') + ' [' + ds[parameter].attrs.get('units', 'm/s') + ']', ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
+        # Line contour
+        cs = ax.contour(standard_lon, standard_lat, data, levels=levels_contour, transform=ccrs.PlateCarree(),cmap=cmap, zorder=1, vmin = int(np.min(data)), vmax = max_val)
+        ax.clabel(cs, levels = levels_contour, inline=False, fontsize=14, fmt='%.1f', colors='black')
 
-        cs = ax.contour(standard_lon, standard_lat, hs, levels=levels_contour, transform=ccrs.PlateCarree(),cmap=cmap, zorder=1, vmin = int(np.nanmin(hs)), vmax = max_val)
-        ax.clabel(cs, levels = levels_contour, inline=False, fontsize=16, fmt='%.1f', colors='black')
-
+    # Map extent and grid lines
     ax.set_extent(set_extent, crs=ccrs.PlateCarree())
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False, linewidth=0.5, color='black', alpha=1, linestyle='--')
     gl.right_labels = False
@@ -640,6 +590,40 @@ def plot_extreme_current_map(file ='CF_Return_Levels_3hourly_WindSpeed_6heights_
         plt.title(title, fontsize=16)
     plt.savefig(output_file, dpi=300)
     return fig
+
+# Function to smooth the data with a Gaussian filter
+def Gaussian_filter(data, sigma=1.5):
+        '''
+         Smooths an xarray.DataArray using a Gaussian filter, ignoring NaNs.
+         NaNs are excluded by applying the filter to both the data and a validity mask.
+
+        Parameters
+        - data : xarray.DataArray
+            Input array to smooth.
+        - sigma : float, default=1.5
+            Standard deviation of the Gaussian filter.
+
+        Returns
+        - xarray.DataArray
+            Smoothed data with NaNs preserved.
+        '''
+        # Filtering the data with NaN handling
+        nan_mask = np.isnan(data)
+        data_filled = np.copy(data)
+        data_filled[nan_mask] = 0
+
+        weights = (~nan_mask).astype(float)  # Create weights ( 1 where data is valid, 0 where NaN)
+        
+        smoothed_data = gaussian_filter(data_filled, sigma = sigma)  # Gaussian filter to data and weights
+        smoothed_weights = gaussian_filter(weights, sigma=sigma)
+        
+        result = smoothed_data/smoothed_weights  # Normalize to ignore NaNs in the average
+        result[smoothed_weights==0] = np.nan   # Reassign NaNs where no weight
+
+        data = xr.DataArray(result, dims=data.dims, coords=data.coords) # Convert back to xarray
+        
+        return data
+
 
 # Function to plot mean air temperature map
 def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], unit='degC', mask_land=True, output_file='mean_air_temperature_map.png'):
