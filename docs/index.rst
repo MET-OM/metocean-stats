@@ -1750,7 +1750,7 @@ Contour visualization of extreme wind at 100m height based on NORA3 data:
 .. image:: files/wind_100yrs_100m_contour.png
   :width: 500
 
-Hexbin visualization of extreme surface current based on NORA3 (Norkyst2400) data:
+Hexbin visualization of extreme surface current speed based on NORA3 (Norkyst2400) data:
 
 .. code-block:: python
 
@@ -1768,7 +1768,7 @@ Hexbin visualization of extreme surface current based on NORA3 (Norkyst2400) dat
 .. image:: files/current_100yrs_surface_hexbin.png
   :width: 500
 
-Contour visualization of extreme surface current based on NORA3 (Norkyst2400) data:
+Contour visualization of extreme surface current speed based on NORA3 (Norkyst2400) data:
 
 .. code-block:: python
 
