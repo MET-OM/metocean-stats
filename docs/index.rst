@@ -1713,7 +1713,7 @@ Hexbin plot of extreme significant wave height based on NORA3 data:
                          title='100-Year Return Values of Significant Wave Height (NORA3)', 
                          set_extent = [0,30,52,73],
                          output_file='wave_100yrs_hexbin.png',
-                         method='hexbin',
+                         method='hexbin'
                          )
 
 .. image:: files/wave_100yrs_hexbin.png
@@ -1745,7 +1745,7 @@ Hexbin plot of extreme wind at 100m height based on NORA3 data:
                          title='100-yr return values Wind at 100 m (NORA3)', 
                          set_extent = [0,30,52,73],
                          land_mask = True
-                         method = 'hexbin',
+                         method = 'hexbin'
                          )
 
 
