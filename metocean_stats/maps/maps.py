@@ -259,7 +259,6 @@ def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title
     Plots a map of extreme significant wave height for a given return period using the specified dataset and visualization method.
 
     Parameters:
-    ----------
     - return_period : int, optional, default=100
         The return period in years for calculating the extreme current speeds. Choose between 50 or 100 years.
     - product : str, optional, default='NORA3'
@@ -280,29 +279,27 @@ def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title
             - 'min'   : Includes all values from the minimum.
 
     Returns:
-    -------
     - fig : matplotlib.figure.Figure
         The figure object containing the generated map plot.
     '''    
     if product == 'NORA3':
-        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/atm/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc')
-        
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/wave/CF_hs_{return_period}y_extreme_gumbel_NORA3.nc')
+
     else:
         print(product, 'is not available')
         return
-    
-    # Transform coordinates based on rotated pole projection
-    lon, lat, _ = get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type= 'rotated_pole') 
+      
     standard_lon, standard_lat = ds['rlon'].values, ds['rlat'].values 
-    
+    standard_lon, standard_lat = np.meshgrid(standard_lon, standard_lat)
+
     data = xr.DataArray(ds['hs'], dims=ds['hs'].dims, coords=ds['hs'].coords)
     data_flat = ds['hs'].values.flatten()
 
     # Remove NaN values
     mask = ~np.isnan(data_flat)
     data_flat = data_flat[mask]
-    lon_flat = lon.flatten()[mask]
-    lat_flat = lat.flatten()[mask]
+    lon_flat = standard_lon.flatten()[mask]
+    lat_flat = standard_lat.flatten()[mask]
 
     # Figure and map
     fig = plt.figure(figsize=(9, 10))
@@ -312,8 +309,14 @@ def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title
     ax.add_feature(cfeature.LAND, facecolor='white', zorder=2)
     cmap = 'afmhot_r'
 
+    # Rotated projection
+    rotated_pole = ccrs.RotatedPole(
+        pole_latitude=ds.projection_ob_tran.grid_north_pole_latitude,
+        pole_longitude=ds.projection_ob_tran.grid_north_pole_longitude
+    )   
+
     if method == 'hexbin':
-        hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=180, cmap=cmap, vmin=np.min(data_flat), vmax=np.max(data_flat), edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
+        hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=180, cmap=cmap, vmin=np.min(data_flat), vmax=np.max(data_flat), edgecolors='white', transform=rotated_pole, reduce_C_function=np.mean, zorder=1)
         cb = plt.colorbar(hb, ax=ax, orientation='vertical', shrink=0.7, pad=0.05)
         cb.set_label(ds['hs'].attrs.get('standard_name', 'hs') + ' [' + ds['hs'].attrs.get('units', 'm') + ']', fontsize=14)
 
@@ -336,12 +339,6 @@ def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title
 
         print('Levels contour:', levels_contour)
         print('Levels contourf:', levels_contourf)
-
-        # Rotated projection
-        rotated_pole = ccrs.RotatedPole(
-            pole_latitude=ds.projection_ob_tran.grid_north_pole_latitude,
-            pole_longitude=ds.projection_ob_tran.grid_north_pole_longitude
-        )   
 
         # Filled contour
         cm = plt.contourf(standard_lon, standard_lat, data,levels=levels_contourf, transform=rotated_pole,cmap=cmap, alpha = 0.6, zorder=1, vmin =0, vmax =int(max_val))
@@ -366,7 +363,7 @@ def plot_extreme_wave_map(return_period=100, product='NORA3', title='empty title
 
 
 # Function to plot extreme wind map
-def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', method='hexbin', percentile_contour=50):
+def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_wind_map.png', land_mask=False, method='hexbin', percentile_contour=50):
     '''
     Plots a map of extreme wind speeds for a given return period using the specified dataset and visualization method.
 
@@ -383,6 +380,8 @@ def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty 
         The map extent specified as [lon_min, lon_max, lat_min, lat_max].
     - output_file: str, optional, default='extreme_wind_map.png'
         The filename to save the plot.
+    - land_mask : bool, optional, default=False  
+        If True, apply a mask to exclude land areas.
     - method : str, optional, default='hexbin'
         Visualization method to use. Options:
             - 'hexbin'  : Plot data using a hexagonal binning with color shading.
@@ -405,8 +404,8 @@ def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty 
         print(product, 'is not available')
         return
     
-    # Transformed coordinates
-    standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'x', 'y', projection_type='lambert_conformal')
+    standard_lon = xr.DataArray(ds['longitude'])
+    standard_lat = xr.DataArray(ds['latitude'])
 
     data = ds['wind_speed'].sel(z=z)
     data = Gaussian_filter(data, 1.5)
@@ -415,8 +414,8 @@ def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty 
     data_flat = ds['wind_speed'].sel(z=z).values.flatten()
     mask = ~np.isnan(data_flat)
     data_flat = data_flat[mask]
-    lon_flat = standard_lon.flatten()[mask]
-    lat_flat = standard_lat.flatten()[mask]
+    lon_flat = standard_lon.values.flatten()[mask]
+    lat_flat = standard_lat.values.flatten()[mask]
 
     # Finding max value in specified area
     lon_min, lon_max, lat_min, lat_max = set_extent
@@ -437,6 +436,9 @@ def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty 
     ax.coastlines(resolution='10m', zorder=3)
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=3)
     cmap='afmhot_r'
+    if land_mask == True:
+        ax.add_feature(cfeature.LAND, facecolor='white', zorder=2)
+    
 
     if method == 'hexbin':
         hb = ax.hexbin(lon_flat, lat_flat, C=data_flat, gridsize=180, cmap=cmap, vmin=min_val, vmax=max_val, edgecolors='white', transform=ccrs.PlateCarree(), reduce_C_function=np.mean, zorder=1)
@@ -520,7 +522,7 @@ def plot_extreme_current_map(return_period=100, z='surface', distribution='gumbe
     '''
 
     if product == 'NORA3':
-        ds = xr.open_dataset(f'https://thredds.met.no/thredds/catalog/nora3_subset_stats/ocean/norkyst2400_annual_maxima_rve.nc')
+        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/ocean/norkyst2400_annual_maxima_rve.nc')
         
     else:
         print(product, 'is not available')

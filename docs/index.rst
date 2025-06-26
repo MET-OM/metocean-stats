@@ -1744,6 +1744,7 @@ Hexbin plot of extreme wind at 100m height based on NORA3 data:
                          product='NORA3',
                          title='100-yr return values Wind at 100 m (NORA3)', 
                          set_extent = [0,30,52,73],
+                         land_mask = True
                          method = 'hexbin',
                          )
 
@@ -1760,6 +1761,7 @@ Contour plot of extreme wind at 100m height based on NORA3 data:
                          product='NORA3',
                          title='100-yr return values Wind at 100 m (NORA3)', 
                          set_extent = [0,30,52,73],
+                         land_mask = False
                          method = 'contour',
                          percentile_contour = 50
                          )
