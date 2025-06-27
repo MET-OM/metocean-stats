@@ -621,8 +621,10 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
     t3_ = []; h3_= []
 
     fig, ax = plt.subplots(figsize=(8,6))
-    custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
-    ax.set_prop_cycle(custom_cycler)
+    #custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
+    #ax.set_prop_cycle(custom_cycler)
+    cmap = plt.cm.Blues
+    ii = np.linspace(0.2,1,len(window)-1)
 
     for i in range(len(window)-1):
         var_3 = df[var3].where((df[var3] > window[i]) & (df[var3] <= window[i+1])).dropna() #w10 = (wind1,wind2]
@@ -636,7 +638,8 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
         h3_.append(h3)
         linestyle = '-' if i % 2 == 0 else '--'
         labels = str(np.round(window[i],2))+'-'+str(np.round(window[i+1],2))
-        plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
+        #plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
+        plt.plot(t3[0],h3[0], color=cmap(ii[i]), linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  #color=cmap(0.5)
 
     #include the whole dataset also:
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=df,var_hs=var_hs,var_tp=var_tp,periods=periods)
