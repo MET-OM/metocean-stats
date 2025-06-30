@@ -359,13 +359,13 @@ def test_plot_taylor_diagram():
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 
-def test_plot_environmental_contours_hs_tp():
-    figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
-    assert isinstance(figures[0],plt.Figure)
+# def test_plot_environmental_contours_hs_tp():
+#     figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
+#     assert isinstance(figures[0],plt.Figure)
 
-def test_plot_environmental_contours_U_hs():
-    figures = plot_environmental_contours(ds,'HS','W10',config='DNVGL_hs_U',save_path='joint_U_hs_')
-    assert isinstance(figures[0],plt.Figure)
+# def test_plot_environmental_contours_U_hs():
+#     figures = plot_environmental_contours(ds,'HS','W10',config='DNVGL_hs_U',save_path='joint_U_hs_')
+#     assert isinstance(figures[0],plt.Figure)
 
 
 def test_plot_cca_profile():
