@@ -668,8 +668,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     mean_hs = []
     variance_lnTp = []
     mean_lnTp = []
-    
-    hs_bin = np.arange(0,maxHs+intx,intx)
+    hs_bin = np.arange(0,maxHs+2*intx,intx)
     for i in range(len(hs_bin)-1):
         idxs = np.where((hs_bin[i]<=Hs) & (Hs<hs_bin[i+1]))
         if Hs[idxs].shape[0] > 15 : 
@@ -696,7 +695,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     b2 = parameters[0]
     b3 = parameters[1]
     
-    
+
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
     
@@ -730,6 +729,8 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     #    hs_tpl_tph[3].to_csv(str(param[2])+'_year.csv', index=False)  
 
     return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
+
+
 
 def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='Weibull3P_MOM', method='default', threshold='default'):
     # Calculate parameters for each month based on different method
@@ -798,6 +799,7 @@ def monthly_extremes(data, var='hs', periods=[1, 10, 100, 10000], distribution='
 
     return params, return_values, threshold_values, num_events_per_year
 
+
 def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1, 10, 100, 10000], distribution='Weibull3_MOM', adjustment='NORSOK', method='default', threshold='default'):
     # Your implementation of monthly_extremes_weibull function
     # Calculate Weibull parameters for each month
@@ -813,8 +815,12 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     for dir in range(0,360,30):
         sector_data = data[data['direction_sector']==dir]
         if sector_data.empty:
-            sector_data = data * 0 # fill with zeros, this will give 0 extremes for empety sectors
-
+            sp=0.0
+            sector_prob.append(sp)
+            params.append((np.nan, np.nan, np.nan))
+            return_values.append(np.full((len(periods)), fill_value=np.nan))
+            #sector_data = data.loc[:, data.select_dtypes(include=['number']).columns] * 0 # fill with zeros, this will give 0 extremes for empty sectors
+            continue
         if isinstance(threshold, str) and threshold.startswith('P'):
             threshold_value = sector_data[var].quantile(int(threshold.split('P')[1])/100)
             threshold_values.append(threshold_value)
@@ -823,24 +829,21 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
             num_events_per_year.append((sector_data[var] >= threshold_value).sum()/num_years)
         else:
             threshold_value = threshold
-
         periods_adj = [x * 6 for x in periods]#*24*365.2422/time_step
         periods_noadj = periods#*24*365.2422/time_step
-        
         if adjustment == 'NORSOK':
             pass
         else:
             periods_adj = periods_noadj
-
-        if method == 'minimum': # used for negative temperature
-            shape, loc, scale, value = RVE_ALL(sector_data.min().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
-        elif method == 'maximum': # used for positive temperature
-            shape, loc, scale, value = RVE_ALL(sector_data.max().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
-        elif method == 'default':
-            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
-        elif method == 'POT':
-            shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
-    
+        if (len(sector_data)>0):
+            if method == 'minimum': # used for negative temperature
+                shape, loc, scale, value = RVE_ALL(sector_data.min().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+            elif method == 'maximum': # used for positive temperature
+                shape, loc, scale, value = RVE_ALL(sector_data.max().dropna(),var=var,periods=periods_adj,distribution=distribution,method='default',threshold=threshold_value)
+            elif method == 'default':
+                shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
+            elif method == 'POT':
+                shape, loc, scale, value = RVE_ALL(sector_data,var=var,periods=periods_adj,distribution=distribution,method=method,threshold=threshold_value)
         sp = 100*len(sector_data)/len(data[var])
         sector_prob.append(sp)
         params.append((shape, loc, scale))
@@ -855,7 +858,6 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
         num_events_per_year.append((data[var] >= threshold_value).sum()/num_years)
     else:
         threshold_value = threshold
-
     if method == 'minimum':
         shape, loc, scale, value = RVE_ALL(data.resample('YE').min(),var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
     elif method == 'maximum':
@@ -864,7 +866,7 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
         shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method='default',threshold=threshold_value)
     elif method == 'POT':
         shape, loc, scale, value = RVE_ALL(data,var=var,periods=periods,distribution=distribution,method=method,threshold=threshold_value)
-            
+    
     params.append((shape, loc, scale))
     return_values.append(value)
     return_values = np.array(return_values)
@@ -874,6 +876,7 @@ def directional_extremes(data: pd.DataFrame, var: str, var_dir: str, periods=[1,
     # Replace values in each column that exceed the thresholds
     for col in range(return_values.shape[1]):
         return_values[:, col] = np.minimum(return_values[:, col], thresholds[col])
+
     return params, return_values, sector_prob,  threshold_values, num_events_per_year
 
 def monthly_joint_distribution_Hs_Tp_weibull(data, var='hs', periods=[1, 10, 100, 10000]):

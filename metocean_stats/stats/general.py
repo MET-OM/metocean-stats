@@ -425,24 +425,6 @@ def scatter(df,var1,var2,location,regression_line,qqplot=True):
     return fig
 
 
-
-
-def calculate_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12,output_file: str = None):
-    results = []
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    for month in range(1, 13):
-        avg_duration, p10, p50, p90 = weather_window_length(time_series=data[var],threshold=threshold,op_duration=window_size,timestep=3,month=month)
-        results.append((p10,p50, avg_duration, p90))
-    results_df = pd.DataFrame(results, columns=['P10', 'P50', 'Mean', 'P90'], index=months).T.round(2)
-    if output_file:
-        # Save results to CSV
-        results_df.to_csv('monthly_weather_window_results.csv')
-    
-    return results_df
-
-
-
-
 def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12):
     """
     Calculate the mean and percentiles of consecutive periods where a variable
@@ -560,6 +542,78 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
         p50 = np.percentile(wt1[mon_s0==month],50)
         p90 = np.percentile(wt1[mon_s0==month],90)
     return mean, p10, p50, p90
+
+
+def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timestep,month=None):
+    """
+    Usage:
+    df: input df containing timeseries for different variables
+    vars: list of strings: variables to consider (up to 3)
+    threshold: list of floats: thresholds to use for each variable included (same unit as timeseries)
+    op_duration: duration of operation in hours
+    timestep: time resolution of time_series in hours
+    month: default is all year
+    Returns specific weather windows duration in hours
+    Generalization of weather_window_length to multiple conditions
+    Modified by clio-met
+    """
+    month_ts = df.index.month
+    if (len(vars)!=len(threshold)):
+        print('Error: vars must be the same length as threshold')
+        print(sys.exit())
+    if len(vars)==1:
+        ts_mask=np.where(df[vars[0]]<threshold[0],1,0)
+    elif len(vars)==2:
+        ts_mask=np.where(((df[vars[0]]<threshold[0]) & (df[vars[1]]<threshold[1])),1,0)
+    elif len(vars)==3:
+        ts_mask=np.where(((df[vars[0]]<threshold[0]) & (df[vars[1]]<threshold[1]) & (df[vars[2]]<threshold[2])),1,0)
+    else:
+        print('Error: only 3 variables can be given')
+        sys.exit()
+    od=int(op_duration/timestep)
+    ts=np.zeros((len(ts_mask)-od+1))
+    for i in range(len(ts_mask)-od+1):
+        ts[i]=np.sum(ts_mask[i:i+od])
+    s0=np.where(ts==od)[0].tolist()
+    mon_s0=month_ts[0:s0[-1]+1]
+    wt=[]
+    for s in range(len(s0)):
+        if s0[s]==0:
+            wt.append(0)
+        elif s==0:
+            diff=s0[s]
+            a=0
+            wt.append(diff)
+            while (diff!=0):
+                diff=s0[s]-a-1
+                wt.append(diff*timestep)
+                a=a+1
+        else:
+            diff=s
+            a=0
+            while (diff!=0):
+                diff=s0[s]-s0[s-1]-a-1
+                wt.append(diff*timestep)
+                a=a+1
+    wt1=(np.array(wt)+op_duration)/24
+    # Note that we this subroutine, we stop the calculation of the waiting time
+    # at the first timestep of the last operating period found in the timeseries
+    if month is None:
+        mean = np.mean(wt1)
+        p10 = np.percentile(wt1,10)
+        p50 = np.percentile(wt1,50)
+        p90 = np.percentile(wt1,90)
+        p95 = np.percentile(wt1,95)
+        max = np.max(wt1)
+    else:
+        mean = np.mean(wt1[mon_s0==month])
+        p10 = np.percentile(wt1[mon_s0==month],10)
+        p50 = np.percentile(wt1[mon_s0==month],50)
+        p90 = np.percentile(wt1[mon_s0==month],90)
+        p95 = np.percentile(wt1[mon_s0==month],95)
+        max = np.max(wt1[mon_s0==month])
+    return mean, p10, p50, p90, p95, max
+
 
 def pressure_surge(df,var='MSLP'):
     surge_max = (min(df.MSLP)-np.mean(df.MSLP))*(-0.01)
