@@ -14,6 +14,7 @@ from virocon.plotting import _get_n_axes
 from .plotting import (
     plot_2D_pdf_heatmap,
     plot_DNVGL_steepness,
+    get_DNVGL_steepness,
 )
 
 from .predefined import (
@@ -259,6 +260,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if ax is None:
             _,ax = plt.subplots()
 
+        if limits is None:
+            limits = [(0,2*self.data.iloc[:,d].max()) for d in range(self.n_dim)]
+
         if points is not None:
             if levels is not None:
                 raise ValueError("Only one of levels or return_values may be specified. The other must be None.")
@@ -285,7 +289,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         idx = np.argsort(levels)
         inverse_sort_idx = np.argsort(idx)
-        levels = levels[idx]
+        levels = np.array(levels)[idx]
 
         if labels is not None: 
             if isinstance(labels,str):
@@ -466,71 +470,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             ax=ax,
             **kwargs)
     
-    def get_marginal_return_values(
-            self,
-            distribution:str,
-            return_periods:list[float],
-            data:pd.Series = None,
-            dim:int = 0,
-            threshold: float = None,
-            r = "48h",
-            block_size = "365.244D",
-            ):
-        """
-        Calculate marginal return values from return periods using pyextremes.
-        By default, this uses the primary variable of the data used to fit the model, but another Series can be used.
-        Either way this requires that a datetime index on the data is available.
-
-        Parameters
-        ------------
-        distribution : str
-            A distribution from scipy. Currently implemented are
-            - genpareto (POT)
-            - expon (POT)
-            - genextreme (BM)
-            - gumbel_r (BM)
-        return_periods : list of floats
-            List of return periods (in years).
-        data : pd.Series, default None 
-            The timeseries of data to analyze. If None, the internal dataset
-            which was used to fit the model will be analyzed instead.
-        dim : int, default 0
-            The variable to analyze. By default, the first dimension/column.
-            Ignored if data is given directly in the form of a pandas Series.
-        threshold : float, default None
-            Threshold value, used in POT methods (see distribution).
-        r : float 
-            Minimum length of time between peaks, used in POT methods.
-        block_size : str (datetime compatible interval), default one year.
-            The size of a block, used in BM methods (annual/monthly/daily max).
-        """
-
-        if data is None:
-            data = self.data.iloc[:,dim]
-        else:
-            try: 
-                pd.to_datetime(data.index)
-            except:
-                raise ValueError("Can not get extremes: The data does not have a valid datetime index.")
-        
-        # Pyextremes analysis
-        model = pyextremes.EVA(data)
-        if distribution in ["genpareto","expon"]:
-            if threshold is None:
-                timedelta = data.index[-1]-data.index[0] # assuming sorted
-                if timedelta.days > (365.24*25):
-                    threshold = data.resample("YS").max().min()
-                else:
-                    threshold = np.percentile(data,99)
-            model.get_extremes(method="POT",threshold=threshold,r=r)
-        elif distribution in ["genextreme","gumbel_r"] or distribution.startswith("gumbel"):
-            model.get_extremes(method="BM",block_size=block_size)
-        else:
-            raise ValueError("Distribution must be one of: [genpareto, expon, genextreme, gumbel_r].")
-        
-        model.fit_model(model="MLE",distribution=distribution)
-
-        return model.get_return_value(return_period=return_periods)[0]
 
     def get_dependent_given_marginal(
             self,
@@ -604,7 +543,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         percentiles = np.array(percentiles)
         # Set default style.
         if labels is None:
-            labels = [f"{self.semantics['symbols'][1]} - {100*p:g}%" for p in percentiles]
+            labels = [f"${self.semantics['symbols'][1]}$ - {100*p:g}%" for p in percentiles]
         elif np.array(labels).size != percentiles.size:
             raise ValueError("Number of labels does not fit the number of percentiles.")
         if "color" not in kwargs and "c" not in kwargs:
@@ -648,6 +587,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             use_peak_wave_period = True,
             ylim = None,
             xlim = None,
+            legend = "Steepness",
             **kwargs
             ):
         """
@@ -669,13 +609,30 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if ax is None:
             _,ax = plt.subplots()
         if ylim is None:
-            ylim = np.max(self.data.values[:,0])
+            ylim = np.max(self.data.values[:,0])*1.5
+        # Get h and t.
+        wave_period_type = 'tp' if use_peak_wave_period else 'tz'
+        if xlim is None and ylim is None:
+            xlim,ylim = 40,20
+        if ylim is not None:
+            h = np.linspace(0,ylim,10000)
+            t = get_DNVGL_steepness(h,"hs",wave_period_type)
+        elif xlim is not None:
+            t = np.linspace(0,xlim,10000)
+            h = get_DNVGL_steepness(t,wave_period_type,"hs")
+
+        # These are defaults, to be overwritten by **kwargs.
+        plot_params = {**{'linestyle':'--','color':'black',},**kwargs}
+        handle = ax.plot(t,h,**plot_params)
+        if legend is not None:
+            self.legend_labels.append(legend)
+            self.legend_handles += handle
         return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
     def plot_data_scatter(
             self,
             ax=None,
-        data=None,
+            data=None,
             label:str=None,
             **kwargs):
         """
@@ -700,6 +657,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             data = self.data.values
         else:
             data = np.array(data)
+        if data.size == 0:
+            raise ValueError("Data is empty.")
         if data.ndim == 1:
             data = np.array([data])
         if data.ndim > 2:
@@ -758,7 +717,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             data = self.data.values
         else:
             data = np.array(data)
-
+        if data.size == 0:
+            raise ValueError("Data is empty.")
         if data.ndim == 1:
             data = np.array([data])
         if data.ndim > 2:

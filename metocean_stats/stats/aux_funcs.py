@@ -28,6 +28,7 @@ def Tp_correction(Tp):
     """
     This function will correct the Tp from ocean model which are vertical straight lines in Hs-Tp distribution
     """   
+    np.random.seed(1)
     new_Tp=1+np.log(Tp/3.244)/0.09525
     index = np.where(Tp>=3.2) # indexes of Tp
     r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
