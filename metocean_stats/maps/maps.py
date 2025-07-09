@@ -182,7 +182,7 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
 
     if bathymetry == 'NORA3':
         ds = xr.open_dataset('https://thredds.met.no/thredds/dodsC/windsurfer/mywavewam3km_files/2022/12/20221231_MyWam3km_hindcast.nc')
-        standard_lon, standard_lat, _ = maps.get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type='rotated_pole')
+        standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type='rotated_pole')
         depth = ds['model_depth'].values
     else:
         pass
