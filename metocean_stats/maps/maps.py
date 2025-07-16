@@ -225,14 +225,15 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
 
     if bathymetry == 'NORA3':
         mask_extent = (
-            (standard_lon >= lon_min) & (standard_lon <= lon_max) &
-            (standard_lat >= lat_min) & (standard_lat <= lat_max)
+            (standard_lon >= lon_min-2) & (standard_lon <= lon_max-2) &
+            (standard_lat >= lat_min-2) & (standard_lat <= lat_max-2)
         )
         depth_extent = np.ma.masked_where(~mask_extent, depth)
-        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=30,
+        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=np.arange(0,np.nanmax(depth_extent)+100,int(np.nanmax(depth_extent)/30)),
                            cmap='binary', transform=ccrs.PlateCarree())
-        cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.6)
-        cbar.set_label('Depth [m]')
+        cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.8)
+        cbar.ax.tick_params(labelsize=14)
+        cbar.set_label('Depth [m]',fontsize=15)
     else:
         pass
 
