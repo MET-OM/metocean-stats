@@ -16,22 +16,24 @@ from .. import tables
 
 def plot_scatter_diagram(
         data: pd.DataFrame, 
-        var1: str, step_var1: float, 
-        var2: str, step_var2: float, 
-        output_file='', 
-        log_color=False, 
-        percentage_values=True,
-        annot=False, 
-        significant_digits = 2,
-        annot_nonzero_only = True,
-        range_including = True, 
+        var1 = "TP",
+        step_var1 = 1,
+        var2 = "HS",
+        step_var2 = 1,
+        density_joint = False,
+        density_marginal = True,
+        format_joint = ".0f",
+        format_marginal = ".0f",
+        format_ticks = ".1f",
         from_origin = True,
-        marginal_values = True,
-        cmap = plt.get_cmap('Blues'),
-        use_cbar = True,
-        square = False,
-        linewidths:float = 0,
-        linecolor: str = 'black',
+        xlim = None,
+        ylim = None,
+        annot_cells = "rounded",
+        annot_margin = True,
+        percent_sign_cells = False,
+        percent_sign_margin = True,
+        cbar = False,
+        norm = mcolors.LogNorm(),
         **kwargs
         ):
     """
@@ -42,103 +44,145 @@ def plot_scatter_diagram(
     data : pd.DataFrame
         The data containing the variables as columns.
     var1 : str
-        The first variable, plotted on y-axis
+        The first (x-axis) variable as a column name.
     step_var1 : float
         Interval of bins of the first variable.
     var2 : str
-        The second variable, plotted on x-axis.
+        The second (y-axis) variable as a column name.
     step_var2 : float
         Interval of bins of the second variable.
-    output_file : str, default = ''
-        Output filename. Empty string will not save a file.
-    log_color : bool, default False
-        Use logarithmic colorscale.
-    percentage_values : bool, default True
-        Whether to use percentage of total sum in margins and cell annotations, as opposed to number of events.
-    annot : bool, default False
-        Write the numeric value of each cell in the figure.
-    significant_digits : int, default 2
-        Number of digits used in annotated cells and/or marginal values.
-    annot_nonzero_only : bool, default True
-        If false, zero-valued cells will still be annotated.
-    range_including : bool, default True
-        Include the end of the range in the tick labels, e.g. 0.0-0.5 instead of just 0.0
-    from_origin : bool, default True
-        Start the scatter plot in origin, even if there are no values in the first bin(s).
-    marginal_values : bool, default True
-        Include the marginal sum/fraction on ticks, e.g. 0.0-0.5 | 5.8%
-    cmap : matplotlib colormap, default "Blues"
-        Any matplotlib colormap.
-    use_cbar : bool, default True
-        Whether to include the colorbar.
-    square : bool, default False
-        Make the figure a square.
-    **kwargs : other arguments
-        Any other keyword arguments accepted by seaborn heatmap.
-        
+    density_joint : bool, default False
+        Display the joint distribution as percentage values.
+    density_marginal : bool, default True
+        Display the marginal distribution as percentage values. 
+    format_joint : str
+        Formatting string of the joint (cell) values
+    format_marginal : str
+        Formatting string of the marginal values
+    format_ticks : str
+        Formatting string of the x- and y-tick values
+    from_origin : bool
+        Control whether the histogram should start at the origin
+        (default) or at the first observed data points.
+    xlim : tuple(float,float)
+        Manually specify start and end of the x-axis
+    ylim : tuple(float,float)
+        Manually specify start and end of the y-axis
+    annot_cells : str
+        Controls which cells will be annotated with a value:
+         - "all": all cells are annotated
+         - "nonzero": all cells with any occurance are annotated
+         - "rounded": only cells which still have a nonzero value 
+         after applying the cell number formatting are annotated
+         - "off": no cells are annotated
+    annot_margin : bool, default True
+        Add the marginal distributions of values.
+    percent_sign_cells : bool, default False
+        Add a percent sign after the cell values, if using density.
+    percent_sign_marginal: bool, default True
+        Add a percent sign after the marginal values, if using density.
+    cbar : bool, default False
+        Include a colorbar.
+    norm : matplotlib color norm, default LogNorm()
+        A colormap norm.
+    **kwargs
+        Keyword arguments for seaborn heatmap
+
     Returns
     ----------
-    matplotlib figure
+    matplotlib axis
 
     Notes
     -------
-    The function is written by dung-manh-nguyen, KonstantinChri, and efvik.
+    The function is written by efvik.
     """
 
-    sd = stats.calculate_scatter(data, var1, step_var1, var2, step_var2,from_origin=from_origin)
+    valid_annot = ["all","nonzero","rounded","off"]
+    if annot_cells not in valid_annot:
+        raise ValueError(f"Keyword annot_cells must be one of {valid_annot}.")
 
-    # Convert to percentage
-    tbl = sd.values
-    var1_data = data[var1]
-    if percentage_values:
-        tbl = tbl/len(var1_data)*100
+    data = data[[var1,var2]]
+    if np.any(np.isnan(data)):
+        print("Warning: Removing NaN rows.")
+        data = data.dropna(how="any")
 
-    # Then make new row and column labels with a summed percentage
-    sumcols = np.sum(tbl, axis=0)
-    sumrows = np.sum(tbl, axis=1)
+    # Initial min and max
+    xmin = data[var2].values.min()
+    ymin = data[var1].values.min()
+    xmax = data[var2].values.max()
+    ymax = data[var1].values.max()
 
-    bins_var1 = sd.index
-    bins_var2 = sd.columns
-    lower_bin_1 = bins_var1[0] - step_var1
-    lower_bin_2 = bins_var2[0] - step_var2
+    # Change min (max) to zero only if all values are above (below) and from_origin=True
+    xmin = 0 if (from_origin and (xmin>0)) else (xmin//step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else (ymin//step_var1)*step_var1
 
-    def _tick_writer(a,b,c):
-        a = int(a) if np.isclose(int(a),a) else np.round(a,1)
-        b = int(b) if np.isclose(int(b),b) else np.round(b,1)
-        c = str(int(c)) if not percentage_values else f'{c:.{significant_digits}f}'
+    xmax = 0 if (from_origin and (xmax<0)) else xmax
+    ymax = 0 if (from_origin and (ymax<0)) else ymax
 
-        tick = f'{a}'
-        if range_including: tick = tick + f'-{b}'
-        if marginal_values:
-            tick = tick + f' | {c}'
-            if percentage_values: tick = tick + '%'
-        return tick
+    # ylim and xlim can be manually specified
+    if xlim is not None:
+        xmin,xmax = xlim
+    if ylim is not None:
+        ymin,ymax = ylim
 
-    rows = []
-    rows.append(_tick_writer(lower_bin_1,bins_var1[0],sumrows[0]))
-    for i in range(len(bins_var1)-1):
-        rows.append(_tick_writer(bins_var1[i],bins_var1[i+1],sumrows[i+1]))
+    # Define bins and get histogram
+    x = np.arange(xmin,xmax+step_var2,step_var2)
+    y = np.arange(ymin,ymax+step_var1,step_var1)
+    hist, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
+    xticks = np.arange(0,hist.shape[1]+1)
+    yticks = np.arange(0,hist.shape[0]+1)
 
-    cols = []
-    cols.append(_tick_writer(lower_bin_2,bins_var2[0],sumcols[0]))
-    for i in range(len(bins_var2)-1):
-        cols.append(_tick_writer(bins_var2[i],bins_var2[i+1],sumcols[i+1]))
+    xlabels = [f"{i:{format_ticks}}" for i in x]
+    ylabels = [f"{i:{format_ticks}}" for i in y]
 
-    rows = rows[::-1]
-    tbl = tbl[::-1,:]
-    dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
-    fig,ax = plt.subplots()
-    norm = mcolors.LogNorm() if log_color else None
-    mask = (dfout.round(significant_digits) != 0) if annot_nonzero_only else np.ones_like(dfout,dtype='bool')
-    fmt = f".{significant_digits}f" if percentage_values else f'.{significant_digits}g'
-    sns.heatmap(ax=ax, data=dfout.where(mask), cbar=use_cbar, cmap=cmap, fmt=fmt, norm=norm, annot=annot, square=square, linewidths=linewidths, linecolor=linecolor, **kwargs)
+    sum_x = hist.sum(axis=0)
+    sum_y = hist.sum(axis=1)
 
-    plt.ylabel(var1)
-    plt.xlabel(var2)
-    plt.tight_layout()
-    if output_file != '': plt.savefig(output_file)
-    return fig
-    
+    suffix_cell = ""
+    if density_joint:
+        hist = 100*hist/hist.sum()
+        if percent_sign_cells:
+            suffix_cell = "%"
+
+    suffix_margin = ""
+    if density_marginal:
+        sum_x = 100*sum_x/sum_x.sum()
+        sum_y = 100*sum_y/sum_y.sum()
+        if percent_sign_margin:
+            suffix_margin = "%"
+
+    if annot_cells == "rounded":
+        text = [[f"{h:{format_joint}}"+suffix_cell for h in row] for row in hist]
+        zero = f"{0:{format_joint}}"
+        text = [[t if t!=zero else "" for t in row] for row in text]
+    if annot_cells == "nonzero":
+        text = [[f"{h:{format_joint}}"+suffix_cell if h>0 else "" for h in row] for row in hist]
+    if annot_cells == "all":
+        text = [[f"{h:{format_joint}}"+suffix_cell for h in row] for row in hist]
+    if annot_cells == "off":
+        text =  [["" for h in row] for row in hist]
+
+    if norm.vmin == None:
+        norm.vmin = hist[hist>0].min()
+
+    ax = sns.heatmap(data=np.where(hist,hist, 1e-16),annot=text,fmt="",
+                    xticklabels=False,yticklabels=False,
+                    cbar=cbar,norm=norm,**kwargs)
+
+
+    sum_x = [[f"{i:{format_marginal}}"+suffix_margin for i in sum_x]]
+    sum_y = [[f"{i:{format_marginal}}"+suffix_margin] for i in sum_y[::-1]]
+
+    if annot_margin:
+        ax.table(sum_x,loc="top",cellLoc="center")
+        ax.table(sum_y,loc="right",cellLoc="center",bbox=(1,0,(1/len(sum_y)),1))
+
+    _=ax.set_yticks(yticks,ylabels)
+    _=ax.set_xticks(xticks,xlabels)
+    ax.set_xlabel("Peak wave period, $T_p$")
+    ax.set_ylabel("Significant wave height, $H_s$")
+    ax.invert_yaxis()
+    return ax
     
     
 def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=70)
