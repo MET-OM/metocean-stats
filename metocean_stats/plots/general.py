@@ -24,7 +24,8 @@ def plot_scatter_diagram(
         density_marginal = True,
         format_joint = ".0f",
         format_marginal = ".0f",
-        format_ticks = ".1f",
+        format_xticks = ".1f",
+        format_yticks = ".1f",
         from_origin = True,
         xlim = None,
         ylim = None,
@@ -60,15 +61,19 @@ def plot_scatter_diagram(
         Formatting string of the joint (cell) values
     format_marginal : str
         Formatting string of the marginal values
-    format_ticks : str
-        Formatting string of the x- and y-tick values
+    format_xticks : str
+        Formatting string of the x-tick values
+    format_yticks : str
+        Formatting string of the y-tick values
     from_origin : bool
         Control whether the histogram should start at the origin
         (default) or at the first observed data points.
     xlim : tuple(float,float)
-        Manually specify start and end of the x-axis
+        Manually specify start and end of the x-axis.
+        This should be a multiple of step_var2.
     ylim : tuple(float,float)
-        Manually specify start and end of the y-axis
+        Manually specify start and end of the y-axis.
+        This should be a multiple of step_var1.
     annot_cells : str
         Controls which cells will be annotated with a value:
          - "all": all cells are annotated
@@ -116,27 +121,35 @@ def plot_scatter_diagram(
     ymax = data[var1].values.max()
 
     # Change min (max) to zero only if all values are above (below) and from_origin=True
-    xmin = 0 if (from_origin and (xmin>0)) else (xmin//step_var2)*step_var2
-    ymin = 0 if (from_origin and (ymin>0)) else (ymin//step_var1)*step_var1
+    xmin = 0 if (from_origin and (xmin>0)) else np.floor(xmin/step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else np.floor(ymin/step_var1)*step_var1
 
-    xmax = 0 if (from_origin and (xmax<0)) else xmax
-    ymax = 0 if (from_origin and (ymax<0)) else ymax
+    xmax = 0 if (from_origin and (xmax<0)) else np.ceil(xmax/step_var2)*step_var2
+    ymax = 0 if (from_origin and (ymax<0)) else np.ceil(ymax/step_var1)*step_var1
 
     # ylim and xlim can be manually specified
     if xlim is not None:
-        xmin,xmax = xlim
+        xmin = xlim[0] if xlim[0] is not None else xmin
+        xmax = xlim[1] if xlim[1] is not None else xmax
+        if (l:=data[(data[var2]<xmin)|(data[var2]>xmax)].size):
+            print(f"WARNING: {l} points excluded by chosen xlim {xlim}")
+        diff = xmax-xmin
     if ylim is not None:
-        ymin,ymax = ylim
+        ymin = ylim[0] if ylim[0] is not None else ymin
+        ymax = ylim[1] if ylim[1] is not None else ymax
+        if (l:=data[(data[var1]<ymin)|(data[var1]>ymax)].size):
+            print(f"WARNING: {l} points excluded by chosen ylim {ylim}")
 
     # Define bins and get histogram
-    x = np.arange(xmin,xmax+step_var2,step_var2)
-    y = np.arange(ymin,ymax+step_var1,step_var1)
-    hist, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
-    xticks = np.arange(0,hist.shape[1]+1)
-    yticks = np.arange(0,hist.shape[0]+1)
+    n_bins_x = int(np.round((xmax - xmin) / step_var2)) + 1
+    n_bins_y = int(np.round((ymax - ymin) / step_var1)) + 1
+    x = np.linspace(xmin,xmax,n_bins_x)
+    y = np.linspace(ymin,ymax,n_bins_y)
 
-    xlabels = [f"{i:{format_ticks}}" for i in x]
-    ylabels = [f"{i:{format_ticks}}" for i in y]
+    hist, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
+
+    xlabels = [f"{i:{format_xticks}}" for i in x]
+    ylabels = [f"{i:{format_yticks}}" for i in y]
 
     sum_x = hist.sum(axis=0)
     sum_y = hist.sum(axis=1)
@@ -179,10 +192,14 @@ def plot_scatter_diagram(
         ax.table(sum_x,loc="top",cellLoc="center")
         ax.table(sum_y,loc="right",cellLoc="center",bbox=(1,0,(1/hist.shape[1]),1))
 
+    xticks = np.arange(0,hist.shape[1]+1)
+    yticks = np.arange(0,hist.shape[0]+1)
+
     _=ax.set_xticks(xticks,xlabels)
     _=ax.set_yticks(yticks,ylabels)
-    ax.set_xlabel("Peak wave period, $T_p$")
-    ax.set_ylabel("Significant wave height, $H_s$")
+
+    ax.set_xlabel(var2)
+    ax.set_ylabel(var1)
     ax.invert_yaxis()
     return ax
     
