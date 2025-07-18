@@ -29,6 +29,7 @@ setuptools.setup(
         'python-docx',
         'netcdf4',
         'pydap',
+        'virocon>=2.4'
     ],
     packages = setuptools.find_packages(),
     include_package_data = True,
