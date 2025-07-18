@@ -44,11 +44,11 @@ def plot_scatter_diagram(
     data : pd.DataFrame
         The data containing the variables as columns.
     var1 : str
-        The first (x-axis) variable as a column name.
+        The first (y-axis) variable as a column name.
     step_var1 : float
         Interval of bins of the first variable.
     var2 : str
-        The second (y-axis) variable as a column name.
+        The second (x-axis) variable as a column name.
     step_var2 : float
         Interval of bins of the second variable.
     density_joint : bool, default False
@@ -175,10 +175,10 @@ def plot_scatter_diagram(
 
     if annot_margin:
         ax.table(sum_x,loc="top",cellLoc="center")
-        ax.table(sum_y,loc="right",cellLoc="center",bbox=(1,0,(1/len(sum_y)),1))
+        ax.table(sum_y,loc="right",cellLoc="center",bbox=(1,0,(1/hist.shape[1]),1))
 
-    _=ax.set_yticks(yticks,ylabels)
     _=ax.set_xticks(xticks,xlabels)
+    _=ax.set_yticks(yticks,ylabels)
     ax.set_xlabel("Peak wave period, $T_p$")
     ax.set_ylabel("Significant wave height, $H_s$")
     ax.invert_yaxis()
