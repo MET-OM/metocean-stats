@@ -1704,45 +1704,106 @@ Plot map with points of interest:
 .. image:: files/map.png
   :height: 500
 
-Plot extreme signigicant wave height based on NORA3 data:
+Hexbin plot of extreme significant wave height based on NORA3 data:
 
 .. code-block:: python
 
   maps.plot_extreme_wave_map(return_period=100, 
                          product='NORA3', 
-                         title='100-yr return values Hs (NORA3)', 
-                         set_extent = [0,30,52,73])
+                         title='100-Year Return Values of Significant Wave Height (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         output_file='wave_100yrs_hexbin.png',
+                         method='hexbin'
+                         )
 
-
-.. image:: files/extreme_wave_map.png
+.. image:: files/wave_100yrs_hexbin.png
   :width: 500
 
-Plot extreme wind at 10 m height based on NORA3 data:
+Contour plot of extreme significant wave height based on NORA3 data:
 
 .. code-block:: python
 
-   maps.plot_extreme_wind_map(return_period=100, 
-                         product='NORA3',
-                         z=10, 
-                         title='100-yr return values Wind at 10 m (NORA3)', 
-                         set_extent = [0,30,52,73])
+  maps.plot_extreme_wave_map(return_period=100, 
+                         product='NORA3', 
+                         title='100-Year Return Values of Significant Wave Height (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         output_file='wave_100yrs_contour.png',
+                         method='contour',
+                         percentile_contour=45
+                         )
 
-
-.. image:: files/extreme_wind_map10m.png
+.. image:: files/wave_100yrs_contour.png
   :width: 500
 
-Plot extreme wind at 100 m height based on NORA3 data:
+Hexbin plot of extreme wind at 100m height based on NORA3 data:
 
 .. code-block:: python
 
    plot_extreme_wind_map(return_period=100, 
-                         product='NORA3',
                          z=100, 
+                         product='NORA3',
                          title='100-yr return values Wind at 100 m (NORA3)', 
-                         set_extent = [0,30,52,73])
+                         set_extent = [0,30,52,73],
+                         land_mask = True
+                         method = 'hexbin'
+                         )
 
 
-.. image:: files/extreme_wind_map100m.png
+.. image:: files/wind_100yrs_100m_hexbin.png
+  :width: 500
+
+Contour plot of extreme wind at 100m height based on NORA3 data:
+
+.. code-block:: python
+
+   plot_extreme_wind_map(return_period=100, 
+                         z=100, 
+                         product='NORA3',
+                         title='100-yr return values Wind at 100 m (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         land_mask = False
+                         method = 'contour',
+                         percentile_contour = 50
+                         )
+
+
+.. image:: files/wind_100yrs_100m_contour.png
+  :width: 500
+
+Hexbin plot of extreme surface current speed based on NORA3 (Norkyst2400) data:
+
+.. code-block:: python
+
+   plot_extreme_current_map(return_period=100,
+                         z='surface', 
+                         distribution='gumbel',
+                         product='NORA3',
+                         title='100-yr return values Current at surface (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         output_file='current_100yrs_surface_contour.png',
+                         method='hexbin'
+                         )
+
+
+.. image:: files/current_100yrs_surface_hexbin.png
+  :width: 500
+
+Contour plot of extreme surface current speed based on NORA3 (Norkyst2400) data:
+
+.. code-block:: python
+
+   plot_extreme_current_map(return_period=100,
+                         z='surface', 
+                         distribution='gumbel',
+                         product='NORA3',
+                         title='100-yr return values Current at surface (NORA3)', 
+                         set_extent = [0,30,52,73],
+                         output_file='current_100yrs_surface_contour.png',
+                         method='contour',
+                         percentile_contour=60
+                         )
+
+.. image:: files/current_100yrs_surface_contour.png
   :width: 500
 
 Plot mean 2-m air temperature based on NORA3 data:
