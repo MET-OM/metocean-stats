@@ -28,12 +28,13 @@ def plot_scatter_diagram(
         from_origin = True,
         xlim = None,
         ylim = None,
-        annot_cells = "rounded",
+        annot_cells = "nonzero",
         annot_margin = True,
         percent_sign_cells = False,
         percent_sign_margin = True,
-        cbar = False,
         norm = mcolors.LogNorm(),
+        cbar = False,
+        cmap = "Blues",
         **kwargs
         ):
     """
@@ -81,12 +82,14 @@ def plot_scatter_diagram(
         Add a percent sign after the cell values, if using density.
     percent_sign_marginal: bool, default True
         Add a percent sign after the marginal values, if using density.
-    cbar : bool, default False
-        Include a colorbar.
     norm : matplotlib color norm, default LogNorm()
         A colormap norm.
+    cbar : bool, default False
+        Include a colorbar.
     **kwargs
-        Keyword arguments for seaborn heatmap
+        Any keyword arguments for seaborn heatmap.
+        For example: cbar_kws = {"anchor":(x, y)} 
+        will adjust position of the colorbar.
 
     Returns
     ----------
@@ -162,13 +165,12 @@ def plot_scatter_diagram(
     if annot_cells == "off":
         text =  [["" for h in row] for row in hist]
 
-    if norm.vmin == None:
-        norm.vmin = hist[hist>0].min()
+    if hasattr(norm,"vmin") and (norm.vmin == None):
+        norm.vmin = hist[hist>0].min()/10
 
     ax = sns.heatmap(data=np.where(hist,hist, 1e-16),annot=text,fmt="",
                     xticklabels=False,yticklabels=False,
-                    cbar=cbar,norm=norm,**kwargs)
-
+                    cbar=cbar,norm=norm,cmap=cmap,**kwargs)
 
     sum_x = [[f"{i:{format_marginal}}"+suffix_margin for i in sum_x]]
     sum_y = [[f"{i:{format_marginal}}"+suffix_margin] for i in sum_y[::-1]]
