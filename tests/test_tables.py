@@ -498,9 +498,9 @@ def test_monthly_directional_percentiles_basic():
         compass_point_names=True
     )
     
-    # Check if the output is a dictionary with 12 months
+    # Check if the output is a dictionary with 12 months + year
     assert isinstance(result, dict), "Output is not a dictionary."
-    assert len(result) == 12, f"Expected 12 tables, but got {len(result)}."
+    assert len(result) == 13, f"Expected 13 tables, but got {len(result)}."
 
     # Check structure of each table
     for month, df in result.items():
