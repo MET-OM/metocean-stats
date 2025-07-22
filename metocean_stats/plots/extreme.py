@@ -196,6 +196,7 @@ def plot_multi_diagnostic_return_levels(data, var,
 
     # Initialize plot and fill in empirical return levels
     fig, ax = plt.subplots()
+    ax.margins(x=0,y=0)
 
     # Plot points (return level, return period) corresponding to
     # empirical values
@@ -209,7 +210,7 @@ def plot_multi_diagnostic_return_levels(data, var,
         #           marker="o", s=20, lw=1,
         #           facecolor="k", edgecolor="w", zorder=20)
         ax.scatter(df_emp_rl_cut['return_levels'],
-                   df_emp_rl_cut['prob_non_exceedance'],
+                   1-df_emp_rl_cut['prob_non_exceedance'],
                    marker="o", s=20, lw=1,
                    facecolor="k", edgecolor="w", zorder=20)
 
@@ -247,7 +248,7 @@ def plot_multi_diagnostic_return_levels(data, var,
             #        df_model_rl_tmp_cut.index,
             #        label=dist)
             ax.plot(df_model_rl_tmp_cut['return_levels'],
-                    df_model_rl_tmp_cut['prob_non_exceedance'],
+                    1-df_model_rl_tmp_cut['prob_non_exceedance'],
                     label=dist)
 
         elif yaxis == 'rp':
@@ -255,24 +256,19 @@ def plot_multi_diagnostic_return_levels(data, var,
                     df_model_rl_tmp.index,
                     label=dist)
 
-    plt.yscale('log')
+    ax.set_yscale('log')
     ax.grid(True, which="both")
 
     # Change label and ticklabels of y-axis, to display either probabilities
     # of non-exceedance or return period
     if yaxis == 'prob':
+        ax.invert_yaxis() # only invert if probability plot.
+        ticks = np.array([0,0.5,0.9,0.99,0.999,0.9999,0.99999,0.999999,0.9999999])
         ax.set_ylabel("Probability of non-exceedance")
-        #list_yticks = [1/0.9, 2, 10]\
-        #            + [10**i for i in range(2, 5) if max(periods) > 10**i]
-        #if max(periods) > max(list_yticks):
-        #    list_yticks = list_yticks + [max(periods)]
-        #ax.set_yticks(list_yticks)
-        #ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
-        list_yticks = [10**-1,10**(np.log10(0.5)),10**0]
-        list_ytickslabels = ['0.1','0.5','1']
-        ax.set_yticks(list_yticks)
-        ax.set_yticklabels(list_ytickslabels)
-        ax.set_ylim(0.05,1.02)
+        ylim = ax.get_ylim()
+        ax.set_yticks(1-ticks,ticks)
+        # This line should expand ylim to the nearest tick above.
+        ax.set_ylim(ylim[0],1-ticks[np.searchsorted(ticks,1-ylim[1])])
 
     elif yaxis == 'rp':
         ax.set_ylabel("Return period [yr]")
@@ -632,7 +628,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
             continue
         hs = df[var_hs].where(var_3.notnull()).dropna()
         tp = df[var_tp].where(var_3.notnull()).dropna()
-        dff = pd.DataFrame({'HS': hs, 'TP': tp, var3_name: var_3})
+        dff = pd.DataFrame({var_hs: hs, var_tp: tp, var3_name: var_3})
         a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
         t3_.append(t3)
         h3_.append(h3)
@@ -728,7 +724,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     # Fit Weibull distribution to your data and estimate parameters
     data = df.HS.values  # Your data
-    shape, loc, scale = stats.Weibull_method_of_moment(data)
+    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data)
     
     # Define return periods
     periods = np.arange(1.5873, 10000, 100) 
@@ -745,7 +741,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
         bootstrap_sample = np.random.choice(data, size=1000, replace=True)
         
         # Fit Weibull distribution to resampled data
-        shape_b, loc_b, scale_b = stats.Weibull_method_of_moment(bootstrap_sample)
+        shape_b, loc_b, scale_b = aux_funcs.Weibull_method_of_moment(bootstrap_sample)
         # Calculate return values for resampled distribution
         bootstrap_return_values.append(st.weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
     

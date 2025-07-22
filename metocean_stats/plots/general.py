@@ -7,63 +7,201 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
 import matplotlib.ticker as mticker
 import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
 from cycler import cycler
 
 from .. import stats
 from .. import tables
 
 
-def plot_scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
+def plot_scatter_diagram(
+        data: pd.DataFrame, 
+        var1 = "TP",
+        step_var1 = 1,
+        var2 = "HS",
+        step_var2 = 1,
+        density_joint = False,
+        density_marginal = True,
+        format_joint = ".0f",
+        format_marginal = ".0f",
+        format_xticks = ".1f",
+        format_yticks = ".1f",
+        from_origin = True,
+        xlim = None,
+        ylim = None,
+        annot_cells = "nonzero",
+        annot_margin = True,
+        percent_sign_cells = False,
+        percent_sign_margin = True,
+        norm = mcolors.LogNorm(),
+        cbar = False,
+        cmap = "Blues",
+        **kwargs
+        ):
     """
-    The function is written by dung-manh-nguyen and KonstantinChri.
     Plot scatter diagram (heatmap) of two variables (e.g, var1='hs', var2='tp')
-    step_var: size of bin e.g., 0.5m for hs and 1s for Tp
-    cmap: colormap, default is 'Blues'
-    outputfile: name of output file with extrensition e.g., png, eps or pdf 
-     """
-
-    sd = tables.calculate_scatter(data, var1, step_var1, var2, step_var2)
-
-    # Convert to percentage
-    tbl = sd.values
-    var1_data = data[var1]
-    tbl = tbl/len(var1_data)*100
-
-    # Then make new row and column labels with a summed percentage
-    sumcols = np.sum(tbl, axis=0)
-    sumrows = np.sum(tbl, axis=1)
-
-    sumrows = np.around(sumrows, decimals=1)
-    sumcols = np.around(sumcols, decimals=1)
-
-    bins_var1 = sd.index
-    bins_var2 = sd.columns
-    lower_bin_1 = bins_var1[0] - step_var1
-    lower_bin_2 = bins_var2[0] - step_var2
-
-    rows = []
-    rows.append(f'{lower_bin_1:04.1f}-{bins_var1[0]:04.1f} | {sumrows[0]:04.1f}%')
-    for i in range(len(bins_var1)-1):
-        rows.append(f'{bins_var1[i]:04.1f}-{bins_var1[i+1]:04.1f} | {sumrows[i+1]:04.1f}%')
-
-    cols = []
-    cols.append(f'{int(lower_bin_2)}-{int(bins_var2[0])} | {sumcols[0]:04.1f}%')
-    for i in range(len(bins_var2)-1):
-        cols.append(f'{int(bins_var2[i])}-{int(bins_var2[i+1])} | {sumcols[i+1]:04.1f}%')
-
-    rows = rows[::-1]
-    tbl = tbl[::-1,:]
-    dfout = pd.DataFrame(data=tbl, index=rows, columns=cols)
-    fig,ax = plt.subplots()
-    sns.heatmap(ax=ax,data=dfout.where(dfout>0), cbar=True, cmap='Blues', fmt=".1f")
-    plt.ylabel(var1)
-    plt.xlabel(var2)
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-    return fig
     
+    Parameters
+    -----------
+    data : pd.DataFrame
+        The data containing the variables as columns.
+    var1 : str
+        The first (y-axis) variable as a column name.
+    step_var1 : float
+        Interval of bins of the first variable.
+    var2 : str
+        The second (x-axis) variable as a column name.
+    step_var2 : float
+        Interval of bins of the second variable.
+    density_joint : bool, default False
+        Display the joint distribution as percentage values.
+    density_marginal : bool, default True
+        Display the marginal distribution as percentage values. 
+    format_joint : str
+        Formatting string of the joint (cell) values
+    format_marginal : str
+        Formatting string of the marginal values
+    format_xticks : str
+        Formatting string of the x-tick values
+    format_yticks : str
+        Formatting string of the y-tick values
+    from_origin : bool
+        Control whether the histogram should start at the origin
+        (default) or at the first observed data points.
+    xlim : tuple(float,float)
+        Manually specify start and end of the x-axis.
+        This should be a multiple of step_var2.
+    ylim : tuple(float,float)
+        Manually specify start and end of the y-axis.
+        This should be a multiple of step_var1.
+    annot_cells : str
+        Controls which cells will be annotated with a value:
+         - "all": all cells are annotated
+         - "nonzero": all cells with any occurance are annotated
+         - "rounded": only cells which still have a nonzero value 
+         after applying the cell number formatting are annotated
+         - "off": no cells are annotated
+    annot_margin : bool, default True
+        Add the marginal distributions of values.
+    percent_sign_cells : bool, default False
+        Add a percent sign after the cell values, if using density.
+    percent_sign_marginal: bool, default True
+        Add a percent sign after the marginal values, if using density.
+    norm : matplotlib color norm, default LogNorm()
+        A colormap norm.
+    cbar : bool, default False
+        Include a colorbar.
+    **kwargs
+        Any keyword arguments for seaborn heatmap.
+        For example: cbar_kws = {"anchor":(x, y)} 
+        will adjust position of the colorbar.
+
+    Returns
+    ----------
+    matplotlib axis
+
+    Notes
+    -------
+    The function is written by efvik.
+    """
+
+    valid_annot = ["all","nonzero","rounded","off"]
+    if annot_cells not in valid_annot:
+        raise ValueError(f"Keyword annot_cells must be one of {valid_annot}.")
+
+    data = data[[var1,var2]]
+    if np.any(np.isnan(data)):
+        print("Warning: Removing NaN rows.")
+        data = data.dropna(how="any")
+
+    # Initial min and max
+    xmin = data[var2].values.min()
+    ymin = data[var1].values.min()
+    xmax = data[var2].values.max()
+    ymax = data[var1].values.max()
+
+    # Change min (max) to zero only if all values are above (below) and from_origin=True
+    xmin = 0 if (from_origin and (xmin>0)) else np.floor(xmin/step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else np.floor(ymin/step_var1)*step_var1
+
+    xmax = 0 if (from_origin and (xmax<0)) else np.ceil(xmax/step_var2)*step_var2
+    ymax = 0 if (from_origin and (ymax<0)) else np.ceil(ymax/step_var1)*step_var1
+
+    # ylim and xlim can be manually specified
+    if xlim is not None:
+        xmin = xlim[0] if xlim[0] is not None else xmin
+        xmax = xlim[1] if xlim[1] is not None else xmax
+        if (l:=data[(data[var2]<xmin)|(data[var2]>xmax)].size):
+            print(f"WARNING: {l} points excluded by chosen xlim {xlim}")
+        diff = xmax-xmin
+    if ylim is not None:
+        ymin = ylim[0] if ylim[0] is not None else ymin
+        ymax = ylim[1] if ylim[1] is not None else ymax
+        if (l:=data[(data[var1]<ymin)|(data[var1]>ymax)].size):
+            print(f"WARNING: {l} points excluded by chosen ylim {ylim}")
+
+    # Define bins and get histogram
+    n_bins_x = int(np.round((xmax - xmin) / step_var2)) + 1
+    n_bins_y = int(np.round((ymax - ymin) / step_var1)) + 1
+    x = np.linspace(xmin,xmax,n_bins_x)
+    y = np.linspace(ymin,ymax,n_bins_y)
+
+    hist, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
+
+    xlabels = [f"{i:{format_xticks}}" for i in x]
+    ylabels = [f"{i:{format_yticks}}" for i in y]
+
+    sum_x = hist.sum(axis=0)
+    sum_y = hist.sum(axis=1)
+
+    suffix_cell = ""
+    if density_joint:
+        hist = 100*hist/hist.sum()
+        if percent_sign_cells:
+            suffix_cell = "%"
+
+    suffix_margin = ""
+    if density_marginal:
+        sum_x = 100*sum_x/sum_x.sum()
+        sum_y = 100*sum_y/sum_y.sum()
+        if percent_sign_margin:
+            suffix_margin = "%"
+
+    if annot_cells == "rounded":
+        text = [[f"{h:{format_joint}}"+suffix_cell for h in row] for row in hist]
+        zero = f"{0:{format_joint}}"
+        text = [[t if t!=zero else "" for t in row] for row in text]
+    if annot_cells == "nonzero":
+        text = [[f"{h:{format_joint}}"+suffix_cell if h>0 else "" for h in row] for row in hist]
+    if annot_cells == "all":
+        text = [[f"{h:{format_joint}}"+suffix_cell for h in row] for row in hist]
+    if annot_cells == "off":
+        text =  [["" for h in row] for row in hist]
+
+    if hasattr(norm,"vmin") and (norm.vmin == None):
+        norm.vmin = hist[hist>0].min()/10
+
+    ax = sns.heatmap(data=np.where(hist,hist, 1e-16),annot=text,fmt="",
+                    xticklabels=False,yticklabels=False,
+                    cbar=cbar,norm=norm,cmap=cmap,**kwargs)
+
+    sum_x = [[f"{i:{format_marginal}}"+suffix_margin for i in sum_x]]
+    sum_y = [[f"{i:{format_marginal}}"+suffix_margin] for i in sum_y[::-1]]
+
+    if annot_margin:
+        ax.table(sum_x,loc="top",cellLoc="center")
+        ax.table(sum_y,loc="right",cellLoc="center",bbox=(1,0,(1/hist.shape[1]),1))
+
+    xticks = np.arange(0,hist.shape[1]+1)
+    yticks = np.arange(0,hist.shape[0]+1)
+
+    _=ax.set_xticks(xticks,xlabels)
+    _=ax.set_yticks(yticks,ylabels)
+
+    ax.set_xlabel(var2)
+    ax.set_ylabel(var1)
+    ax.invert_yaxis()
+    return ax
     
     
 def plot_pdf_all(data, var, bins=70, output_file='pdf_all.png'): #pdf_all(data, bins=70)

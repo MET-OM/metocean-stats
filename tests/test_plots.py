@@ -7,8 +7,9 @@ from metocean_stats import plots
 from metocean_stats.stats.aux_funcs import readNora10File
 
 # Define TimeSeries-object for NORA3
-ds = readNora10File('tests/data/NORA_test.txt')
-ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
+dirname = os.path.dirname(__file__)
+ds =    readNora10File(os.path.join(dirname, 'data/NORA_test.txt'))
+ds_ocean = pd.read_csv(os.path.join(dirname, 'data/NorkystDA_test.csv'),comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
 
@@ -32,18 +33,6 @@ def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
         pass
     else:
         raise ValueError("FigValue is not correct")
-
-
-# # This doesn't work anymore because some details have changed, but several new tests have been added to replace it.
-# def test_plot_monthly_stats(ds=ds):
-#     output_file = 'test_monthly_stats.png'
-#     fig = plots.plot_monthly_stats(ds, var='T2m', show=['Minimum', 'Mean', 'Maximum'], title='T2m', output_file=output_file)
-#     if os.path.exists(output_file):
-#         os.remove(output_file)
-#     if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:
-#         pass
-#     else:
-#         raise ValueError("FigValue is not correct")
 
 def test_plot_directional_stats(ds=ds):
     output_file = 'test_directional_stats.png'
@@ -369,6 +358,14 @@ def test_plot_taylor_diagram():
     fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+
+# def test_plot_environmental_contours_hs_tp():
+#     figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
+#     assert isinstance(figures[0],plt.Figure)
+
+# def test_plot_environmental_contours_U_hs():
+#     figures = plot_environmental_contours(ds,'HS','W10',config='DNVGL_hs_U',save_path='joint_U_hs_')
+#     assert isinstance(figures[0],plt.Figure)
 
 
 def test_plot_cca_profile():

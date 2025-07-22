@@ -12,47 +12,52 @@ from scipy.signal import find_peaks
 
 from .aux_funcs import convert_latexTab_to_csv
 
-def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
-    """
-    Create scatter table of two variables (e.g, var1='hs', var2='tp')
-    step_var: size of bin e.g., 0.5m for hs and 1s for Tp
-    The rows are the upper bin edges of var1 and the columns are the upper bin edges of var2
-    """
-    dvar1 = data[var1]
-    v1min = np.min(dvar1)
-    v1max = np.max(dvar1)
-    if step_var1 > v1max:
-        raise ValueError(f"Step size {step_var1} is larger than the maximum value of {var1}={v1max}.")
+def calculate_scatter(data,var1, step_var1, var2, step_var2, from_origin=False, labels_lower=False):
+    '''
+    data : pd.DataFrame
+        The data containing the variables as columns.
+    var1 : str
+        The first variable.
+    step_var1 : float
+        Bin size of the first variable.
+    var2 : str
+        The second variable.
+    step_var2 : float
+        Bin size of the second variable.
+    from_origin : bool, default False
+        This will include the origin, even if there are no values near zero.
+    labels_lower : bool, default False
+        By default, upper edges of bins are used as labels. Switch this to use lower bin edges instead.
+    '''
 
-    dvar2 = data[var2]
-    v2min = np.min(dvar2)
-    v2max = np.max(dvar2)
-    if step_var2 > v2max:
-        raise ValueError(f"Step size {step_var2} is larger than the maximum value of {var2}={v2max}.")
+    data = data[[var1,var2]]
+    if np.any(np.isnan(data)):
+        print("Warning: Removing NaN rows.")
+        data = data.dropna(how="any")
 
-    # Find the the upper bin edges
-    max_bin_1 = ceil(v1max / step_var1)
-    max_bin_2 = ceil(v2max / step_var2)
-    min_bin_1 = ceil(v1min / step_var1)
-    min_bin_2 = ceil(v2min / step_var2)
+    # Initial min and max
+    xmin = data[var2].values.min()
+    ymin = data[var1].values.min()
+    xmax = data[var2].values.max()
+    ymax = data[var1].values.max()
 
-    offset_1 = min_bin_1 - 1
-    offset_2 = min_bin_2 - 1
+    # Change min (max) to zero only if all values are above (below) and from_origin=True
+    xmin = 0 if (from_origin and (xmin>0)) else (xmin//step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else (ymin//step_var1)*step_var1
 
-    var1_upper_bins = np.arange(min_bin_1, max_bin_1 + 1, 1) * step_var1
-    var2_upper_bins = np.arange(min_bin_2, max_bin_2 + 1, 1) * step_var2
+    xmax = 0 if (from_origin and (xmax<0)) else xmax
+    ymax = 0 if (from_origin and (ymax<0)) else ymax
 
-    row_size = len(var1_upper_bins)
-    col_size = len(var2_upper_bins)
-    occurences = np.zeros([row_size, col_size])
+    # Define bins and get histogram
+    x = np.arange(xmin,xmax+step_var2,step_var2)
+    y = np.arange(ymin,ymax+step_var1,step_var1)
+    a, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
 
-    for v1, v2 in zip(dvar1, dvar2):
-        # Find the correct bin and sum up
-        row = floor(v1 / step_var1) - offset_1
-        col = floor(v2 / step_var2) - offset_2
-        occurences[row, col] += 1
+    # Choose upper or lower edges as labels
+    x = x[:-1] if labels_lower else x[1:]
+    y = y[:-1] if labels_lower else y[1:]
 
-    return pd.DataFrame(data=occurences, index=var1_upper_bins, columns=var2_upper_bins)
+    return pd.DataFrame(data = a.astype("int"),index = y,columns=x)
 
 def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
     """
