@@ -3,7 +3,6 @@ import numpy as np
 
 import virocon.dependencies
 from virocon.predefined import (
-    get_DNVGL_Hs_U,
     get_OMAE2020_V_Hs
 )
 
@@ -466,6 +465,65 @@ def get_cT_Hs_Tp():
         "symbols": ["Cs_θ", "H_s", "T_p"],
         "units": ["m/s", "m", "s"],
         "swap_axis":True
+    }
+
+    return dist_descriptions, fit_descriptions, semantics
+
+def get_DNVGL_Hs_U():
+    """
+    Get DNVGL significant wave height and wind speed model.
+
+    Get the descriptions necessary to create the significant wave height
+    and wind speed model as defined in DNVGL [2]_ in section 3.6.4.
+
+    Returns
+    -------
+    dist_descriptions : list of dict
+        List of dictionaries containing the dist descriptions for each dimension.
+        Can be used to create a GlobalHierarchicalModel.
+    fit_descriptions : None
+        Default fit is used so None is returned.
+        Can be passed to fit function of GlobalHierarchicalModel.
+    semantics : dict
+        Dictionary with a semantic description of the model.
+        Can be passed to plot functions.
+
+    References
+    ----------
+    .. [2] DNV GL (2017). Recommended practice DNVGL-RP-C205: Environmental
+        conditions and environmental loads.
+    """
+
+    def _power3(x, a, b, c):
+        return a + b * x**c
+
+    bounds = [(0, None), (0, None), (None, None)]
+
+    alpha_dep = virocon.DependenceFunction(_power3, bounds=bounds, latex="$a + b * x^c$")
+    beta_dep = virocon.DependenceFunction(_power3, bounds=bounds, latex="$a + b * x^c$")
+
+    dist_description_hs = {
+        "distribution": virocon.WeibullDistribution(),
+        "intervals": virocon.NumberOfIntervalsSlicer(n_intervals=20),
+    }
+
+    dist_description_u = {
+        "distribution": virocon.WeibullDistribution(f_gamma=0),
+        "conditional_on": 0,
+        "parameters": {
+            "alpha": alpha_dep,
+            "beta": beta_dep,
+        },
+    }
+
+    dist_descriptions = [dist_description_hs, dist_description_u]
+
+    fit_descriptions = None
+
+    semantics = {
+        "names": ["Significant wave height", "Wind speed"],
+        "symbols": ["H_s", "U"],
+        "units": ["m", "m s$^{-1}$"],
     }
 
     return dist_descriptions, fit_descriptions, semantics
