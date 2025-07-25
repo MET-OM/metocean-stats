@@ -277,7 +277,7 @@ Joint Distribution - new system!
 
    from metocean_stats.CMA import JointProbabilityModel, predefined
    model = JointProbabilityModel(predefined.get_DNVGL_Hs_Tz)
-   model.fit(data,"HS","TP")
+   model.fit(df,"HS","TP")
    ax = model.plot_contours(periods = [1,10,100,1000], method = "IFORM")
    model.plot_dependent_percentiles(ax,percentiles=[0.05,0.5,0.95])
    model.plot_data_scatter(ax)
