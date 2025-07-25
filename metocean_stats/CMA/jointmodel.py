@@ -666,6 +666,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if data.shape[1] != 2:
             raise NotImplementedError("Only 2-dimensional data is supported.")
         
+        kwargs.setdefault("s",2)
+
         x,y = (1,0) if self.swap_axis else (0,1)
         handle = ax.scatter(data[:,x],data[:,y],**kwargs)
         if label is not None:

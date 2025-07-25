@@ -272,16 +272,19 @@ Prob. of Non-Exceedance (fitted)
 Joint Distribution - new system!
 ---------------------------------
 
+
 .. code-block:: python
 
    from metocean_stats.CMA import JointProbabilityModel, predefined
    model = JointProbabilityModel(predefined.get_DNVGL_Hs_Tz)
+   model.fit(data,"HS","TP")
    ax = model.plot_contours(periods = [1,10,100,1000], method = "IFORM")
    model.plot_dependent_percentiles(ax,percentiles=[0.05,0.5,0.95])
+   model.plot_data_scatter(ax)
    model.plot_legend(ax)
    ax.get_figure().savefig("hs_tp_contours.png")
 
-.. image:: files/new_contours.pdf
+.. image:: files/metocean_contours_new.png
    :width: 500
 
 Joint Distribution Hs-Tp Plot
