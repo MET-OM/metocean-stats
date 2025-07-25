@@ -815,6 +815,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self.legend_handles.append(handle)
             self.legend_labels.append(label)
 
+        self.plot_semantics(ax)
+
         return ax
 
     def plot_3D_contour_slices(
