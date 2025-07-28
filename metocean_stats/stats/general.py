@@ -529,7 +529,7 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
@@ -596,7 +596,7 @@ def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timest
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
