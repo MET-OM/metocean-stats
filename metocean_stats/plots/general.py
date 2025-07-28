@@ -394,6 +394,75 @@ def plot_daily_stats(data:pd.DataFrame,
     if output_file != "": plt.savefig(output_file)
     return fig
 
+
+def plot_hourly_stats(data:pd.DataFrame,
+                     var:str,
+                     show=["min","25%","max"],
+                     fill_between:list[str]=[],
+                     fill_color_like = "",
+                     title = "",
+                     cmap = plt.get_cmap("viridis"),
+                     output_file:str="daily_stats.png"):
+    '''
+    Plot hourly statistics of a DataFrame variable.
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        The dataframe.
+    var : str
+        A column of the dataframe.
+    show : list[str]
+        List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max".
+    fill_between : [str,str]
+        Optional: Set a shaded area between two percentiles (any options from the "show" argument).
+    fill_color_like : str
+        Optional: Color the shaded area like any item from "show" argument, e.g. fill_color_like = "mean".
+    title : str
+        Title of the plot.
+    output_file : str
+        File path for saved figure.    
+    
+    Returns
+    --------
+    fig : Figure
+        Matplotlib figure object.
+
+    Contribution by jlopez1979
+    '''
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.hour).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.hour.max())
+    xaxis = percentiles.index.values
+    
+    labels = [s for s in show]
+    if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
+    show = _percentile_str_to_pd_format(show)
+
+    fill_between = _percentile_str_to_pd_format(fill_between)
+    fill_color_like = _percentile_str_to_pd_format(fill_color_like)
+
+    colors = cmap(np.linspace(0,1,len(show)))
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i])
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+    
+    plt.title(title,fontsize=14)
+    plt.xlabel('Hours',fontsize=12)
+    plt.ylabel(var,fontsize=12)
+    plt.legend(labels)
+    plt.grid()
+    if output_file != "": plt.savefig(output_file)
+    return fig
+
+
 def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
     """
     Plot directional statistics of a variable from a DataFrame.
