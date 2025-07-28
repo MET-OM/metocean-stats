@@ -934,7 +934,7 @@ Hs Daily Statistics with shaded band
 .. image:: files/plot_daily_stats_wave_height_fill.png
    :width: 500
 
-Hs Daily Statistics with shaded band
+Hs Hourly Statistics with shaded band
 -------------------------------------
 
 .. code-block:: python
@@ -945,7 +945,7 @@ Hs Daily Statistics with shaded band
       show=["5%", "mean", "95%"], 
       fill_between=["25%", "75%"], 
       fill_color_like="mean",
-      title="HS [m]")
+      title="HS[m]")
     
 .. image:: files/plot_hourly_stats_wave_height_fill.png
    :width: 500
