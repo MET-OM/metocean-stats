@@ -1361,7 +1361,7 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
     # Calculate the current at the other depths when curr_ref = percentile or return-period value  
     cca_prof=np.zeros((nlevels,nlevels))
     for d in range(nlevels): # Loop over the worst case level
-        prof_others=df_sel.drop(columns=[list_col[d]]).to_numpy() # extraxt currents as a matrix for all levels except the worst-case one
+        prof_others=df_sel.drop(columns=[list_col[d]]).to_numpy() # extract currents as a matrix for all levels except the worst-case one
         prof_wcd=df_sel[list_col[d]].to_numpy() # extract currents at the worst-case level
         list_ind=np.arange(0,nlevels,1).tolist()
         del list_ind[d] # remove the index of the worst-case level (index d)
