@@ -495,6 +495,30 @@ def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_si
     return mean, p10, p50,p90
 
 def weather_window_length(time_series,threshold,op_duration,timestep,month=None):
+    """
+    This function calculates weather windows statistics for a condition on one variable
+
+    Parameters
+    ----------
+    tim_series: pd.DataFrame
+        Contains timeseries of the variable of interest
+    threshold: float
+        Threshold below which operation is possible (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Written by clio-met
+    """
     # time_series: input timeseries
     # threshold over which operation is possible (same unit as timeseries)
     # op_duration: duration of operation in hours
@@ -546,16 +570,31 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
 
 def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timestep,month=None):
     """
-    Usage:
-    df: input df containing timeseries for different variables
-    vars: list of strings: variables to consider (up to 3)
-    threshold: list of floats: thresholds to use for each variable included (same unit as timeseries)
-    op_duration: duration of operation in hours
-    timestep: time resolution of time_series in hours
-    month: default is all year
-    Returns specific weather windows duration in hours
-    Generalization of weather_window_length to multiple conditions
-    Modified by clio-met
+    This function calculates weather windows statistics for up to 3 simultaneous conditions
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains timeseries for different variables
+    vars: list of strings
+        Variables' names to consider (up to 3)
+    threshold: list of floats
+        Thresholds below which operation is possible
+        for each variable (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Generalization of weather_window_length to multiple conditions by clio-met
     """
     month_ts = df.index.month
     if (len(vars)!=len(threshold)):
