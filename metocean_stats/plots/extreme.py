@@ -781,8 +781,10 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
 def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='default',threshold='default', units='m',output_file='monthly_extremes_weibull.png'):
     df = tables.table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method,threshold=threshold, units=units, output_file=None)
     fig, ax = plt.subplots()
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(periods)))
     for i in range(len(periods)):
-        plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1])
+        plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1],color=colors[i])
 
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Month',fontsize=15)
@@ -795,8 +797,12 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
 def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
     df = tables.table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(periods)))
+    a=0
     for i in periods:
-        plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years')
+        plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years',color=colors[a])
+        a=a+1
     
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Direction',fontsize=15)
@@ -945,9 +951,13 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     plt.yticks(z)  # Set yticks to be the values in z
     ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
 
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(df.columns[1:])))
+    a=0
     for column in df.columns[1:]:
-        plt.plot(df[column][1:],z,marker='.', label=column)
-    plt.ylabel('z[m]')
+        plt.plot(df[column][1:],z,marker='.', label=column, color=colors[a])
+        a=a+1
+    plt.ylabel('z [m]')
     plt.xlabel('[m/s]')
     plt.title(title)
     if reverse_yaxis is True:

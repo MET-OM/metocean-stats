@@ -10,6 +10,7 @@ import matplotlib.ticker as mticker
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
 from cycler import cycler
+import calendar
 
 
 from .. import stats
@@ -293,11 +294,11 @@ def plot_monthly_stats(data: pd.DataFrame,
         plot_monthly_stats(df, 'temperature', show=["min","mean","99%"], fill_between = ["25%","75%"], 
         fill_color_like = "mean", title = "Monthly Temperature Statistics", output_file = "temp_stats.png")
     """
-    
+
     fig,ax = plt.subplots()
     percentiles = data[var].groupby(data[var].index.month).describe(percentiles=np.arange(0,1,0.01))
     xaxis = np.arange(0,data[var].index.month.max())
-    
+
     labels = [s for s in show]
     if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
     show = _percentile_str_to_pd_format(show)
@@ -316,7 +317,7 @@ def plot_monthly_stats(data: pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
 
     if month_xticks:
-        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        monthlabels= ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         ax.set_xticks(np.arange(1,13))
         ax.set_xticklabels(monthlabels)
 
@@ -326,6 +327,7 @@ def plot_monthly_stats(data: pd.DataFrame,
     plt.grid()
     if output_file != "": plt.savefig(output_file)
     return fig
+
 
 def plot_daily_stats(data:pd.DataFrame,
                      var:str,
@@ -386,8 +388,10 @@ def plot_daily_stats(data:pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
     
     if month_xticks:
+        monthlabels= ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         ax.xaxis.set_major_locator(MonthLocator(bymonthday=1,bymonth=range(1,13)))
-        ax.xaxis.set_major_formatter(DateFormatter('%b'))
+        ax.set_xticklabels(monthlabels)
+        #ax.xaxis.set_major_formatter(DateFormatter('%b')) # Writes the months in Norwegian, not English
 
     plt.title(title,fontsize=14)
     plt.xlabel('Month',fontsize=12)
