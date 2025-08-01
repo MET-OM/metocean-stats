@@ -1036,17 +1036,34 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
 def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
     """
     This function plots the CCA profiles for a specific percentile or return period
-    data: dataframe
-    var: prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
-    month: gives the month of interest (e.g. January or Jan), default (None) takes all months
-    percentile: is the percentile associated with the worst case scenario
-    return_period: a return-period e.g., 10 for a 10-yr return period
-    distrbution, method, and threshold: only used if retrun_period is specified 
-    unit_var: is a string with the unit of the variable var, default is m/s
-    unit_lev: is a string with the units of the vertical levels, default is m
-    output_file: name of the figure file
-    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
-    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
+    month: string
+        Month of interest (e.g. 'January' or 'Jan'), default (None) takes all months
+    percentile: float
+        Percentile associated with the worst case scenario
+    return_period: float
+        Return-period e.g., 10 for a 10-yr return period
+    distribution, method, and threshold: string, string, string
+        To specify only if return_period is given 
+    unit_var: string
+        Unit of the variable var, default is 'm/s'
+    unit_lev: string
+        Units of the vertical levels, default is 'm'
+    output_file: string
+        Name of the figure file
+
+    Returns
+    -------
+    fig: matplotlib figure in a new file
+
+    Authors
+    -------
     Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):
