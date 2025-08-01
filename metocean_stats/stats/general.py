@@ -735,3 +735,90 @@ def linfitef(x, y, stdx: float=1.0, stdy: float=1.0) -> tuple[float, float]:
     intercept = y0 - slope * x0
     
     return slope, intercept
+
+
+
+def tidal_type(df,var='tide'):
+    """
+    This function calculates the tidal type from sea level
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains the timeseries with index as hourly datetime
+    var: string
+        Variable name, column name
+
+    Returns
+    -------
+    output: string
+        Tidal type
+    
+    Authors
+    -------
+    Written by Dung M. Nguyen
+    """
+    def find_h_g(Xk,Tm):
+        dt = 1
+        K = 0
+        for i in range(len(Xk)):
+            c = i/Tm
+            if c.is_integer():
+                K = i
+            
+        if K == 0 : 
+            Hm = 0
+            gm = 0
+        else:
+            Am = 0
+            Bm = 0
+            for k in range(K+1):
+                Am = Am + 2/K*Xk[k]*np.cos(2*np.pi/Tm*k*dt)
+                Bm = Bm + 2/K*Xk[k]*np.sin(2*np.pi/Tm*k*dt)
+                
+            Hm = np.sqrt(Am**2 + Bm**2)
+            if Bm > 0 and Am > 0:
+                gm = np.arctan(Bm/Am)
+            elif Bm > 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am > 0:
+                gm = np.arctan(Bm/Am) + 2*np.pi
+    
+        return Hm, gm
+    
+    mean = np.mean(df[var].values)
+    series = df.tide.values - mean
+    
+    ## M2
+    Tm = 12.42 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hm2=Hm
+    
+    ## S2
+    Tm = 12.00 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hs2=Hm
+    
+    ### K1
+    Tm = 23.934 # hours 
+    Hm,gm = find_h_g(series,Tm)
+    Hk1=Hm
+    
+    #### O1
+    Tm = 25.82 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Ho1=Hm
+    
+    F = (Hk1+Ho1)/(Hm2+Hs2)
+    if F < 0.25 :
+        tidal_type = 'Tidal type = semi-diurnal'
+    elif F < 1.5 :
+        tidal_type = 'Tidal type = mixed, mailly semi-diurnal'
+    elif F < 3 :
+        tidal_type = 'Tidal type = mixed, mailly diurnal'
+    else:
+        tidal_type = 'Tidal type = diurnal'
+
+    return tidal_type
