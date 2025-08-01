@@ -185,14 +185,25 @@ def return_levels_idm(data, var, dist='Weibull_3P',
 
 def get_threshold_os(data, var):
     """
-    Follows the method by Outten and Sobolowski (2021) to define the threshold 
-    to be used in subroutine return_levels_pot
+    This function follows the method by Outten and Sobolowski (2021)
+    to calculate the threshold to define extremes for the POT method.
+    This threshold is the minimum of the annual maxima
+    Used in subroutine return_levels_pot
     
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Name of the variable
     
-    return: Threshold as defined in Outten and Sobolowski (2021)    
+    Returns
+    ------- 
+    min_ym: float
+        Threshold as defined in Outten and Sobolowski (2021)    
     
+    Authors
+    -------
     Function written by clio-met (July 2023)
     """
     ts = data[var]
@@ -392,19 +403,29 @@ def return_levels_weibull_2p(data, var,
 def return_levels_exp(data, var='hs', periods=[50, 100, 1000], 
                       threshold=None, r="48h"):
     """
-    Calulates return value estimates for different periods, fitting an 
+    This function calulates return value estimates for different periods, fitting an 
     exponential distribution to given data.  
     
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable 
-    periods (1D-array or list): List of periods to for which to return return
-                                value estimates
-    threshold (float): Threshold used to define the extrems
-    r (str): Minimum period of time between two peaks. Default 48h.
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Name of the variable 
+    periods: 1D ndarray or list
+        List of periods for which to return return value estimates
+    threshold: float
+        Threshold used to define the extremes
+    r: string
+        Minimum period of time between two peaks. Default is '48h'.
     
-    return (list of float): return value estimates corresponding to input
-                            periods 
+    Returns
+    -------
+    return_levels: list of float
+        Return value estimates corresponding to input periods 
     
+    Authors
+    -------
     Function written by dung-manh-nguyen and KonstantinChri.
     """        
     # how to use this function 
@@ -485,13 +506,27 @@ def old_return_levels_GP(data, var, threshold=None,
     return rl
 
 def RVE_ALL(dataframe,var='hs',periods=[1,10,100,1000],distribution='Weibull3P',method='default',threshold='default'):
-    
-    # data : dataframe, should be daily or hourly
-    # period: a value, or an array return periods =np.array([1,10,100,10000],dtype=float)
-    # distribution: 'EXP', 'GEV', 'GUM', 'LoNo', 'Weibull2P' or 'Weibull3P'
-    # method: 'default' (all data), 'AM' or 'POT'
-    # threshold='default'(min anual maxima), or a value 
+    """
+    This function returns the distribution parameters from the fitting to the data and the return level(s)
 
+    Parameters
+    ----------
+    data: dataframe,
+        Contains daily or hourly time series
+    period: float or list
+        List of the return periods
+    distribution: string
+        Can be 'EXP', 'GEV', 'GUM', 'LoNo', 'Weibull2P' or 'Weibull3P'
+    method: string
+        Can be 'default' (all data), 'AM' or 'POT'
+    threshold: string 'default' or float 
+        'default' means the mininimum of the anual maxima
+
+    Returns
+    -------
+    The shape, location, and scale parameters of the distribution,
+    and the return levels for every return period given
+    """
     shape, loc, scale = [], [], []
     periods = np.array(periods)
     #it_selected_max = dataframe.groupby(dataframe.index.year)[var].idxmax().values
@@ -728,7 +763,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     #if save_rve:
     #    hs_tpl_tph[3].to_csv(str(param[2])+'_year.csv', index=False)  
 
-    return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph 
+    return a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3, h3, X, hs_tpl_tph 
 
 
 
@@ -998,24 +1033,31 @@ def return_levels_annual_max_uncertainty(data, var='hs', dist='GEV',
                              periods=[50, 100, 1000],
                              uncertainty=None): 
     """
-    Calulates return value estimates for different periods, fitting a 
-    Generalized Extreme Value ('GEV') or a Gumbel ('GUM') distribution to given 
+    This function calulates return value estimates for different periods, fitting 
+    a Generalized Extreme Value ('GEV') or a Gumbel ('GUM') distribution to given 
     data.  
     
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable 
-    periods (1D-array or list): List of periods to for which to return return
-                                value estimates
-    method (str): Distribution to fit to the data. Either 'GEV' for Generalized
-    Extreme Value or 'GUM' for Gumbel.
-    uncertainty (float): confidence interval between 0 and 1 (recommended 0.95)
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Name of the variable 
+    periods: 1D ndarray or list
+        List of periods for which to return return value estimates
+    method: string
+        Distribution to fit to the data. Either 'GEV' for Generalize Extreme Value or 'GUM' for Gumbel.
+    uncertainty: float 
+        Confidence interval between 0 and 1 (recommended 0.95)
 
-    return (pandas DataFrame): return levels estimates and corresponding
-                               probability of non-exceedance indexed by 
-                               corresponding periods. 
-                               Also contains attrs for the method, 
-                               and the distribution. 
+    Returns
+    -------
+    df: pd.DataFrame
+        Return levels estimates and corresponding probability of non-exceedance indexed by corresponding periods. 
+        Also contains attributes with the method and the distribution. 
     
+    Authors
+    -------
     Function written by dung-manh-nguyen and KonstantinChri.
     Modified by clio-met 
     """
@@ -1077,26 +1119,37 @@ def return_levels_pot_uncertainty(data, var, dist='Weibull_2P',
                       threshold=None, r="48h",
                       uncertainty=None):
     """
-    Calulates return value estimates for different periods, fitting a 
-    given distribution to threshold excess values of the data.  
+    This function calulates return value estimates for different periods, fitting
+    a given distribution to threshold excess values of the data.  
     
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable
-    dist (str): POT distribution to choose from 'GP' for Generalized Pareto,
-                'Weibull_2P' for Weibull 2-paremeters or 'EXP' for exponential
-    periods (1D-array or list): List of periods to for which to return return
-                                value estimates
-    threshold (float): Threshold used to define the extremes
-    r (str): Minimum period of time between two peaks. Default 48h.
-    uncertainty (float): confidence interval between 0 and 1 (recommended 0.95)
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Name of the variable
+    dist: string
+        Distribtuion to be used
+        Can be 'GP' for Generalized Pareto, 'Weibull_2P' for Weibull 2-paremeters,
+        or 'EXP' for exponential
+    periods: 1D ndarray or list
+        List of periods for which to return return value estimates
+    threshold: float
+        Threshold to define the extremes
+    r: string:
+        Minimum period of time between two peaks. Default is '48h'.
+    uncertainty: float
+        Confidence interval between 0 and 1 (recommended 0.95)
+
+    Returns
+    -------    
+    df: pd.DataFrame
+        Return levels estimates and corresponding probability of non-exceedance indexed by corresponding periods.
+        Also contains attributes for the method, the distribution, the threshold,
+        and the period to define independent extremes (r).  
     
-    return (pandas DataFrame): return levels estimates and corresponding
-                               probability of non-exceedance indexed by 
-                               corresponding periods. Also contains attrs for 
-                               the method, the distribution, the threshold, 
-                               and the period considered between independent 
-                               extremes (r).  
-    
+    Authors
+    -------
     Function written by dung-manh-nguyen and KonstantinChri.
     Modified by clio-met
     """
@@ -1192,20 +1245,30 @@ def get_empirical_return_levels_new(data, var, method="POT",
                                 block_size="365.2425D",
                                 threshold=None):
     """
-    Returns an estimation of observed return periods and return levels.
+    This function returns an estimation of observed return periods and return levels.
     
-    data (pd.DataFrame): dataframe containing the time series
-    var (str): name of the variable
-    method (str): Method of definition for the extremes, 
-                  'BM' for Block Maxima or 'POT' for Peak over threshold
-    block_size (str): Size of the block for block maxima
-    threshold (float): Threshold to be used for peak-over-threshold, default
-                       None.
+    Parameters
+    ----------
+    data: pd.dataframe
+        Contains the time series
+    var: string
+        Name of the variable
+    method: string
+        Method of definition for the extremes 
+        Can be 'BM' for Block Maxima or 'POT' for Peak over threshold (default)
+    block_size: string
+        Size of the block for block maxima (default is one year)
+    threshold: float
+        Threshold to be used for peak-over-threshold, default is None
     
-    return (pandas DataFrame): df, dataframe containing empirical return levels
-                               and return periods. df.attrs contains meta-data
-                               about the method used, threshold or block size 
-                               used, and variable of interest.   
+    Returns
+    -------
+    df: pd.DataFrame
+        Contains empirical return levels and return periods.
+        df.attrs contains meta-data: method, threshold or block size, and variable of interest.
+
+    Authors
+    -------
     Modified by clio-met
     """
     
@@ -1301,16 +1364,35 @@ def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100
 def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default'):
     import sys
     """
-    This function calculates the CCA profiles for a specific percentile or return period
-    df: dataframe
-    var: prefix of the variable name of interest e.g. 'current_speed_' for 'current_speed_{depth}m'
-    month: gives the month of interest (e.g. January or Jan), default (None) takes all months
-    percentile: is the percentile associated with the worst case scenario
-    return_period: a return-period e.g., 10 for a 10-yr return period
-    distrbution, method, and threshold: only used if return_period is specified
-    output: list of vertical levels used, 1-d array for the worst case scenario (the percentiles or return values), the array with the profiles
-    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
-    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
+    This function calculates the CCA profiles for a specific percentile or a specific return period.
+
+    Parameters
+    ----------
+    df: pd.dataframe
+        Contains the time series
+    var: string
+        Prefix of the variable name of interest e.g. 'current_speed_' for 'current_speed_{depth}m'
+    month: string
+        Month of interest (e.g. January or Jan), default (None) takes all months
+    percentile: float, or by default None
+        Percentile associated with the worst case scenario
+    return_period: float, or by default None
+        Return-period e.g., 10 for a 10-yr return period
+    distrbution, method, and threshold: 3 strings
+        To be provided only if return_period is specified
+
+    Returns
+    -------
+    output: 3 ndarray
+        Vertical levels used, 1-d array for the worst case scenario (the percentiles or return values), and
+        2-D array with the profiles with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
+
+    Note
+    ----
+    If some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value.
+
+    Authors
+    -------
     Function written by clio-met based on 'Turkstra models of current profiles by Winterstein, Haver and Nygaard (2009)'
     """
     # Select the columns of interest
@@ -1361,7 +1443,7 @@ def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_per
     # Calculate the current at the other depths when curr_ref = percentile or return-period value  
     cca_prof=np.zeros((nlevels,nlevels))
     for d in range(nlevels): # Loop over the worst case level
-        prof_others=df_sel.drop(columns=[list_col[d]]).to_numpy() # extraxt currents as a matrix for all levels except the worst-case one
+        prof_others=df_sel.drop(columns=[list_col[d]]).to_numpy() # extract currents as a matrix for all levels except the worst-case one
         prof_wcd=df_sel[list_col[d]].to_numpy() # extract currents at the worst-case level
         list_ind=np.arange(0,nlevels,1).tolist()
         del list_ind[d] # remove the index of the worst-case level (index d)

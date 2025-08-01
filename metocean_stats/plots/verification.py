@@ -301,7 +301,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
     elif (len(var_ref)>len(var_comp)) and (len(var_comp)==1): #for option 1
         if norm_std is not True:
-            print('This option can only be runned with normalized standard deviation as True.')
+            print('This option can only be run with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
         var=[*var_ref,*var_comp]
@@ -327,7 +327,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
     elif len(var_ref)==len(var_comp): #for option 3
         if norm_std is not True:
-            print('This option can only be runned with normalized standard deviation as True.')
+            print('This option can only be run with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
         var=[*var_ref,*var_comp]

@@ -4,11 +4,14 @@ import seaborn as sns
 import scipy.stats as st
 import matplotlib.pyplot as plt
 
+import matplotlib as mpl
 from matplotlib.dates import MonthLocator, DateFormatter
 import matplotlib.ticker as mticker
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
 from cycler import cycler
+import calendar
+
 
 from .. import stats
 from .. import tables
@@ -291,11 +294,11 @@ def plot_monthly_stats(data: pd.DataFrame,
         plot_monthly_stats(df, 'temperature', show=["min","mean","99%"], fill_between = ["25%","75%"], 
         fill_color_like = "mean", title = "Monthly Temperature Statistics", output_file = "temp_stats.png")
     """
-    
+
     fig,ax = plt.subplots()
     percentiles = data[var].groupby(data[var].index.month).describe(percentiles=np.arange(0,1,0.01))
     xaxis = np.arange(0,data[var].index.month.max())
-    
+
     labels = [s for s in show]
     if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
     show = _percentile_str_to_pd_format(show)
@@ -314,7 +317,7 @@ def plot_monthly_stats(data: pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
 
     if month_xticks:
-        monthlabels = list(pd.date_range("2024","2024-12",freq="MS").strftime("%b"))
+        monthlabels= ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         ax.set_xticks(np.arange(1,13))
         ax.set_xticklabels(monthlabels)
 
@@ -324,6 +327,7 @@ def plot_monthly_stats(data: pd.DataFrame,
     plt.grid()
     if output_file != "": plt.savefig(output_file)
     return fig
+
 
 def plot_daily_stats(data:pd.DataFrame,
                      var:str,
@@ -384,8 +388,10 @@ def plot_daily_stats(data:pd.DataFrame,
             plt.fill_between(xaxis+1,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
     
     if month_xticks:
+        monthlabels= ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         ax.xaxis.set_major_locator(MonthLocator(bymonthday=1,bymonth=range(1,13)))
-        ax.xaxis.set_major_formatter(DateFormatter('%b'))
+        ax.set_xticklabels(monthlabels)
+        #ax.xaxis.set_major_formatter(DateFormatter('%b')) # Writes the months in Norwegian, not English
 
     plt.title(title,fontsize=14)
     plt.xlabel('Month',fontsize=12)
@@ -393,6 +399,77 @@ def plot_daily_stats(data:pd.DataFrame,
     plt.grid()
     if output_file != "": plt.savefig(output_file)
     return fig
+
+
+def plot_hourly_stats(data:pd.DataFrame,
+                     var:str,
+                     show=["min","25%","max"],
+                     fill_between:list[str]=[],
+                     fill_color_like = "",
+                     title = "",
+                     cmap = plt.get_cmap("viridis"),
+                     output_file:str="daily_stats.png"):
+    '''
+    Plot hourly statistics of a DataFrame variable.
+    
+    Arguments
+    ---------
+    data : pd.DataFrame
+        The dataframe.
+    var : str
+        A column of the dataframe.
+    show : list[str]
+        List of percentiles/statistics to include. Options are: "min","mean","0%","1%",...,"100%","max".
+    fill_between : [str,str]
+        Optional: Set a shaded area between two percentiles (any options from the "show" argument).
+    fill_color_like : str
+        Optional: Color the shaded area like any item from "show" argument, e.g. fill_color_like = "mean".
+    title : str
+        Title of the plot.
+    output_file : str
+        File path for saved figure.    
+    
+    Returns
+    --------
+    fig : Figure
+        Matplotlib figure object.
+
+    Authors
+    -------
+    Contribution by jlopez1979
+    '''
+    
+    fig,ax = plt.subplots()
+    percentiles = data[var].groupby(data[var].index.hour).describe(percentiles=np.arange(0,1,0.01))
+    xaxis = np.arange(0,data[var].index.hour.max())
+    xaxis = percentiles.index.values
+    
+    labels = [s for s in show]
+    if fill_between: labels += [fill_between[0]+"-"+fill_between[1]]
+    show = _percentile_str_to_pd_format(show)
+
+    fill_between = _percentile_str_to_pd_format(fill_between)
+    fill_color_like = _percentile_str_to_pd_format(fill_color_like)
+
+    colors = cmap(np.linspace(0,1,len(show)))
+    for i,v in enumerate(show):
+        percentiles[v].plot(color=colors[i])
+
+    if fill_between != []:
+        if fill_color_like != "":
+            fill_color = colors[np.where(fill_color_like==np.array(show))[0][0]]
+            plt.fill_between(xaxis,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25,color=fill_color)
+        else:
+            plt.fill_between(xaxis,percentiles[fill_between[0]],percentiles[fill_between[1]],alpha=0.25)
+    
+    plt.title(title,fontsize=14)
+    plt.xlabel('Hours',fontsize=12)
+    plt.ylabel(var,fontsize=12)
+    plt.legend(labels)
+    plt.grid()
+    if output_file != "": plt.savefig(output_file)
+    return fig
+
 
 def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_dir: str,show=['Mean','P99','Maximum'], title: str='Variable [units] location',output_file: str = 'directional_stats.png'):
     """
@@ -431,13 +508,13 @@ def plot_directional_stats(data: pd.DataFrame, var: str, step_var: float, var_di
     if output_file != "": plt.savefig(output_file)
     return fig
 
-def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+def plot_monthly_weather_window(data: pd.DataFrame, var: str, threshold=5, window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     results_df = tables.table_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
-    results_df.T.plot(marker='o')
-    lines = results_df.T.plot(marker='o')
-    plt.title(str(var)+' < '+str(threshold)+' for ' + str(window_size)+' hours')
+    results_df.T.plot(marker='o',cmap='viridis')
+    lines = results_df.T.plot(marker='o',cmap='viridis')
+    plt.title(str(var[0])+' < '+str(threshold[0])+' for ' + str(window_size)+' hours')
     plt.xlabel('Month')
     plt.ylabel('Duration [days]')
     plt.legend()
@@ -447,6 +524,13 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
     if add_table:
         # Get legend colors and labels
         legend_colors = [line.get_color() for line in lines.get_lines()]
+        text_colors=[] #To change the text color to white if the cell color is too dark
+        for i in range(len(legend_colors)):
+            (r,g,b,a)=legend_colors[i]
+            if ((r<0.1) | (g<0.1) | (b<0.1)):
+                text_colors.append('white')
+            else:
+                text_colors.append('black')
         # Add the table of results_df under the plot
         plt.xticks([])
         plt.xlabel('')
@@ -458,10 +542,11 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
         table.auto_set_font_size(False)
         table.set_fontsize(10)
         table.scale(1, 1.5)
-        # Make the blue color value
+        # Color the cells of the first column and 
         cell_dict = table.get_celld()
         for i in range(1,len(legend_colors)+1):
             cell_dict[(i, -1)].set_facecolor(legend_colors[i-1])
+            cell_dict[(i, -1)].get_text().set_color(text_colors[i-1])
     plt.tight_layout()
     if output_file != "": plt.savefig(output_file)
 
@@ -489,14 +574,14 @@ def plot_monthly_weather_window(data: pd.DataFrame, var: str,threshold=5, window
 #     return df2 
 
 
-def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,threshold=[5], window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
+def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str, threshold=[5], window_size=12, timestep=3, add_table=True, output_file: str = 'monthly_weather_window_plot.png'):
     # var is a list of variables (max 3) as well as thresholds (one for each variable)
     # adjusted by clio-met
-    results_df = tables.table_monthly_weather_window_MultipleVariables(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
+    results_df = tables.table_monthly_weather_window(data=data, var=var, threshold=threshold, window_size=window_size, timestep=timestep)
     # Plot the results
     fig, ax = plt.subplots(figsize=(12, 6))
-    results_df.T.plot(marker='o')
-    lines = results_df.T.plot(marker='o')
+    results_df.T.plot(marker='o',cmap='viridis')
+    lines = results_df.T.plot(marker='o',cmap='viridis')
     title=[]
     for i in range(len(var)):
         title.append(var[i]+' < '+str(threshold[i]))
@@ -512,6 +597,13 @@ def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,t
     if add_table:
         # Get legend colors and labels
         legend_colors = [line.get_color() for line in lines.get_lines()]
+        text_colors=[] #To change the text color to white if the cell color is too dark
+        for i in range(len(legend_colors)):
+            (r,g,b,a)=legend_colors[i]
+            if ((r<0.1) | (g<0.1) | (b<0.1)):
+                text_colors.append('white')
+            else:
+                text_colors.append('black')
         # Add the table of results_df under the plot
         plt.xticks([])
         plt.xlabel('')
@@ -527,28 +619,33 @@ def plot_monthly_weather_window_MultipleVariables(data: pd.DataFrame, var: str,t
         cell_dict = table.get_celld()
         for i in range(1,len(legend_colors)+1):
             cell_dict[(i, -1)].set_facecolor(legend_colors[i-1])
+            cell_dict[(i, -1)].get_text().set_color(text_colors[i-1])
     plt.tight_layout()
     if output_file != "": plt.savefig(output_file)
 
     return fig, table
 
 
-def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150],reverse_yaxis=False, output_file='stats_profile.png'):
+def plot_profile_stats(data,var=['W10','W50','W80','W100','W150'],z=[10, 50, 80, 100, 150],xlabel='[m/s]',loc='lower right',reverse_yaxis=False,output_file='stats_profile.png'):
     df = tables.table_profile_stats(data=data, var=var, z=z, output_file=None)
     df = df.drop(['Std.dev', 'Max Speed Event'],axis=1)
     fig, ax = plt.subplots()
     plt.yticks(z)  # Set yticks to be the values in z
     ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
-
+    cmap = mpl.colormaps['viridis']
+    # Take colors at regular intervals spanning the colormap.
+    colors = cmap(np.linspace(0, 1, len(df.columns[1:])))
+    i=0
     for column in df.columns[1:]:
-        plt.plot(df[column][1:],z,marker='.', label=column)
-    plt.ylabel('z[m]')
-    plt.xlabel('[m/s]')
+        plt.plot(df[column][1:],z,marker='.', label=column,color=colors[i])
+        i=i+1
+    plt.ylabel('z [m]')
+    plt.xlabel(xlabel)
     if reverse_yaxis:
         plt.gca().invert_yaxis()
     plt.legend()
     plt.grid(True)
-    plt.legend(loc='lower right')
+    plt.legend(loc=loc)
     plt.tight_layout()
     if output_file != "": plt.savefig(output_file)
 
@@ -564,16 +661,11 @@ def plot_profile_monthly_stats(
         reverse_yaxis=True, 
         output_file='table_profile_monthly_stats.png',
         include_year=True):
-
-    # Custom color cycle
-    custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
-    
+   
     # Get the data
     df = tables.table_profile_monthly_stats(data=data, var=var, z=z, method=method, output_file=None, rounding=None)
     # Create a plot
     fig, ax = plt.subplots()
-    # Set the custom color cycle
-    ax.set_prop_cycle(custom_cycler)
     # Set yticks to be the values in z
     plt.yticks(z)
     
@@ -583,15 +675,24 @@ def plot_profile_monthly_stats(
     # Only plot specified variables.
     if months == []:
         months = df.columns
+        n_col=len(months)-1
     if not include_year:
         months = [m for m in months if m!="Year"]
+        n_col=len(months)
     
+    cmap = mpl.colormaps['viridis']
+    # Take colors at regular intervals spanning the colormap.
+    colors = cmap(np.linspace(0, 1, n_col))
+    if include_year:
+        colors=np.vstack((colors, [0,0,0,1])) # Add black color for the whole year
     # Plot each column with alternating line styles
     for idx, column in enumerate(months):
-        linestyle = '-' if idx % 2 == 0 else '--'
-        plt.plot(df[column], z, marker='.', linestyle=linestyle, label=column)
+        if column=='Year':
+            plt.plot(df[column], z, marker='.', linestyle='solid', linewidth=2, color=colors[idx], label=column)
+        else:
+            plt.plot(df[column], z, marker='.', linestyle='solid', color=colors[idx], label=column)
     
-    plt.ylabel('z[m]')
+    plt.ylabel('z [m]')
     plt.title(title)
     
     # Reverse the y-axis if needed
