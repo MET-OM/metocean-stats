@@ -1625,6 +1625,18 @@ Tidal Levels Plot
 .. image:: files/tidal_levels.png
    :width: 500
 
+Tidal Type
+-----------------
+
+.. code-block:: python
+
+   stats.tidal_type(
+       df, 
+       var='tide'
+   )
+
+'Tidal type = semi-diurnal'
+
 Storm Surge for Given Hs Table
 ------------------------------
 

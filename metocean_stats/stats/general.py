@@ -815,9 +815,9 @@ def tidal_type(df,var='tide'):
     if F < 0.25 :
         tidal_type = 'Tidal type = semi-diurnal'
     elif F < 1.5 :
-        tidal_type = 'Tidal type = mixed, mailly semi-diurnal'
+        tidal_type = 'Tidal type = mixed, mainly semi-diurnal'
     elif F < 3 :
-        tidal_type = 'Tidal type = mixed, mailly diurnal'
+        tidal_type = 'Tidal type = mixed, mainly diurnal'
     else:
         tidal_type = 'Tidal type = diurnal'
 
