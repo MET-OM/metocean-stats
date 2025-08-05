@@ -1630,20 +1630,23 @@ Monthly Mean 1D Wave Spectrum
 .. image:: files/wave_spectrum_2d.png
    :width: 500
 
-.. Diana Wave Spectrum 
-.. .. code-block:: python
+Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile
 
-..    plots.plot_wave_spectrum_2d(
-..       data, 
-..       var = 'SPEC',
-..       period = ('2021-01-01T00', '2024-12-31T23'),
-..       month = None,
-..       method = 'hm0_max',
-..       output_file  = 'wave_spectrum_1D.png'
-..    )
+.. code-block:: python
 
-.. .. image:: files/wave_spectrum_2d.png
-..    :width: 500
+   plots.plot_wave_spectrum_2d(
+      data, 
+      var = 'SPEC',
+      period = ('2022-01-01T00', '2022-07-31T23'),
+      month = None,
+      method = 'top_1_percent_mean',
+      partition=True,
+      freq_mask=True,
+      output_file  = 'Diana_spectrum.png'
+   )
+
+.. image:: files/wave_spectrum_diana_partition.png
+   :width: 500
 
 Tidal Levels Table
 ------------------
