@@ -234,6 +234,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
             # Plot reference point in black
             ax.plot(std[0],0.0,'o',clip_on=False,color='k', markersize=14)
+            ax.text(std[0]+0.03,0.01,'ref',fontsize=18)#, weight='bold',verticalalignment='center')
             # Plot reference circle
             ybc_r=np.sqrt(std[0]**2-xbc**2)
             ax.plot(xbc,ybc_r,'k',linewidth=2.0)
@@ -300,7 +301,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
     elif (len(var_ref)>len(var_comp)) and (len(var_comp)==1): #for option 1
         if norm_std is not True:
-            print('This option can only be runned with normalized standard deviation as True.')
+            print('This option can only be run with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
         var=[*var_ref,*var_comp]
@@ -326,7 +327,7 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
 
     elif len(var_ref)==len(var_comp): #for option 3
         if norm_std is not True:
-            print('This option can only be runned with normalized standard deviation as True.')
+            print('This option can only be run with normalized standard deviation as True.')
             return
         fig, ax = plt.subplots(figsize=(10, 10))
         var=[*var_ref,*var_comp]
@@ -357,5 +358,8 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
     else:   
         print('The option you have sent in is invalid.')
     if output_file != "": plt.savefig(output_file,dpi=200,facecolor='white',bbox_inches='tight')
+    
+    
+    plt.show()
     plt.close()
     return fig

@@ -7,8 +7,9 @@ from metocean_stats import plots
 from metocean_stats.stats.aux_funcs import readNora10File
 
 # Define TimeSeries-object for NORA3
-ds = readNora10File('tests/data/NORA_test.txt')
-ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
+dirname = os.path.dirname(__file__)
+ds =    readNora10File(os.path.join(dirname, 'data/NORA_test.txt'))
+ds_ocean = pd.read_csv(os.path.join(dirname, 'data/NorkystDA_test.csv'),comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
 
 
@@ -32,18 +33,6 @@ def test_plot_prob_non_exceedance_fitted_3p_weibull(ds=ds):
         pass
     else:
         raise ValueError("FigValue is not correct")
-
-
-# # This doesn't work anymore because some details have changed, but several new tests have been added to replace it.
-# def test_plot_monthly_stats(ds=ds):
-#     output_file = 'test_monthly_stats.png'
-#     fig = plots.plot_monthly_stats(ds, var='T2m', show=['Minimum', 'Mean', 'Maximum'], title='T2m', output_file=output_file)
-#     if os.path.exists(output_file):
-#         os.remove(output_file)
-#     if fig.axes[0].lines[0].get_xdata()[0].round(2) == 0:
-#         pass
-#     else:
-#         raise ValueError("FigValue is not correct")
 
 def test_plot_directional_stats(ds=ds):
     output_file = 'test_directional_stats.png'
@@ -327,6 +316,31 @@ def test_plot_daily_stats_missing_column():
     except KeyError:
         print("test_plot_daily_stats_missing_column passed (KeyError raised as expected).")
 
+def test_plot_hourly_stats_wind_speed():
+    # Test the function with wind speed data (W10)
+    fig = plots.plot_hourly_stats(ds, var="W10", show=["min", "mean", "max"],output_file="")
+
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+    # Ensure the figure has the correct title if provided
+    assert fig.axes[0].get_title() == "", "Unexpected title for the plot."
+
+def test_plot_hourly_stats_wave_height_fill():
+    # Test the function with significant wave height data (HS) and fill_between option
+    fig = plots.plot_hourly_stats(ds, var="HS", show=["25%", "75%", "mean"], 
+                                 fill_between=["25%", "75%"], fill_color_like="mean",output_file="")
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+def test_plot_hourly_stats_missing_column():
+    # Test with a missing column (should raise an error or handle it gracefully)
+    try:
+        plots.plot_hourly_stats(ds, var="non_existent_column",output_file="")
+        assert False, "The function did not raise an error for a missing column."
+    except KeyError:
+        print("test_plot_hourly_stats_missing_column passed (KeyError raised as expected).")
 
 def test_plot_monthly_stats_wind_speed():
     # Test the function with wind speed data (W10)
@@ -369,6 +383,14 @@ def test_plot_taylor_diagram():
     fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+
+# def test_plot_environmental_contours_hs_tp():
+#     figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
+#     assert isinstance(figures[0],plt.Figure)
+
+# def test_plot_environmental_contours_U_hs():
+#     figures = plot_environmental_contours(ds,'HS','W10',config='DNVGL_hs_U',save_path='joint_U_hs_')
+#     assert isinstance(figures[0],plt.Figure)
 
 
 def test_plot_cca_profile():
