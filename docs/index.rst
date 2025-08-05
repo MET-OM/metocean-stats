@@ -1561,23 +1561,86 @@ CCA profiles Table
    :header-rows: 1
    :file: files/table_cca_profiles.csv
 
-Directional Wave Energy Spectrum Plot
+.. Directional Wave Energy Spectrum Plot
+.. -----------------------------------------
+
+.. .. code-block:: python
+
+..    plots.plot_spectrum(
+..        spectrum, 
+..        frequencies,
+..        directions, 
+..        spec_unit='m**2 s',
+..        radius='frequency',
+..        log_radius=False,
+..        output_file='Spectrum_plot.png')
+..    )
+
+.. .. image:: files/Spectrum_plot.png
+..    :width: 500
+
+Wave Spectrum Plots
 -----------------------------------------
 
+Monthly Mean 1D Wave Spectrum
 .. code-block:: python
 
-   plots.plot_spectrum(
-       spectrum, 
-       frequencies,
-       directions, 
-       spec_unit='m**2 s',
-       radius='frequency',
-       log_radius=False,
-       output_file='Spectrum_plot.png')
+   plots.plot_wave_spectrum_1d(
+      data, 
+      var = 'SPEC',
+      period = None,
+      month = None,
+      method = 'mean',
+      output_file  = 'wave_spectrum_1D.png'
    )
 
-.. image:: files/Spectrum_plot.png
+.. image:: files/wave_spectrum_1d_months.png
    :width: 500
+
+1D Spectrum Mean for a Specific Month Across Several Years
+.. code-block:: python
+
+   plots.plot_wave_spectrum_1d(
+      data, 
+      var = 'SPEC',
+      period = None,
+      month = 1,
+      method = 'mean',
+      output_file  = 'wave_spectrum_1D.png'
+   )
+
+.. image:: files/wave_spectrum_1d_month.png
+   :width: 500
+
+2D Wave Spectrum at Time of Maximum Hm0 in Selected Period
+.. code-block:: python
+
+   plots.plot_wave_spectrum_2d(
+      data, 
+      var = 'SPEC',
+      period = ('2021-01-01T00', '2024-12-31T23'),
+      month = None,
+      method = 'hm0_max',
+      output_file  = 'wave_spectrum_1D.png'
+   )
+
+.. image:: files/wave_spectrum_2d.png
+   :width: 500
+
+.. Diana Wave Spectrum 
+.. .. code-block:: python
+
+..    plots.plot_wave_spectrum_2d(
+..       data, 
+..       var = 'SPEC',
+..       period = ('2021-01-01T00', '2024-12-31T23'),
+..       month = None,
+..       method = 'hm0_max',
+..       output_file  = 'wave_spectrum_1D.png'
+..    )
+
+.. .. image:: files/wave_spectrum_2d.png
+..    :width: 500
 
 Tidal Levels Table
 ------------------
