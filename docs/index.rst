@@ -1583,6 +1583,7 @@ Wave Spectrum Plots
 -----------------------------------------
 
 Monthly Mean 1D Wave Spectrum
+
 .. code-block:: python
 
    plots.plot_wave_spectrum_1d(
@@ -1598,6 +1599,7 @@ Monthly Mean 1D Wave Spectrum
    :width: 500
 
 1D Spectrum Mean for a Specific Month Across Several Years
+
 .. code-block:: python
 
    plots.plot_wave_spectrum_1d(
@@ -1613,6 +1615,7 @@ Monthly Mean 1D Wave Spectrum
    :width: 500
 
 2D Wave Spectrum at Time of Maximum Hm0 in Selected Period
+
 .. code-block:: python
 
    plots.plot_wave_spectrum_2d(
