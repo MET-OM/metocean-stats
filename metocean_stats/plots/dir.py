@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import windrose
+import sys
+import matplotlib.ticker as mticker
 
 def rose(data,
          var_dir,
@@ -61,7 +63,7 @@ def var_rose(data,
                                decimal_places=decimal_places,units=units,single_figure=single_figure,output_file=output_file)
     
     plt.close()
-    return fig 
+    return fig
 
 def monthly_var_rose(data, 
                      var_dir,
@@ -136,10 +138,8 @@ def monthly_var_rose(data,
 
 
 def plot_spectrum_2d(ds, var='SPEC', radius='frequency', log_radius=False, plot_type='contourf', dir_letters=False, output_file='Spectrum_plot.png'):
-    import sys
-    import matplotlib.ticker as mticker
     '''
-    Returns a plot of the given spectrum.
+    This function plots a directional wave spectrum
     
     Parameters
     ----------
@@ -162,6 +162,8 @@ def plot_spectrum_2d(ds, var='SPEC', radius='frequency', log_radius=False, plot_
     -------
     Figure matplotlib
 
+    Authors
+    -------
     Function written by clio-met
     '''
     spectrum=ds[var]

@@ -495,6 +495,30 @@ def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_si
     return mean, p10, p50,p90
 
 def weather_window_length(time_series,threshold,op_duration,timestep,month=None):
+    """
+    This function calculates weather windows statistics for a condition on one variable
+
+    Parameters
+    ----------
+    tim_series: pd.DataFrame
+        Contains timeseries of the variable of interest
+    threshold: float
+        Threshold below which operation is possible (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Written by clio-met
+    """
     # time_series: input timeseries
     # threshold over which operation is possible (same unit as timeseries)
     # op_duration: duration of operation in hours
@@ -529,7 +553,7 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
@@ -546,16 +570,31 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
 
 def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timestep,month=None):
     """
-    Usage:
-    df: input df containing timeseries for different variables
-    vars: list of strings: variables to consider (up to 3)
-    threshold: list of floats: thresholds to use for each variable included (same unit as timeseries)
-    op_duration: duration of operation in hours
-    timestep: time resolution of time_series in hours
-    month: default is all year
-    Returns specific weather windows duration in hours
-    Generalization of weather_window_length to multiple conditions
-    Modified by clio-met
+    This function calculates weather windows statistics for up to 3 simultaneous conditions
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains timeseries for different variables
+    vars: list of strings
+        Variables' names to consider (up to 3)
+    threshold: list of floats
+        Thresholds below which operation is possible
+        for each variable (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Generalization of weather_window_length to multiple conditions by clio-met
     """
     month_ts = df.index.month
     if (len(vars)!=len(threshold)):
@@ -596,7 +635,7 @@ def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timest
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
@@ -696,3 +735,90 @@ def linfitef(x, y, stdx: float=1.0, stdy: float=1.0) -> tuple[float, float]:
     intercept = y0 - slope * x0
     
     return slope, intercept
+
+
+
+def tidal_type(df,var='tide'):
+    """
+    This function calculates the tidal type from sea level
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains the timeseries with index as hourly datetime
+    var: string
+        Variable name, column name
+
+    Returns
+    -------
+    output: string
+        Tidal type
+    
+    Authors
+    -------
+    Written by Dung M. Nguyen
+    """
+    def find_h_g(Xk,Tm):
+        dt = 1
+        K = 0
+        for i in range(len(Xk)):
+            c = i/Tm
+            if c.is_integer():
+                K = i
+            
+        if K == 0 : 
+            Hm = 0
+            gm = 0
+        else:
+            Am = 0
+            Bm = 0
+            for k in range(K+1):
+                Am = Am + 2/K*Xk[k]*np.cos(2*np.pi/Tm*k*dt)
+                Bm = Bm + 2/K*Xk[k]*np.sin(2*np.pi/Tm*k*dt)
+                
+            Hm = np.sqrt(Am**2 + Bm**2)
+            if Bm > 0 and Am > 0:
+                gm = np.arctan(Bm/Am)
+            elif Bm > 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am > 0:
+                gm = np.arctan(Bm/Am) + 2*np.pi
+    
+        return Hm, gm
+    
+    mean = np.mean(df[var].values)
+    series = df.tide.values - mean
+    
+    ## M2
+    Tm = 12.42 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hm2=Hm
+    
+    ## S2
+    Tm = 12.00 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hs2=Hm
+    
+    ### K1
+    Tm = 23.934 # hours 
+    Hm,gm = find_h_g(series,Tm)
+    Hk1=Hm
+    
+    #### O1
+    Tm = 25.82 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Ho1=Hm
+    
+    F = (Hk1+Ho1)/(Hm2+Hs2)
+    if F < 0.25 :
+        tidal_type = 'Tidal type = semi-diurnal'
+    elif F < 1.5 :
+        tidal_type = 'Tidal type = mixed, mainly semi-diurnal'
+    elif F < 3 :
+        tidal_type = 'Tidal type = mixed, mainly diurnal'
+    else:
+        tidal_type = 'Tidal type = diurnal'
+
+    return tidal_type

@@ -316,6 +316,31 @@ def test_plot_daily_stats_missing_column():
     except KeyError:
         print("test_plot_daily_stats_missing_column passed (KeyError raised as expected).")
 
+def test_plot_hourly_stats_wind_speed():
+    # Test the function with wind speed data (W10)
+    fig = plots.plot_hourly_stats(ds, var="W10", show=["min", "mean", "max"],output_file="")
+
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+    # Ensure the figure has the correct title if provided
+    assert fig.axes[0].get_title() == "", "Unexpected title for the plot."
+
+def test_plot_hourly_stats_wave_height_fill():
+    # Test the function with significant wave height data (HS) and fill_between option
+    fig = plots.plot_hourly_stats(ds, var="HS", show=["25%", "75%", "mean"], 
+                                 fill_between=["25%", "75%"], fill_color_like="mean",output_file="")
+    
+    # Check that the output is a Matplotlib Figure
+    assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    
+def test_plot_hourly_stats_missing_column():
+    # Test with a missing column (should raise an error or handle it gracefully)
+    try:
+        plots.plot_hourly_stats(ds, var="non_existent_column",output_file="")
+        assert False, "The function did not raise an error for a missing column."
+    except KeyError:
+        print("test_plot_hourly_stats_missing_column passed (KeyError raised as expected).")
 
 def test_plot_monthly_stats_wind_speed():
     # Test the function with wind speed data (W10)
