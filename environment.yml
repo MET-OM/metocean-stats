@@ -18,4 +18,5 @@ dependencies:
   - netcdf4
   - pydap
   - setuptools
+  - metpy                 # spectra
 

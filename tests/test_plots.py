@@ -5,11 +5,13 @@ import matplotlib.pyplot as plt
 
 from metocean_stats import plots
 from metocean_stats.stats.aux_funcs import readNora10File
+from .data import synthetic_dataset
 
 # Define TimeSeries-object for NORA3
 ds = readNora10File('tests/data/NORA_test.txt')
 ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
+ds_synthetic_spectra = synthetic_dataset.synthetic_dataset_spectra()
 
 
 def test_plot_scatter(ds=ds):
@@ -375,3 +377,27 @@ def test_plot_cca_profile():
     fig = plots.plot_cca_profiles(ds_ocean,var='current_speed_',month=None,return_period=10,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+
+def test_plot_wave_spectrum_1d():
+    output_file = 'test_plot_wave_spectrum_1d.png'
+    fig = plots.plot_wave_spectrum_1d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_wave_spectrum_2d():
+    output_file = 'test_plot_wave_spectrum_2d.png'
+    fig = plots.plot_wave_spectrum_2d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_diana_spectrum():
+    output_file = 'test_plot_diana_spectrum.png'
+    fig = plots.plot_diana_spectrum(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', partition=True, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_peak_direction_spectra():
+    output_file = 'test_plot_dir_mean_2dspectrum.png'
+    fig = plots.plot_peak_direction_spectra(data=ds_synthetic_spectra, var='SPEC', method='mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)

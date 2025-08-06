@@ -10,3 +10,4 @@ from .dir import *
 from .extreme import *
 from .general import *
 from .verification import *
+from .spectra import *

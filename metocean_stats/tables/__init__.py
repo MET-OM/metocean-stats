@@ -8,3 +8,4 @@ Copyright 2023, Konstantinos Christakos, MET Norway
 from .dir import *
 from .extreme import *
 from .general import *
+from .spectra import *
