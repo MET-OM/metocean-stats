@@ -196,6 +196,7 @@ def plot_multi_diagnostic_return_levels(data, var,
 
     # Initialize plot and fill in empirical return levels
     fig, ax = plt.subplots()
+    ax.margins(x=0,y=0)
 
     # Plot points (return level, return period) corresponding to
     # empirical values
@@ -209,7 +210,7 @@ def plot_multi_diagnostic_return_levels(data, var,
         #           marker="o", s=20, lw=1,
         #           facecolor="k", edgecolor="w", zorder=20)
         ax.scatter(df_emp_rl_cut['return_levels'],
-                   df_emp_rl_cut['prob_non_exceedance'],
+                   1-df_emp_rl_cut['prob_non_exceedance'],
                    marker="o", s=20, lw=1,
                    facecolor="k", edgecolor="w", zorder=20)
 
@@ -247,7 +248,7 @@ def plot_multi_diagnostic_return_levels(data, var,
             #        df_model_rl_tmp_cut.index,
             #        label=dist)
             ax.plot(df_model_rl_tmp_cut['return_levels'],
-                    df_model_rl_tmp_cut['prob_non_exceedance'],
+                    1-df_model_rl_tmp_cut['prob_non_exceedance'],
                     label=dist)
 
         elif yaxis == 'rp':
@@ -255,24 +256,19 @@ def plot_multi_diagnostic_return_levels(data, var,
                     df_model_rl_tmp.index,
                     label=dist)
 
-    plt.yscale('log')
+    ax.set_yscale('log')
     ax.grid(True, which="both")
 
     # Change label and ticklabels of y-axis, to display either probabilities
     # of non-exceedance or return period
     if yaxis == 'prob':
+        ax.invert_yaxis() # only invert if probability plot.
+        ticks = np.array([0,0.5,0.9,0.99,0.999,0.9999,0.99999,0.999999,0.9999999])
         ax.set_ylabel("Probability of non-exceedance")
-        #list_yticks = [1/0.9, 2, 10]\
-        #            + [10**i for i in range(2, 5) if max(periods) > 10**i]
-        #if max(periods) > max(list_yticks):
-        #    list_yticks = list_yticks + [max(periods)]
-        #ax.set_yticks(list_yticks)
-        #ax.set_yticklabels([round(1-1/rp,5) for rp in list_yticks])
-        list_yticks = [10**-1,10**(np.log10(0.5)),10**0]
-        list_ytickslabels = ['0.1','0.5','1']
-        ax.set_yticks(list_yticks)
-        ax.set_yticklabels(list_ytickslabels)
-        ax.set_ylim(0.05,1.02)
+        ylim = ax.get_ylim()
+        ax.set_yticks(1-ticks,ticks)
+        # This line should expand ylim to the nearest tick above.
+        ax.set_ylim(ylim[0],1-ticks[np.searchsorted(ticks,1-ylim[1])])
 
     elif yaxis == 'rp':
         ax.set_ylabel("Return period [yr]")
@@ -621,8 +617,10 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
     t3_ = []; h3_= []
 
     fig, ax = plt.subplots(figsize=(8,6))
-    custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
-    ax.set_prop_cycle(custom_cycler)
+    #custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
+    #ax.set_prop_cycle(custom_cycler)
+    cmap = plt.cm.Blues
+    ii = np.linspace(0.2,1,len(window)-1)
 
     for i in range(len(window)-1):
         var_3 = df[var3].where((df[var3] > window[i]) & (df[var3] <= window[i+1])).dropna() #w10 = (wind1,wind2]
@@ -630,13 +628,14 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
             continue
         hs = df[var_hs].where(var_3.notnull()).dropna()
         tp = df[var_tp].where(var_3.notnull()).dropna()
-        dff = pd.DataFrame({'HS': hs, 'TP': tp, var3_name: var_3})
+        dff = pd.DataFrame({var_hs: hs, var_tp: tp, var3_name: var_3})
         a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=dff,var_hs=var_hs,var_tp=var_tp,periods=periods)
         t3_.append(t3)
         h3_.append(h3)
         linestyle = '-' if i % 2 == 0 else '--'
         labels = str(np.round(window[i],2))+'-'+str(np.round(window[i+1],2))
-        plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
+        #plt.plot(t3[0],h3[0], linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  
+        plt.plot(t3[0],h3[0], color=cmap(ii[i]), linestyle=linestyle, label=var3_name+'$\\in$' + labels+' ['+var3_units+']')  #color=cmap(0.5)
 
     #include the whole dataset also:
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=df,var_hs=var_hs,var_tp=var_tp,periods=periods)
@@ -725,7 +724,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
     # Fit Weibull distribution to your data and estimate parameters
     data = df.HS.values  # Your data
-    shape, loc, scale = stats.Weibull_method_of_moment(data)
+    shape, loc, scale = aux_funcs.Weibull_method_of_moment(data)
     
     # Define return periods
     periods = np.arange(1.5873, 10000, 100) 
@@ -742,7 +741,7 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
         bootstrap_sample = np.random.choice(data, size=1000, replace=True)
         
         # Fit Weibull distribution to resampled data
-        shape_b, loc_b, scale_b = stats.Weibull_method_of_moment(bootstrap_sample)
+        shape_b, loc_b, scale_b = aux_funcs.Weibull_method_of_moment(bootstrap_sample)
         # Calculate return values for resampled distribution
         bootstrap_return_values.append(st.weibull_min.ppf(1 - 1 / return_periods, shape_b, loc_b, scale_b))
     
@@ -782,8 +781,10 @@ def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
 def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],distribution='Weibull3P_MOM',method='default',threshold='default', units='m',output_file='monthly_extremes_weibull.png'):
     df = tables.table_monthly_return_periods(data=data,var=var, periods=periods,distribution=distribution,method=method,threshold=threshold, units=units, output_file=None)
     fig, ax = plt.subplots()
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(periods)))
     for i in range(len(periods)):
-        plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1])
+        plt.plot(df['Month'][1:-1], df.iloc[1:-1,-i-1],marker = 'o',label=df.keys()[-i-1].split(':')[1],color=colors[i])
 
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Month',fontsize=15)
@@ -796,8 +797,12 @@ def plot_monthly_return_periods(data, var='hs', periods=[1, 10, 100, 10000],dist
 def plot_directional_return_periods(data, var='hs',var_dir='Pdir', periods=[1, 10, 100, 10000],distribution='Weibull', units='m',adjustment='NORSOK',method='default',threshold='default', output_file='monthly_extremes_weibull.png'):
     df = tables.table_directional_return_periods(data=data,var=var,var_dir=var_dir, periods=periods, distribution=distribution, units=units,adjustment=adjustment,method=method,threshold=threshold, output_file=None)
     fig, ax = plt.subplots()
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(periods)))
+    a=0
     for i in periods:
-        plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years')
+        plt.plot(df['Direction sector'][1:-1], df[f'Return period: {i} [years]'][1:-1],marker = 'o',label=f'{i} years',color=colors[a])
+        a=a+1
     
     plt.title('Return values for '+str(var)+' ['+units+']',fontsize=16)
     plt.xlabel('Direction',fontsize=15)
@@ -946,9 +951,13 @@ def plot_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10
     plt.yticks(z)  # Set yticks to be the values in z
     ax.yaxis.set_major_locator(mticker.MultipleLocator(int(max(z)/4)))  # Set major y-ticks at intervals of 10
 
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0,1,len(df.columns[1:])))
+    a=0
     for column in df.columns[1:]:
-        plt.plot(df[column][1:],z,marker='.', label=column)
-    plt.ylabel('z[m]')
+        plt.plot(df[column][1:],z,marker='.', label=column, color=colors[a])
+        a=a+1
+    plt.ylabel('z [m]')
     plt.xlabel('[m/s]')
     plt.title(title)
     if reverse_yaxis is True:
@@ -1037,17 +1046,34 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
 def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default',unit_var='m/s',unit_lev='m',output_file='plot_cca_profiles.png'):
     """
     This function plots the CCA profiles for a specific percentile or return period
-    data: dataframe
-    var: prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
-    month: gives the month of interest (e.g. January or Jan), default (None) takes all months
-    percentile: is the percentile associated with the worst case scenario
-    return_period: a return-period e.g., 10 for a 10-yr return period
-    distrbution, method, and threshold: only used if retrun_period is specified 
-    unit_var: is a string with the unit of the variable var, default is m/s
-    unit_lev: is a string with the units of the vertical levels, default is m
-    output_file: name of the figure file
-    with the dimensions (vertical levels of the profile, vertical level of the worst case scenario)
-    NB: if some points of the profile exceed the worst-case curve, they will be brought back down to the worst case value
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+        Contains the time series
+    var: string
+        Prefix of the variable name of interest e.g. 'current_speed_' for names such as 'current_speed_{depth}m'
+    month: string
+        Month of interest (e.g. 'January' or 'Jan'), default (None) takes all months
+    percentile: float
+        Percentile associated with the worst case scenario
+    return_period: float
+        Return-period e.g., 10 for a 10-yr return period
+    distribution, method, and threshold: string, string, string
+        To specify only if return_period is given 
+    unit_var: string
+        Unit of the variable var, default is 'm/s'
+    unit_lev: string
+        Units of the vertical levels, default is 'm'
+    output_file: string
+        Name of the figure file
+
+    Returns
+    -------
+    fig: matplotlib figure in a new file
+
+    Authors
+    -------
     Function written by clio-met
     """
     if ((percentile is None) and (return_period is None)):

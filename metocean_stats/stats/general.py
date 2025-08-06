@@ -12,47 +12,52 @@ from scipy.signal import find_peaks
 
 from .aux_funcs import convert_latexTab_to_csv
 
-def calculate_scatter(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float) -> pd.DataFrame:
-    """
-    Create scatter table of two variables (e.g, var1='hs', var2='tp')
-    step_var: size of bin e.g., 0.5m for hs and 1s for Tp
-    The rows are the upper bin edges of var1 and the columns are the upper bin edges of var2
-    """
-    dvar1 = data[var1]
-    v1min = np.min(dvar1)
-    v1max = np.max(dvar1)
-    if step_var1 > v1max:
-        raise ValueError(f"Step size {step_var1} is larger than the maximum value of {var1}={v1max}.")
+def calculate_scatter(data,var1, step_var1, var2, step_var2, from_origin=False, labels_lower=False):
+    '''
+    data : pd.DataFrame
+        The data containing the variables as columns.
+    var1 : str
+        The first variable.
+    step_var1 : float
+        Bin size of the first variable.
+    var2 : str
+        The second variable.
+    step_var2 : float
+        Bin size of the second variable.
+    from_origin : bool, default False
+        This will include the origin, even if there are no values near zero.
+    labels_lower : bool, default False
+        By default, upper edges of bins are used as labels. Switch this to use lower bin edges instead.
+    '''
 
-    dvar2 = data[var2]
-    v2min = np.min(dvar2)
-    v2max = np.max(dvar2)
-    if step_var2 > v2max:
-        raise ValueError(f"Step size {step_var2} is larger than the maximum value of {var2}={v2max}.")
+    data = data[[var1,var2]]
+    if np.any(np.isnan(data)):
+        print("Warning: Removing NaN rows.")
+        data = data.dropna(how="any")
 
-    # Find the the upper bin edges
-    max_bin_1 = ceil(v1max / step_var1)
-    max_bin_2 = ceil(v2max / step_var2)
-    min_bin_1 = ceil(v1min / step_var1)
-    min_bin_2 = ceil(v2min / step_var2)
+    # Initial min and max
+    xmin = data[var2].values.min()
+    ymin = data[var1].values.min()
+    xmax = data[var2].values.max()
+    ymax = data[var1].values.max()
 
-    offset_1 = min_bin_1 - 1
-    offset_2 = min_bin_2 - 1
+    # Change min (max) to zero only if all values are above (below) and from_origin=True
+    xmin = 0 if (from_origin and (xmin>0)) else (xmin//step_var2)*step_var2
+    ymin = 0 if (from_origin and (ymin>0)) else (ymin//step_var1)*step_var1
 
-    var1_upper_bins = np.arange(min_bin_1, max_bin_1 + 1, 1) * step_var1
-    var2_upper_bins = np.arange(min_bin_2, max_bin_2 + 1, 1) * step_var2
+    xmax = 0 if (from_origin and (xmax<0)) else xmax
+    ymax = 0 if (from_origin and (ymax<0)) else ymax
 
-    row_size = len(var1_upper_bins)
-    col_size = len(var2_upper_bins)
-    occurences = np.zeros([row_size, col_size])
+    # Define bins and get histogram
+    x = np.arange(xmin,xmax+step_var2,step_var2)
+    y = np.arange(ymin,ymax+step_var1,step_var1)
+    a, y, x = np.histogram2d(data.values[:,0],data.values[:,1],bins=(y,x))
 
-    for v1, v2 in zip(dvar1, dvar2):
-        # Find the correct bin and sum up
-        row = floor(v1 / step_var1) - offset_1
-        col = floor(v2 / step_var2) - offset_2
-        occurences[row, col] += 1
+    # Choose upper or lower edges as labels
+    x = x[:-1] if labels_lower else x[1:]
+    y = y[:-1] if labels_lower else y[1:]
 
-    return pd.DataFrame(data=occurences, index=var1_upper_bins, columns=var2_upper_bins)
+    return pd.DataFrame(data = a.astype("int"),index = y,columns=x)
 
 def scatter_diagram(data: pd.DataFrame, var1: str, step_var1: float, var2: str, step_var2: float, output_file):
     """
@@ -490,6 +495,30 @@ def calculate_weather_window(data: pd.DataFrame, var: str,threshold=5, window_si
     return mean, p10, p50,p90
 
 def weather_window_length(time_series,threshold,op_duration,timestep,month=None):
+    """
+    This function calculates weather windows statistics for a condition on one variable
+
+    Parameters
+    ----------
+    tim_series: pd.DataFrame
+        Contains timeseries of the variable of interest
+    threshold: float
+        Threshold below which operation is possible (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Written by clio-met
+    """
     # time_series: input timeseries
     # threshold over which operation is possible (same unit as timeseries)
     # op_duration: duration of operation in hours
@@ -524,7 +553,7 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
@@ -541,16 +570,31 @@ def weather_window_length(time_series,threshold,op_duration,timestep,month=None)
 
 def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timestep,month=None):
     """
-    Usage:
-    df: input df containing timeseries for different variables
-    vars: list of strings: variables to consider (up to 3)
-    threshold: list of floats: thresholds to use for each variable included (same unit as timeseries)
-    op_duration: duration of operation in hours
-    timestep: time resolution of time_series in hours
-    month: default is all year
-    Returns specific weather windows duration in hours
-    Generalization of weather_window_length to multiple conditions
-    Modified by clio-met
+    This function calculates weather windows statistics for up to 3 simultaneous conditions
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains timeseries for different variables
+    vars: list of strings
+        Variables' names to consider (up to 3)
+    threshold: list of floats
+        Thresholds below which operation is possible
+        for each variable (same unit as timeseries)
+    op_duration: float
+        Duration of operation in hours
+    timestep: float
+        Time resolution of time_series in hours
+    month: integer
+        From 1 for January to 12 for Decemer. Default is all year
+
+    Returns
+    -------
+    Returns statistics of weather windows duration in hours
+
+    Authors
+    -------
+    Generalization of weather_window_length to multiple conditions by clio-met
     """
     month_ts = df.index.month
     if (len(vars)!=len(threshold)):
@@ -591,7 +635,7 @@ def weather_window_length_MultipleVariables(df,vars,threshold,op_duration,timest
                 wt.append(diff*timestep)
                 a=a+1
     wt1=(np.array(wt)+op_duration)/24
-    # Note that we this subroutine, we stop the calculation of the waiting time
+    # Note that in this subroutine, we stop the calculation of the waiting time
     # at the first timestep of the last operating period found in the timeseries
     if month is None:
         mean = np.mean(wt1)
@@ -691,3 +735,90 @@ def linfitef(x, y, stdx: float=1.0, stdy: float=1.0) -> tuple[float, float]:
     intercept = y0 - slope * x0
     
     return slope, intercept
+
+
+
+def tidal_type(df,var='tide'):
+    """
+    This function calculates the tidal type from sea level
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Contains the timeseries with index as hourly datetime
+    var: string
+        Variable name, column name
+
+    Returns
+    -------
+    output: string
+        Tidal type
+    
+    Authors
+    -------
+    Written by Dung M. Nguyen
+    """
+    def find_h_g(Xk,Tm):
+        dt = 1
+        K = 0
+        for i in range(len(Xk)):
+            c = i/Tm
+            if c.is_integer():
+                K = i
+            
+        if K == 0 : 
+            Hm = 0
+            gm = 0
+        else:
+            Am = 0
+            Bm = 0
+            for k in range(K+1):
+                Am = Am + 2/K*Xk[k]*np.cos(2*np.pi/Tm*k*dt)
+                Bm = Bm + 2/K*Xk[k]*np.sin(2*np.pi/Tm*k*dt)
+                
+            Hm = np.sqrt(Am**2 + Bm**2)
+            if Bm > 0 and Am > 0:
+                gm = np.arctan(Bm/Am)
+            elif Bm > 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am < 0:
+                gm = np.arctan(Bm/Am) + np.pi
+            elif Bm < 0 and Am > 0:
+                gm = np.arctan(Bm/Am) + 2*np.pi
+    
+        return Hm, gm
+    
+    mean = np.mean(df[var].values)
+    series = df.tide.values - mean
+    
+    ## M2
+    Tm = 12.42 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hm2=Hm
+    
+    ## S2
+    Tm = 12.00 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Hs2=Hm
+    
+    ### K1
+    Tm = 23.934 # hours 
+    Hm,gm = find_h_g(series,Tm)
+    Hk1=Hm
+    
+    #### O1
+    Tm = 25.82 # hours 
+    Hm, gm = find_h_g(series,Tm) 
+    Ho1=Hm
+    
+    F = (Hk1+Ho1)/(Hm2+Hs2)
+    if F < 0.25 :
+        tidal_type = 'Tidal type = semi-diurnal'
+    elif F < 1.5 :
+        tidal_type = 'Tidal type = mixed, mainly semi-diurnal'
+    elif F < 3 :
+        tidal_type = 'Tidal type = mixed, mainly diurnal'
+    else:
+        tidal_type = 'Tidal type = diurnal'
+
+    return tidal_type
