@@ -1648,6 +1648,19 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 .. image:: files/wave_spectrum_diana_partition.png
    :width: 500
 
+Directional Wave Spectra Averaged by Peak Energy Direction in 30° Sectors
+
+.. code-block:: python
+
+   plots.plot_wave_spectrum_2d(
+      data, 
+      var = 'SPEC',
+      output_file  = 'Diana_spectrum.png'
+   )
+
+.. image:: files/wave_spectra_peak_direction.png
+   :width: 500
+
 Tidal Levels Table
 ------------------
 
