@@ -1607,7 +1607,7 @@ Monthly Mean 1D Wave Spectrum
       period = None,
       month = None,
       method = 'mean',
-      output_file  = 'wave_spectrum_1D.png'
+      output_file  = 'wave_spectrum_1d.png'
    )
 
 .. image:: files/wave_spectrum_1d_months.png
@@ -1623,7 +1623,7 @@ Monthly Mean 1D Wave Spectrum
       period = None,
       month = 1,
       method = 'mean',
-      output_file  = 'wave_spectrum_1D.png'
+      output_file  = 'wave_spectrum_1d.png'
    )
 
 .. image:: files/wave_spectrum_1d_month.png
@@ -1639,7 +1639,7 @@ Monthly Mean 1D Wave Spectrum
       period = ('2021-01-01T00', '2024-12-31T23'),
       month = None,
       method = 'hm0_max',
-      output_file  = 'wave_spectrum_1D.png'
+      output_file  = 'wave_spectrum_2d.png'
    )
 
 .. image:: files/wave_spectrum_2d.png
@@ -1649,7 +1649,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 
 .. code-block:: python
 
-   plots.plot_wave_spectrum_2d(
+   plots.plot_diana_spectrum(
       data, 
       var = 'SPEC',
       period = ('2022-01-01T00', '2022-07-31T23'),
@@ -1657,23 +1657,36 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
       method = 'top_1_percent_mean',
       partition=True,
       freq_mask=True,
-      output_file  = 'Diana_spectrum.png'
+      output_file  = 'diana_spectrum.png'
    )
 
 .. image:: files/wave_spectrum_diana_partition.png
+   :width: 500
+
+2D Monthly Mean Wave Spectra
+
+.. code-block:: python
+
+   plots.plot_monthly_mean_spectra_2d(
+      data, 
+      var = 'SPEC',
+      output_file  = 'monthly_mean_spectra_2d.png'
+   )
+
+.. image:: files/wave_spectra_monthly_mean_2d.png
    :width: 500
 
 Directional Wave Spectra Averaged by Peak Energy Direction in 30° Sectors
 
 .. code-block:: python
 
-   plots.plot_wave_spectrum_2d(
+   plots.plot_peak_direction_spectra(
       data, 
       var = 'SPEC',
-      output_file  = 'Diana_spectrum.png'
+      output_file  = 'peak_direction_spectra_2d.png'
    )
 
-.. image:: files/wave_spectra_peak_direction.png
+.. image:: files/wave_spectra_peak_direction_2d.png
    :width: 500
 
 Tidal Levels Table
