@@ -1680,8 +1680,8 @@ Directional Wave Spectra Averaged by Peak Energy Direction in 30° Sectors
 
 .. code-block:: python
 
-   plots.plot_peak_direction_spectra(
-      data, 
+   plots.plot_peak_direction_spectra_2d(
+      data,         
       var = 'SPEC',
       output_file  = 'peak_direction_spectra_2d.png'
    )
