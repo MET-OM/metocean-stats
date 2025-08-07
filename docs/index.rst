@@ -1639,6 +1639,7 @@ Monthly Mean 1D Wave Spectrum
       period = ('2021-01-01T00', '2024-12-31T23'),
       month = None,
       method = 'hm0_max',
+      plot_type = 'pcolormesh',
       output_file  = 'wave_spectrum_2d.png'
    )
 
@@ -1656,6 +1657,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
       month = None,
       method = 'top_1_percent_mean',
       partition=True,
+      plot_type = 'pcolormesh'
       freq_mask=True,
       output_file  = 'diana_spectrum.png'
    )
@@ -1670,6 +1672,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
    plots.plot_monthly_mean_spectra_2d(
       data, 
       var = 'SPEC',
+      plot_type = 'contour',
       output_file  = 'monthly_mean_spectra_2d.png'
    )
 
@@ -1683,6 +1686,7 @@ Directional Wave Spectra Averaged by Peak Energy Direction in 30° Sectors
    plots.plot_peak_direction_spectra_2d(
       data,         
       var = 'SPEC',
+      plot_type = 'contour'
       output_file  = 'peak_direction_spectra_2d.png'
    )
 
