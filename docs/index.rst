@@ -1679,7 +1679,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 .. image:: files/wave_spectra_monthly_mean_2d.png
    :width: 500
 
-Directional Wave Spectra Averaged by Peak Energy Direction in 30° Sectors
+Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
 
 .. code-block:: python
 
