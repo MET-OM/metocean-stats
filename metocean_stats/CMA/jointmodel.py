@@ -22,7 +22,9 @@ from .predefined import (
     get_DNVGL_Hs_U,
     get_OMAE2020_Hs_Tz,
     get_OMAE2020_V_Hs,
-    get_LoNoWe_hs_tp,
+    get_cT_Hs_Tp,
+    get_vonmises_wind_misalignment,
+    get_LiGaoMoan_U_hs_tp,
 )
 
 from .contours import (
@@ -43,26 +45,20 @@ def _load_preset(preset:str|Callable):
         except:
             raise TypeError(f"Invalid input: Preset should be either callable or a string, got {type(preset)}.")
     
-    if preset == 'omae_hs_tp':
-        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_Hs_Tz()
-        semantics["swap_axis"] = True
-    elif preset == 'dnvgl_hs_tp':
+    if preset == 'hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
-        semantics["swap_axis"] = True
-    elif preset == 'omae_u_hs':
-        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
-        semantics["swap_axis"] = False
-    elif preset == 'dnvgl_hs_u':
+    elif preset == 'hs_u':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
-        semantics["swap_axis"] = True
-    elif preset == 'lonowe_hs_tp':
-        dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
-        semantics["swap_axis"] = True
+    elif preset == 'u_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_LiGaoMoan_U_hs_tp()
+    elif preset == 'u_misalignment':
+        dist_descriptions,fit_descriptions,semantics = get_vonmises_wind_misalignment()
+    elif preset == 'ct_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_cT_Hs_Tp()
     else:
-        raise ValueError(f'Preset {preset} not found.'
-                            'See docstring for available presets.')
-    return dist_descriptions,fit_descriptions,semantics
+        raise ValueError(f'Preset {preset} not found. See docstring for available presets.')
 
+    return dist_descriptions,fit_descriptions,semantics
 
 class JointProbabilityModel(GlobalHierarchicalModel):
     """
@@ -73,7 +69,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def __init__(
             self,
-            model:str|Callable = "DNVGL_hs_tp",
+            model:str|Callable = "hs_tp",
             dist_descriptions:list[dict] = None,
             fit_descriptions:list[dict] = None,
             semantics:dict = None,
@@ -91,13 +87,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         model : str or Callable
             Choose model from any predefined model with a string:
 
-             - DNVGL_Hs_Tp
-             - DNVGL_Hs_U
-             - OMAE_Hs_Tp
-             - OMAE2020_V_Hs
-             - LoNoWe_Hs_Tp
-             - windsea_hs_tp
+             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
+             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
+             - U_Hs_Tp: Model of wind speed, significant wave height and peak wave period, from a paper by Li et. al., 2015.
+             - U_misalignment: Model of wind speed and wind-wave misalignment.
+             - cT_Hs_Tp: Model of aligned current, significant wave height and peak wave period.
 
+            Note that the name signifies the order of dependency of the variables in the model.
             This argument can alternatively be a custom callable (function) that
             returns the three parts - dist_descriptions, fit_descriptions and semantics.
             Examples of this function are found in predefined.py.

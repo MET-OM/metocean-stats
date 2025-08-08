@@ -45,26 +45,6 @@ def get_OMAE2020_Hs_Tz():
     return dist_descriptions,fit_descriptions,semantics
 
 
-
-def get_weiblognormal_independent_Hs_Tz():
-    dist_description_hs = {
-        "distribution": virocon.WeibullDistribution(),
-    }
-
-    dist_description_tz = {
-        "distribution": virocon.LogNormalDistribution(),
-    }
-    dist_descriptions = [dist_description_hs, dist_description_tz]
-    fit_descriptions = [{"method": "mom"}, {"method":"mom"}]
-    semantics = {
-        "names": ["Significant wave height", "Peak wave period"],
-        "symbols": ["H_s", "T_p"],
-        "units": ["m", "s"],
-        "swap_axis":True
-    }
-    return dist_descriptions, fit_descriptions, semantics
-
-
 def get_DNVGL_Hs_Tz():
     """
     Get DNVGL significant wave height and wave period model.
@@ -170,6 +150,7 @@ def get_LoNoWe_hs_tp():
         "names": ["Significant wave height", "Peak wave period"],
         "symbols": ["H_s", "T_p"],
         "units": ["m", "s"],
+        "swap_axis": True
     }
     
     return dist_descriptions,fit_descriptions,semantics
