@@ -11,6 +11,7 @@ from pyextremes import get_extremes
 from .. import stats
 from .. import tables
 from ..stats import aux_funcs
+from ..CMA import JointProbabilityModel
 
 def plot_return_levels(data, var, rl, output_file):
     """
@@ -474,53 +475,44 @@ def plot_threshold_sensitivity(df, output_file):
 
     return fig
 
-def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png'):
-    contours, data_2D = stats.get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
-    """Plot joint contours for the given return periods. 
-    Input:
-        data: pd.DataFrame
-        var1: e.g., 'hs'
-        var2: e.g., 'tp'
-        return_periods: A list of return periods in years, default [50,100]
-        output_file: Path to save the plot 
-    Output:
-         figure with 2Djoint contours
+def plot_joint_2D_contour(
+        data,
+        var1='hs', 
+        var2='tp',
+        return_periods=[10,100,1000], 
+        model='hs_tp',
+        state_duration = 1,
+        output_file='contours.png'):
     """
-    # Plot the contours and save the plot
+    Plot joint contours for the given return periods. 
+    
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    return_periods : list[float], default [50,100]
+        A list of return periods for which to create contours.
+    model : str, default hs_tp
+        The model. One of 
 
-    fig, ax = plt.subplots()
-    if len(data_2D)>0:
-        import seaborn as sns
-        sns.set_theme(style="ticks")
-        sns.scatterplot(x=data_2D[:,1], y=data_2D[:,0], ax=ax, color='black')
-    else:
-        pass
-
-    color = plt.cm.rainbow(np.linspace(0, 1, len(periods)))
-    # Compute an IFORM contour with a return period of N years
-    # loop over contours, get index
-
-    for i,contour in enumerate(contours):
-        # Plot the contour
-        x = []
-        x.extend(contour['x'])
-        x.append(x[0])
-
-        y = []
-        y.extend(contour['y'])
-        y.append(y[0])
-
-        rp = contour['return_period']
-        ax.plot(x, y, color=color[i],label=str(rp)+'y')
-
-        ax.set_xlabel(var2,fontsize='16')
-        ax.set_ylabel(var1,fontsize='16')
-
-    plt.grid()
-    plt.title(output_file.split('.')[0],fontsize=18)
-    plt.legend()
-    plt.savefig(output_file,dpi=300)
-    return fig, ax
+             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
+             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
+    
+    output_file : str
+        Filename for saved figure.
+    
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2)
+    ax = model.plot_contours(periods=return_periods,state_duration=state_duration)
+    model.plot_data_scatter(ax)
+    model.plot_legend(ax)
+    if output_file!="":ax.get_figure().savefig(output_file)
+    return ax
 
 def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='Weibull3P',method='default',threshold='default'):
     
