@@ -1,12 +1,40 @@
+import warnings
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
 from ..stats import aux_funcs
 from .. import stats
+from ..CMA import JointProbabilityModel
 
-def table_monthly_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_param.csv'):
+def table_monthly_joint_distribution_Hs_Tp_param(
+        data,
+        var_hs='hs',
+        var_tp='tp',
+        model = "lonowe",
+        output_file='monthly_Hs_Tp_joint_param.csv'):
     # Calculate LoNoWe parameters for each month
+
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
+
+    if model != "lonowe":
+        month_params = {}
+        model = JointProbabilityModel(model)
+        for m,month in enumerate(months[:-1]):
+            try:
+                model.fit(data[data.index.month==m+1],var_hs,var_tp)
+                month_params[month] = model.parameters(complete=False)
+            except Exception as e:
+                warnings.warn(f"Failed to fit model for {month} due to {e}.")
+                month_params[month] = {k:np.nan for k,_ in model.parameters(complete=False)}
+        model.fit(data,var_hs,var_tp)
+        month_params[months[-1]] = model.parameters(complete=False)
+        month_params = pd.DataFrame(month_params).T
+        if output_file != "": month_params.to_csv(output_file,float_format="%.2f")
+        return month_params
+
+    periods = [1]
     params = []
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
