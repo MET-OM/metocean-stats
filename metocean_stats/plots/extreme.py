@@ -623,15 +623,16 @@ def plot_joint_3D_contour(
         A column of the dataframe corresponding to the second variable of the model.
     var3 : str
         A column of the dataframe corresponding to the third variable of the model.
-    return_periods : list[float], default [50,100]
-        A list of return periods for which to create contours.
-    state_duration : int
-        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
     model : str, default hs_tp
         The model. One of 
 
-                     - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
-             - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+            - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
+            - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+
+    return_period : float, default 100
+        The return period represented by the contour.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
     
     output_file : str
         Filename for saved figure.
@@ -649,7 +650,64 @@ def plot_joint_3D_contour(
     ax = model.plot_3D_contour(
         return_period = return_period,
         state_duration = state_duration)
+    model.plot_legend(ax)
     if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
+    return ax
+
+def plot_joint_3D_contour_slices(
+        data,var1,var2,var3,
+        model="u_hs_tp",
+        slice_values=[5,10,15,20,25],
+        return_period=100,
+        state_duration=1,
+        output_file="3D_contour_slices.pdf"
+        ):
+    """
+    Plot 3-dimensional IFORM contour.
+
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    var3 : str
+        A column of the dataframe corresponding to the third variable of the model.
+    model : str, default hs_tp
+        The model. One of 
+
+            - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
+            - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+    slice_values : list[float]
+        The values of the primary variable (e.g., wind speed) to "cut" the 3D contour at.
+    return_period : float, default 100
+        The contour return period.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    
+    output_file : str
+        Filename for saved figure.
+
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2,var3)
+    ax = model.plot_3D_contour_slices(
+        subplots=False,
+        return_period=return_period,
+        state_duration=state_duration,
+        slice_values=slice_values
+        )
+    model.plot_legend(ax)
+    if output_file!="":ax.get_figure().savefig(output_file)
     return ax
 
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
@@ -708,7 +766,33 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
 
 ##################
 
-def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
+def plot_joint_distribution_Hs_Tp(
+        data,var_hs='hs',var_tp='tp',
+        periods=[1,10,100,10000], 
+        title='Hs-Tp joint distribution',
+        output_file='Hs.Tp.joint.distribution.png',
+        density_plot=False,
+        model = "lonowe",
+        state_duration = 1,
+        ):
+
+    if model != "lonowe":
+        model = JointProbabilityModel(model)
+        model.fit(data,var_hs,var_tp)
+        ax = model.plot_contours(
+            periods=periods,
+            state_duration=state_duration
+            )
+        if density_plot:
+            model.plot_data_density(ax,bins=50)
+        else:
+            model.plot_data_scatter(ax)
+        model.plot_dependent_percentiles(ax)
+        model.plot_DNVGL_steepness_criterion(ax)
+        model.plot_legend(ax)
+        if output_file != "": ax.get_figure().savefig(output_file)
+        return ax
+
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     df = data
     # calculate pdf Hs, Tp 
@@ -761,7 +845,7 @@ def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100
     plt.ylim([0,np.round(hs_tpl_tph['hs_'+str(np.max(periods))].max()+1)])
     plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
-    return fig
+    return ax
 
 def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     
