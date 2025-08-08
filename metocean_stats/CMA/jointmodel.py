@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 import numpy as np
 from collections.abc import Callable
@@ -273,7 +275,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 marginal_labels = False
 
             if points.ndim > 2 or points.shape[1] > 2:
-                raise ValueError("Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
+                raise ValueError(f"Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
             levels = self.pdf(points)
 
             if labels is None:
@@ -318,7 +320,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         for artist in new_artists:
             if "PathCollection" in str(artist): # The scatter.
                 artist.remove()
-            elif "ContourSet" in str(artist): # The contours.
+            elif "ContourSet" in str(artist): # The isodensity contours.
+
+                # The contour doesn't set correct limits, these must be manually provided.
+                contour = np.concatenate([np.array(seg).squeeze() for seg in artist.allsegs],axis=0)
+                ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
+                self._reset_axlim(ax)
+
                 CShandles,CSlabels = artist.legend_elements()
                 self.legend_handles += list(np.array(CShandles)[inverse_sort_idx])
                 if labels is None:
@@ -543,7 +551,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         elif np.array(labels).size != percentiles.size:
             raise ValueError("Number of labels does not fit the number of percentiles.")
         if "color" not in kwargs and "c" not in kwargs:
-            kwargs["c"] = "tab:green"
+            kwargs["c"] = "tab:orange"
         if "linestyles" not in kwargs:
             if len(percentiles) == 3:
                 kwargs["linestyles"] = ["dashed","solid","dashed"]
@@ -675,7 +683,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self,
             ax=None,
             data=None,
-            bins=None,
+            bins=100,
             label:str=None,
             norm=LogNorm(),
             density=False,
@@ -726,13 +734,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         x,y = (1,0) if self.swap_axis else (0,1)
         
-        if bins is None:
-            bins = [
-                np.arange(np.floor(np.min(data[:,x])),
-                          np.ceil(np.max(data[:,x])),0.02),
-                np.arange(np.floor(np.min(data[:,y])),
-                          np.ceil(np.max(data[:,y])),0.01)
-            ]
+        # if bins is None:
+        #     bins = [
+        #         np.arange(np.floor(np.min(data[:,x])),
+        #                   np.ceil(np.max(data[:,x])),0.02),
+        #         np.arange(np.floor(np.min(data[:,y])),
+        #                   np.ceil(np.max(data[:,y])),0.01)
+        #     ]
 
         handle = ax.hist2d(data[:,x],data[:,y],norm=norm,
                            bins=bins,density=density,**kwargs)
@@ -750,6 +758,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             
             self.legend_handles.append(handle)
             self.legend_labels.append(label)
+
+        self._reset_axlim(ax)
+
         return ax
 
 
@@ -1010,7 +1021,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         limits : list of 2 tuples of 2 floats, optional
             Two tuples defining upper and lower limits of pdf sampling,
             for the two remaining dimensions.
-            If not given, they will be guessed based on the data (2x max).
+            If not given, they will be guessed based on the data (3x max).
         invalid_density_policy : str, default "drop"
             What to do with densities that are outside the scope of the sampled pdf,
             i.e., smaller than pdf.min() or larger than pdf.max(). Options:
@@ -1032,6 +1043,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                              " corresponding to lower and upper"
                              " limits per dimension.")
         limits = np.sort(limits,axis=1)
+
         # Create query with shape (samples x 3) and sample pdf
         gridpoints = [
             np.linspace(limits[0,0],limits[0,1],grid_steps),
@@ -1044,7 +1056,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         gridpoints = gridpoints.reshape(3,-1).T # 3xN**2
         Z = self.pdf(gridpoints).reshape([grid_steps,grid_steps]) # NxN
         if np.any(np.isnan(Z)):
-            print("WARNING: Found NaN values in pdf, these are set to 0. "\
+            warnings.warn("Found NaN values in pdf, these are set to 0. "\
                   "This is usually due to sampling limits being outside " \
                   "the domain of the model (distributions or dep. funcs).")
         Z = np.nan_to_num(Z)
@@ -1053,7 +1065,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if density_levels is not None and marginal_values is not None:
             raise ValueError("Density_levels and marginal_values cannot both be defined.")
         if marginal_values is not None:
-            if np.array(marginal_values).size == 1:
+            marginal_values = np.array(marginal_values)
+            if marginal_values.ndim == 0:
                 marginal_values = np.array([marginal_values])
             marginal_dim = np.squeeze(np.where(np.array(self.conditional_on)==None))
             secondary_dim = np.squeeze(np.where(np.array(self.conditional_on)==marginal_dim))
@@ -1072,10 +1085,16 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 density_levels = np.array([density_levels])
             level_sort = np.argsort(density_levels)
             density_levels = density_levels[level_sort]
+            if marginal_values is not None: marginal_values = marginal_values[level_sort]
 
         # Set labels
         if labels is None:
-            labels = np.array([f"p = {d:.0e}" for d in density_levels])
+            if marginal_values is None:
+                labels = np.array([f"p = {d:.0e}" for d in density_levels])
+            else:
+                labels = np.array(
+                    [r"Contour $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+                     f" = {m} {self.semantics['units'][slice_dim]}" for m in marginal_values])
         elif np.array(labels).size != density_levels.size:
             raise ValueError("Number of labels does not match levels.")
         else:
@@ -1120,11 +1139,19 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         handles,_ = CS.legend_elements()
         self.plot_semantics(ax,*axis_labels)
 
-        ax.set_title(r" $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+        ax.set_title(r"Slice at $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
             f" = {slice_value} {self.semantics['units'][slice_dim]}")
 
         self.legend_handles += handles
         self.legend_labels += list(labels)
+
+        # The contour doesn't set correct limits, these must be manually provided.
+        if CS.allsegs:
+            contour = np.concatenate([np.array(seg).squeeze() for seg in CS.allsegs],axis=0)
+            ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
+            self._reset_axlim(ax)
+        else:
+            warnings.warn("No contours of the model exist for these values.")
 
         return ax
 
@@ -1360,6 +1387,26 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         Printout of the model.
         """
         return self.parameters(complete=True)
+
+    def _reset_axlim(self,ax):
+        """
+        Set appropriate plot limits based on content.
+        """
+        x0,y0,x1,y1 = ax.dataLim.bounds
+
+        x1 *= 1.05
+        y1 *= 1.05
+
+
+        if x0>=0 and x1>=0:
+            ax.set_xlim([0,x1])
+        else:
+            ax.set_xlim([x0,x1])
+
+        if y0>=0 and y1>=0:
+            ax.set_ylim([0,y1])
+        else:
+            ax.set_ylim([y0,y1])
 
     def reset_labels(self):
         """
