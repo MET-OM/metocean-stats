@@ -297,6 +297,7 @@ class IFORMContour(Contour):
             unit_sphere_points = get_random_unit_sphere_points(n_dim=self.model.n_dim,n_samples=self.n_points)
         elif self.point_distribution == "gridded":
             unit_sphere_points = get_3D_gridded_unit_sphere_points(primary_dim=0,n_polar=self.n_points,n_azimuthal=self.n_points)
+
         sphere_points = beta * unit_sphere_points
 
         # Get probabilities for coordinates

@@ -759,8 +759,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             return_period:float=100,
             state_duration:float=1,
             method:str="IFORM",
-            surface_plot=False,
-            n_samples = 360,
+            # surface_plot=False, # currently not working.
+            n_samples = 1000,
             label:str=None,
             **kwargs
             ):
@@ -783,8 +783,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - "DirectSampling", monte carlo sampling
              - "ConstantAndExceedance"
              - "ConstantOrExceedance"
-        surface_plot : bool, default False
-            Plot contour as a continuous surface.
         labels : list of str, optional
             A name for each contour.
         kwargs : keyword arguments
@@ -799,6 +797,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         elif "3d" not in ax.name:
             raise ValueError(f"The axis argument must be 3D, got {ax.name}.")
 
+        surface_plot = False  # TODO - fix surface plot (gridded distribution in IFORMContour and ISORMContour)
         if surface_plot:
             x,y,z = get_contour(self,return_period=return_period,state_duration=state_duration,
                                 method=method,point_distribution="gridded",n_samples=n_samples)

@@ -475,45 +475,6 @@ def plot_threshold_sensitivity(df, output_file):
 
     return fig
 
-def plot_joint_2D_contour(
-        data,
-        var1='hs', 
-        var2='tp',
-        return_periods=[10,100,1000], 
-        model='hs_tp',
-        state_duration = 1,
-        output_file='contours.png'):
-    """
-    Plot joint contours for the given return periods. 
-    
-    Parameters
-    -----------
-    data: pd.DataFrame
-        Dataframe containing data columns.
-    var1 : str
-        A column of the dataframe corresponding to the primary variable of the model.
-    var2 : str
-        A column of the dataframe corresponding to the second variable of the model.
-    return_periods : list[float], default [50,100]
-        A list of return periods for which to create contours.
-    model : str, default hs_tp
-        The model. One of 
-
-             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
-             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
-    
-    output_file : str
-        Filename for saved figure.
-    
-    """
-    model = JointProbabilityModel(model)
-    model.fit(data,var1,var2)
-    ax = model.plot_contours(periods=return_periods,state_duration=state_duration)
-    model.plot_data_scatter(ax)
-    model.plot_legend(ax)
-    if output_file!="":ax.get_figure().savefig(output_file)
-    return ax
-
 def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='Weibull3P',method='default',threshold='default'):
     
     # data : dataframe, should be daily or hourly
@@ -592,6 +553,104 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
     plot_return_levels(dataframe,var,value,periods,output_file,it_selected_max)
        
     return 
+
+
+def plot_joint_2D_contour(
+        data,
+        var1='hs', 
+        var2='tp',
+        model='hs_tp',
+        return_periods=[10,100,1000], 
+        state_duration = 1,
+        output_file='contours.png'):
+    """
+    Plot joint contours for the given return periods. 
+    
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    model : str, default hs_tp
+        The model. One of 
+
+             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
+             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
+    return_periods : list[float], default [50,100]
+        A list of return periods for which to create contours.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    output_file : str
+        Filename for saved figure.
+    
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2)
+    ax = model.plot_contours(periods=return_periods,state_duration=state_duration)
+    model.plot_data_scatter(ax)
+    model.plot_legend(ax)
+    if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
+    return ax
+
+def plot_joint_3D_contour(
+        data,var1,var2,var3,
+        model="u_hs_tp",
+        return_period=100,
+        state_duration=1,
+        output_file="3D_contour.pdf"
+        ):
+    """
+    Plot 3-dimensional IFORM contour.
+
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    var3 : str
+        A column of the dataframe corresponding to the third variable of the model.
+    return_periods : list[float], default [50,100]
+        A list of return periods for which to create contours.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    model : str, default hs_tp
+        The model. One of 
+
+                     - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
+             - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+    
+    output_file : str
+        Filename for saved figure.
+
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2,var3)
+    ax = model.plot_3D_contour(
+        return_period = return_period,
+        state_duration = state_duration)
+    if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
+    return ax
 
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
     """
