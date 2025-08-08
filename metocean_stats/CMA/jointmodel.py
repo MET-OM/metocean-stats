@@ -591,7 +591,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             use_peak_wave_period = True,
             ylim = None,
             xlim = None,
-            legend = "Steepness",
+            label = "Steepness",
             **kwargs
             ):
         """
@@ -628,8 +628,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # These are defaults, to be overwritten by **kwargs.
         plot_params = {**{'linestyle':'--','color':'black',},**kwargs}
         handle = ax.plot(t,h,**plot_params)
-        if legend is not None:
-            self.legend_labels.append(legend)
+        if label is not None:
+            self.legend_labels.append(label)
             self.legend_handles += handle
         return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
