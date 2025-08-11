@@ -266,7 +266,6 @@ def plot_yearly_vertical_profiles(df, rad_colname='current_speed_', method='mean
 
 
 def plot_linear_regression(df,var='air_temperature_2m',time='Jan',stat='mean',method=['Least-Squares','Theil-Sen'],confidence_interval=0.95,ylabel='2-m T [°C]',output_figure=None):
-    
     """
     This function plots the Ordinary Least Squares linear regression line and/or
     the median, lower and upper slopes (within the confidence interval) using the Theil-Sen method
