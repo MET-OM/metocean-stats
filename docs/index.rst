@@ -1669,9 +1669,10 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 
 .. code-block:: python
 
-   plots.plot_monthly_spectra_2d_mean(
+   plots.plot_monthly_spectra_2d(
       data, 
       var = 'SPEC',
+      method = 'mean',
       plot_type = 'contour',
       output_file  = 'monthly_mean_spectra_2d.png'
    )
@@ -1683,7 +1684,7 @@ Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
 
 .. code-block:: python
 
-   plots.plot_peak_direction_spectra_2d(
+   plots.plot_direction_spectra_2d(
       data,         
       var = 'SPEC',
       plot_type = 'contour'
