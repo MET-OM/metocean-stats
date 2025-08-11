@@ -1662,7 +1662,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
       output_file  = 'diana_spectrum.png'
    )
 
-.. image:: files/wave_spectrum_diana_partition.png
+.. image:: files/wave_spectrum_diana.png
    :width: 500
 
 2D Monthly Mean Wave Spectra
