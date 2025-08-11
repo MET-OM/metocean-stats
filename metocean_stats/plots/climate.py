@@ -6,6 +6,7 @@ from ..stats import general
 import numpy as np
 import calendar
 import sys
+import re
 
 
 #################################### TO BE ADJUSTED FOR DISCRETE COLORMAP #####################################
@@ -118,7 +119,7 @@ def plot_yearly_stripes(df,var_name='Hs',method='mean',ylabel='Y label',output_f
     plt.tight_layout()
     if output_file != "":
         plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
-    plt.show()
+    plt.close()
 
     return fig
 
@@ -355,6 +356,7 @@ def plot_linear_regression(df,var='air_temperature_2m',time='Jan',stat='mean',me
     plt.tight_layout()
     if output_figure != None:
         plt.savefig(output_figure,dpi=250,facecolor='white',bbox_inches='tight')
+    plt.close()
 
     return fig
 
