@@ -559,6 +559,47 @@ def filter_period(data, period):
 
     return filtered_data, period_label
 
+def wrap_directional_spectrum(data, var='SPEC'):
+    '''
+    Normalize and wrap directional spectral data to 0-360°.
+
+    Parameters:
+    - data : xarray.Dataset or DataArray
+        Input spectral dataset.
+    - var : str, optional, default='SPEC'
+        Variable name. 
+
+    Returns:
+    - spec : xarray.DataArray
+        Direction-sorted and wrapped spectral data.
+    - dirc : xarray.DataArray
+        Corresponding direction coordinates.
+    '''
+    try:
+        datspec=data[var]
+    except KeyError:
+        datspec=data
+
+    directions = datspec.coords['direction']
+
+    # Ensure directions are 0–360 and sorted
+    directions = directions % 360                               # Normalize direction values to [0, 360)
+    sorted_idx = np.argsort(directions.values)                  # Sort direction values in increasing order
+    directions = directions[sorted_idx]
+    datspec = datspec.isel({'direction': sorted_idx})           # Reorder spectrum data accordingly
+
+    # Ensure continuity in the directional spectrum by appending the initial directional value (e.g., 0°) at the 360° position
+    if directions[0] != directions[-1]:
+        if directions[0] < 360:
+            dirc = xr.concat([directions, directions[0:1] + 360], dim='direction')      # Add 360° copy of first value
+        else:
+            dirc = xr.concat([directions, directions[0:1]], dim='direction')            # Fallback: just repeat first value
+        spec = xr.concat([datspec, datspec.isel({'direction': 0})], dim='direction')    # Add same data point at the end
+    else:
+        dirc = directions
+        spec = datspec
+    return spec, dirc
+
 
 def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
     '''
@@ -768,8 +809,9 @@ def Spectral_Partition_wind(data, beta =1.3, method='mean', month=None):
         data['mean_dir_'+part[k]+'_rad'] = compute_mean_wave_direction(data = data['SPEC_' + part[k]], hm0 = data['hm0'], method = method, month=month)
         data['mean_dir_'+part[k]+'_deg'] = (450 - np.rad2deg(data['mean_dir_'+part[k]+'_rad'].values)) % 360                                            # Meteorological convention (0° = North, clockwise)
 
-    print('Mean wave direction swell:', data['mean_dir_swell_deg'].values)
-    print('Mean wave direction sea', data['mean_dir_windsea_deg'].values)
+    # Uncomment the following lines to print the mean direction
+    # print('Mean wave direction swell:', data['mean_dir_swell_deg'].values)
+    # print('Mean wave direction sea', data['mean_dir_windsea_deg'].values)
 
     return data
 
