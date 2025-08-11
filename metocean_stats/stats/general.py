@@ -11,6 +11,7 @@ from math import floor,ceil
 from scipy.signal import find_peaks
 
 from .aux_funcs import convert_latexTab_to_csv
+from ..tables import general as tg
 
 def calculate_scatter(data,var1, step_var1, var2, step_var2, from_origin=False, labels_lower=False):
     '''
@@ -822,3 +823,62 @@ def tidal_type(df,var='tide'):
         tidal_type = 'Tidal type = diurnal'
 
     return tidal_type
+
+
+
+def stats_monthly_every_year(df,var='HS',method=["P25","mean","P75","P99","max"]):
+    """
+    This function sorts data by years and by months and calculates the statistic desired
+
+    Parameters
+    ----------
+    df: dataframe with index of datetime
+        Contains the data
+    var: string
+        Variable name 
+    method: string
+        Statistic: can be 'min', 'mean', 'max', 'P99' ,'99%', ....
+
+    Returns
+    -------
+    pd.DataFrame containing the statistic for every month of every year
+
+    Authors
+    -------
+    Written by Dung M. Nguyen and clio-met
+    """
+
+    percentiles = tg._percentile_str_to_pd_format(method)
+
+    res = pd.DataFrame()
+    
+    for m in percentiles:
+        ll=[]
+        for yr in range(df.index.year[0],df.index.year[-1]+1):
+            for mn in range(1,13):
+                a=df[(df.index.year==yr) & (df.index.month==mn)][var]
+                if m[-1]=='%': # percentile
+                    ll.append(a.describe(percentiles=np.arange(0,1,0.01))[m])
+                if m=='mean':
+                    ll.append(a.mean())
+                if m=='min':
+                    ll.append(a.min())
+                if m=='max':
+                    ll.append(a.max())
+                del a
+        if len(ll)!=0:
+            res[m]=ll
+        del ll
+
+    years=[]
+    months=[]
+    for yr in range(df.index.year[0],df.index.year[-1]+1):
+        for mn in range(1,13):
+            years.append(yr)
+            months.append(mn)
+
+    res['year']=years
+    res['month']=months
+    del years,months
+        
+    return res

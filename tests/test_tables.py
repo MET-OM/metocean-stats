@@ -587,3 +587,14 @@ def test_table_cca_profile():
         raise ValueError("Shape is not correct")
 
 
+def test_table_linear_regression():
+    output_file='test_table_linear_regerssion.csv'
+    df = tables.table_linear_regression(data=ds,var='HS',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (13, 9):
+        pass
+    else:
+        raise ValueError("Shape linear regression table is not correct")
+
+

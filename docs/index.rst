@@ -1904,6 +1904,102 @@ Taylor diagram
 .. image:: files/Taylor_diagram.png
    :width: 500
 
+
+Climate and trends
+==================
+Yearly stripes
+--------------
+
+.. code-block:: python
+
+   plots.plot_yearly_stripes(
+      df,
+      var_name='HS',
+      method= 'mean',
+      ylabel='Hs [m]',
+      output_file='Yearly_stripes.png')
+
+.. image:: files/Yearly_stripes.png
+   :width: 500
+
+Monthly and yearly heatmap
+--------------------------
+
+.. code-block:: python
+
+   plots.plot_heatmap_monthly_yearly(
+      df,
+      var_name='T2m',
+      method= 'mean',
+      cb_label='2-m temperature [°C]',
+      output_file='Heatmap_monthly_yearly.png')
+
+.. image:: files/Heatmap_monthly_yearly.png
+   :width: 500
+
+Yearly vertical profiles
+------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='current_speed_',
+      method= 'mean',
+      yaxis_direction='down',
+      xlabel='Current speed [m/s]',
+      output_file='Yearly_vertical_profiles_current.png')
+
+.. image:: files/Yearly_vertical_profiles_current.png
+   :width: 500
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='W',
+      method= 'mean',
+      yaxis_direction='up',
+      xlabel='Wind speed [m/s]',
+      output_file='Yearly_vertical_profiles_wind.png')
+
+.. image:: files/Yearly_vertical_profiles_wind.png
+   :width: 500
+
+Linear regression Plot and Table
+--------------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      var='HS',
+      time='Year',
+      stat='P70',
+      method=['Least-Squares','Theil-Sen'],
+      confidence_interval=0.95,
+      ylabel='Hs [m]',
+      output_figure='Linear_regression.png')
+
+.. image:: files/Linear_regression.png
+   :width: 500
+
+.. code-block:: python
+
+   tables.table_linear_regression(
+      df,
+      var='HS',
+      stat='mean',
+      method=['Least-Squares','Theil-Sen','Kendall-tau'],
+      confidence_interval=0.95,
+      intercept=True, 
+      output_file='table_linear_regression.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_linear_regression.csv
+
 Auxiliary Functions
 ===================
 
