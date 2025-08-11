@@ -1601,13 +1601,13 @@ Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_wave_spectrum_1d(
+   plots.plot_monthly_spectra_1d(
       data, 
       var = 'SPEC',
       period = None,
       month = None,
       method = 'mean',
-      output_file  = 'wave_spectrum_1d.png'
+      output_file  = 'monthly_spectra_1d.png'
    )
 
 .. image:: files/wave_spectrum_1d_months.png
@@ -1617,13 +1617,13 @@ Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_wave_spectrum_1d(
+   plots.plot_monthly_spectra_1d(
       data, 
       var = 'SPEC',
       period = None,
       month = 1,
       method = 'mean',
-      output_file  = 'wave_spectrum_1d.png'
+      output_file  = 'monthly_spectra_1d.png'
    )
 
 .. image:: files/wave_spectrum_1d_month.png
@@ -1633,14 +1633,14 @@ Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_wave_spectrum_2d(
+   plots.plot_spectrum_2d(
       data, 
       var = 'SPEC',
       period = ('2021-01-01T00', '2024-12-31T23'),
       month = None,
       method = 'hm0_max',
       plot_type = 'pcolormesh',
-      output_file  = 'wave_spectrum_2d.png'
+      output_file  = 'spectrum_2d.png'
    )
 
 .. image:: files/wave_spectrum_2d.png
@@ -1669,7 +1669,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 
 .. code-block:: python
 
-   plots.plot_monthly_mean_spectra_2d(
+   plots.plot_monthly_spectra_2d_mean(
       data, 
       var = 'SPEC',
       plot_type = 'contour',
