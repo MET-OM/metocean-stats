@@ -149,12 +149,11 @@ def plot_heatmap_monthly_yearly(df,var='air_temperature_2m',method='mean',cb_lab
     Written by Dung M. Nguyen and clio-met
     Inspired from Ed Hawkins' warming stripes https://en.wikipedia.org/wiki/Warming_stripes
     """
+    # get month names 
+    months_names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Year']
+
     df2=general.stats_monthly_every_year(df,var=var,method=[method])
     df3=climate.table_yearly_stats(df,var=var,percentiles=[method],output_file="")
-
-    # get month names 
-    months_names = calendar.month_abbr[1:]
-    months_names=months_names+['Year']
 
     years=np.unique(df2['year'].to_numpy())
     months=np.unique(df2['month'].to_numpy())
