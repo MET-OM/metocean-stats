@@ -10,63 +10,67 @@ import re
 
 
 #################################### TO BE ADJUSTED FOR DISCRETE COLORMAP #####################################
-# def plot_heatmap_profiles_yearly(df, rad_colname='current_speed_', cb_label='Current speed [m/s]', yaxis_direction='down', method='mean', output_file='heatmap_profile.pdf'):
-#     """
-#     This function plot heatmap of yearly vertical profiles
+def plot_heatmap_profiles_yearly(df, rad_colname='current_speed_', cb_label='Current speed [m/s]', yaxis_direction='down', method='mean', output_file='heatmap_profile.pdf'):
+    """
+    This function plot heatmap of yearly vertical profiles
 
-#     Parameters
-#     ----------
-#     df: pd.DataFrame
-#         Should have datetime as index and 
-#         column name in format of level and m at the end, for example 12.3m 
-#     rad_colname: string
-#     yaxis_directin: string
-#         Can be 'up' for increasing y-axis (height) and 'down' for decreasing y-axis (depth)
-#     method: string
-#         List of percentiles, e.g. P25, P50, P75, 30%, 40% etc.
-#         Some others are also allowed: count (number of data points), and min, mean, max.
-#     cb_label: string
-#         Label of color bar
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Should have datetime as index and 
+        column name in format of level and m at the end, for example 12.3m 
+    rad_colname: string
+    yaxis_directin: string
+        Can be 'up' for increasing y-axis (height) and 'down' for decreasing y-axis (depth)
+    method: string
+        List of percentiles, e.g. P25, P50, P75, 30%, 40% etc.
+        Some others are also allowed: count (number of data points), and min, mean, max.
+    cb_label: string
+        Label of color bar
     
-#     Returns
-#     -------
-#     Figure
+    Returns
+    -------
+    Figure
 
-#     Authors
-#     -------
-#     Written by Dung M. Nguyen and clio-met
-#     """
-#     df1=table_yearly_1stat_vertical_levels(df, rad_colname=rad_colname, method=method, output_file='')
-#     levs = [str(re.search(r'\d+(\.\d+)?', s).group()) for s in df1.columns]
-#     # Delete the last line of the dataframe (All years)
-#     df1 = df1.iloc[:-1,:]
+    Authors
+    -------
+    Written by Dung M. Nguyen and clio-met
+    """
+    df1=climate.table_yearly_1stat_vertical_levels(df, rad_colname=rad_colname, method=method, output_file='')
+    levs = [str(re.search(r'\d+(\.\d+)?', s).group()) for s in df1.columns]
+    # Delete the last line of the dataframe (All years)
+    df1 = df1.iloc[:-1,:]
 
-#     min_value = min(df1.min())
-#     max_value = max(df1.max())
+    min_value = min(df1.min())
+    max_value = max(df1.max())
 
-#     norm = mcolors.Normalize(vmin=min_value, vmax=max_value)
-#     cmap = plt.cm.get_cmap('viridis',int((max_value-min_value)*1000))
+    norm = mcolors.Normalize(vmin=min_value, vmax=max_value)
+    cmap = plt.cm.get_cmap('viridis',int((max_value-min_value)*1000))
 
-#     fig, ax = plt.subplots(figsize=(12, 7))
-#     cax = ax.imshow(df1.T, aspect='auto', cmap=cmap, norm=norm)
-#     cbar = fig.colorbar(cax, ax=ax)
-#     cbar.ax.tick_params(labelsize=14) # Adjust labelsize as desired
-#     cbar.set_label(cb_label, size=14) # Adjust size as desired
-#     ax.set_yticks(ticks=range(len(levs)), labels=levs)
-#     ax.set_xticks(ticks=range(len(df1.index))[::5], labels=df1.index[::5])
-#     ax.set_xlabel('Years', fontsize=14)
-#     ax.set_ylabel('z [m]', fontsize=14)
-#     ax.tick_params(axis='x', labelsize=14)
-#     ax.tick_params(axis='y', labelsize=14)
-#     if yaxis_direction=='up':
-#         plt.gca().invert_yaxis()
-#     ax.xaxis.set_minor_locator(AutoMinorLocator())
-#     plt.tight_layout()
-#     if output_file != "":
-#         plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
-#     plt.close()
+    fig, ax = plt.subplots(figsize=(12, 7))
+    cax = ax.imshow(df1.T, aspect='auto', cmap=cmap, norm=norm)
+    cbar = fig.colorbar(cax, ax=ax)
+    cbar.ax.tick_params(labelsize=14) # Adjust labelsize as desired
+    cbar.set_label(cb_label, size=14) # Adjust size as desired
+    ax.set_yticks(ticks=range(len(levs)), labels=levs)
+    if len(df1.index)>10:
+        ax.set_xticks(ticks=range(len(df1.index))[::5], labels=df1.index[::5])
+    else:
+        ax.set_xticks(ticks=range(len(df1.index)), labels=df1.index)
+    ax.set_xlabel('Years', fontsize=14)
+    ax.set_ylabel('z [m]', fontsize=14)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
 
-#     return fig
+    if yaxis_direction=='up':
+        plt.gca().invert_yaxis()
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    plt.tight_layout()
+    if output_file != "":
+        plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
+    plt.close()
+
+    return fig
 
 
 

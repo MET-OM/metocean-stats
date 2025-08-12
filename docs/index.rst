@@ -1966,6 +1966,19 @@ Yearly vertical profiles
 .. image:: files/Yearly_vertical_profiles_wind.png
    :width: 500
 
+.. code-block:: python
+
+   plots.plot_heatmap_profiles_yearly(
+      df,
+      rad_colname='W',
+      cb_label='Wind speed [m/s]',
+      yaxis_direction='up',
+      method='P80',
+      output_file='Heatmap_yearly_profiles_wind.png')
+
+.. image:: files/Heatmap_yearly_profiles_wind.png
+   :width: 500
+
 Linear regression Plot and Table
 --------------------------------
 
