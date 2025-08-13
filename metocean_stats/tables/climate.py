@@ -10,7 +10,7 @@ from scipy.stats import theilslopes, linregress, kendalltau
 
 def table_yearly_stats(data:pd.DataFrame,var:str,percentiles:list[str]=["P25","mean","P75","P99","max"],output_file="table_yearly_stats.csv"):
     """
-    Group dataframe by years and calculate percentiles.
+    Group dataframe by years and calculate percentiles, min, mean, or max.
 
     Parameters
     ------------
@@ -30,7 +30,7 @@ def table_yearly_stats(data:pd.DataFrame,var:str,percentiles:list[str]=["P25","m
 
     Authors
     -------
-    Modified from table_monhtly_stats by clio-met
+    Modified from table_monthly_percentile by clio-met
     """
     series = data[var]
     percentiles = general._percentile_str_to_pd_format(percentiles)
@@ -44,7 +44,6 @@ def table_yearly_stats(data:pd.DataFrame,var:str,percentiles:list[str]=["P25","m
     if output_file != "":
         table.to_csv(output_file)
     return table
-
 
 
 def table_yearly_1stat_vertical_levels(df, rad_colname='current_speed_', method='mean', output_file='table_yearly_stats_all_levels.csv'):
@@ -84,44 +83,6 @@ def table_yearly_1stat_vertical_levels(df, rad_colname='current_speed_', method=
         result.to_csv(output_file)
 
     return result
-
-
-def table_yearly_monthly_stats(data:pd.DataFrame,var:str,percentiles:list[str]=["P25","mean","P75","P99","max"],output_file="table_yearly_stats.csv"):
-    """
-    Group dataframe by years and calculate statistics.
-
-    Parameters
-    ------------
-    data: pd.DataFrame
-        The data containing column var, and with a datetime index.
-    var: string
-        The column to calculate percentiles of.
-    percentiles: list of strings
-        List of percentiles, e.g. P25, P50, P75, 30%, 40% etc.
-        Some others are also allowed: count (number of data points), and min, mean, max.
-    output_file: string
-        Name of the output file
-
-    Returns
-    -------
-    pd.DataFrame and output_file if name specified
-
-    Authors
-    -------
-    Modified from table_monhtly_stats by clio-met
-    """
-    series = data[var]
-    percentiles = general._percentile_str_to_pd_format(percentiles)
-    series.index = pd.to_datetime(series.index)
-    year_labels=series.index.year.unique().tolist()+["All years"]
-    table = []
-    for m,g in series.groupby(series.index.year):
-        table.append(g.describe(percentiles=np.arange(0,1,0.01))[percentiles])
-    table.append(series.describe(percentiles=np.arange(0,1,0.01))[percentiles])
-    table = pd.DataFrame(table,year_labels)
-    if output_file != "":
-        table.to_csv(output_file)
-    return table
 
 
 def table_linear_regression(df,var='air_temperature_2m',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=None):

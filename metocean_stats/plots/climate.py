@@ -318,7 +318,7 @@ def plot_linear_regression(df,var='air_temperature_2m',time='Jan',stat='mean',me
     else:
         t=time[0:3]
         ix=np.where(np.array(months_names)==t)[0][0]+1
-        df2=df1.loc[t]
+        df2=df1[t]
         yval=df_monthly[df_monthly['month']==ix].iloc[:,0].to_numpy()
 
     del df1
