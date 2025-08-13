@@ -1671,6 +1671,7 @@ Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
    plots.plot_spectra_2d(
       data,         
       var = 'SPEC',
+      method = 'direction'
       plot_type = 'contour',
       cbar = 'single',
       output_file  = 'wave_spectra_2d_direction.png'
