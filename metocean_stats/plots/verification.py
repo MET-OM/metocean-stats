@@ -359,7 +359,5 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
         print('The option you have sent in is invalid.')
     if output_file != "": plt.savefig(output_file,dpi=200,facecolor='white',bbox_inches='tight')
     
-    
-    plt.show()
     plt.close()
     return fig

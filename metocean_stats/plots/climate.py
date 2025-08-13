@@ -158,20 +158,25 @@ def plot_heatmap_monthly_yearly(df,var='air_temperature_2m',method='mean',cb_lab
 
     df2=general.stats_monthly_every_year(df,var=var,method=[method])
     df3=climate.table_yearly_stats(df,var=var,percentiles=[method],output_file="")
+    print(df2)
+    print(df3)
 
     years=np.unique(df2['year'].to_numpy())
     months=np.unique(df2['month'].to_numpy())
     
     # Select first column
     df2_1st=df2.iloc[:,0]
+    print(df2_1st)
     min_value = np.floor(df2_1st.min())
     max_value = np.ceil(df2_1st.max())
     norm = mcolors.Normalize(vmin=min_value, vmax=max_value)
 
     arr=df2_1st.to_numpy().reshape(len(years),len(months)).T
     # Add the whole year statistic
-    arr=np.concatenate([arr,df3[:-1].to_numpy().flatten()[np.newaxis,:]],axis=0)
-
+    arr=np.concatenate([arr,df3.iloc[:-1,0].to_numpy().flatten()[np.newaxis,:]],axis=0)
+    print(arr)
+    print(df3[:-1])
+    del df2_1st,df2,df3
     
     fig, ax = plt.subplots(figsize=(12, 6))
     cmap = plt.cm.get_cmap('viridis',20)

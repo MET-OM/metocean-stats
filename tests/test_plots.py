@@ -401,35 +401,42 @@ def test_plot_cca_profile():
 
 
 def test_plot_stripes():
-    fig = plot_yearly_stripes(ds,var_name='HS',method='mean',ylabel='Hs [m]',output_file='')
+    fig = plots.plot_yearly_stripes(ds,var_name='HS',method='mean',ylabel='Hs [m]',output_file='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig
 
 
 def test_plot_heatmap_monthly_yearly():
-    fig = plot_heatmap_monthly_yearly(ds,var='T2m',method='mean',cb_label='2-m temperature [°C]',output_file='')
+    fig = plots.plot_heatmap_monthly_yearly(ds,var='T2m',method='mean',cb_label='2-m temperature [°C]',output_file='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig
 
 
 def test_plot_yearly_depth_profiles():
-    fig = plot_yearly_vertical_profiles(ds_ocean, rad_colname='current_speed_', method='mean', yaxis_direction='down', xlabel='Current speed [m/s]', output_file='')
+    fig = plots.plot_yearly_vertical_profiles(ds_ocean, rad_colname='current_speed_', method='mean', yaxis_direction='down', xlabel='Current speed [m/s]', output_file='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig
 
 
 def test_plot_yearly_depth_profiles_wind():
-    fig = plot_yearly_vertical_profiles(ds, rad_colname='W', method='mean', yaxis_direction='up', xlabel='Wind speed [m/s]', output_file='')
+    fig = plots.plot_yearly_vertical_profiles(ds, rad_colname='W', method='mean', yaxis_direction='up', xlabel='Wind speed [m/s]', output_file='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig
 
 
 def test_plot_linear_regression():
-    fig = plot_linear_regression(ds,var='W10',time='Year',stat='P90',method=['Least-Squares','Theil-Sen'],confidence_interval=0.95,ylabel='Wind speed [m/s]',output_figure='')
+    fig = plots.plot_linear_regression(ds,var='W10',time='Year',stat='P90',method=['Least-Squares','Theil-Sen'],confidence_interval=0.95,ylabel='Wind speed [m/s]',output_figure='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig
 
-def test_plot_heatmap_monthly_yearly():
-    fig = plot_heatmap_profiles_yearly(ds,rad_colname='W',cb_label='Wind speed [m/s]',yaxis_direction='up',method='P80',output_file='')
+
+def test_plot_heatmap_profiles_yearly():
+    fig = plots.plot_heatmap_profiles_yearly(ds,rad_colname='W',cb_label='Wind speed [m/s]',yaxis_direction='up',method='P80',output_file='')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    del fig

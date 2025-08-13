@@ -10,4 +10,4 @@ from .dir import *
 from .extreme import *
 from .general import *
 from .verification import *
-#from ..tables.climate import *
+from .climate import *

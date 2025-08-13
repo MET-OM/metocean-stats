@@ -77,7 +77,7 @@ def table_yearly_1stat_vertical_levels(df, rad_colname='current_speed_', method=
     df=df[filter_col]
     result = pd.DataFrame(columns = filter_col)
     for i in range(len(filter_col)):
-        result[filter_col[i]]=table_yearly_stats(df,var=filter_col[i],percentiles=method,output_file="")
+        result[filter_col[i]]=table_yearly_stats(df,var=filter_col[i],percentiles=[method],output_file="")
     
     result=result.dropna(axis=1, how='any')
     if output_file != "":
