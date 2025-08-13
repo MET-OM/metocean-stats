@@ -1668,7 +1668,7 @@ Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
 
 .. code-block:: python
 
-   plots.plot_direction_spectra_2d(
+   plots.plot_spectra_2d(
       data,         
       var = 'SPEC',
       plot_type = 'contour',
