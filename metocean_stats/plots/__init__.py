@@ -11,3 +11,4 @@ from .extreme import *
 from .general import *
 from .verification import *
 from .climate import *
+from .spectra import *

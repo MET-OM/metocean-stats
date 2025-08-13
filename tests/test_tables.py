@@ -5,12 +5,13 @@ import numpy as np
 from metocean_stats import tables
 from metocean_stats.tables.climate import *
 from metocean_stats.stats.aux_funcs import readNora10File
+from .data import synthetic_dataset
 
 # Define TimeSeries-object for NORA3
 ds = readNora10File('tests/data/NORA_test.txt')
 ds_ocean = pd.read_csv('tests/data/NorkystDA_test.csv',comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
-
+ds_synthetic_spectra = synthetic_dataset.synthetic_dataset_spectra()
 
 def test_scatter_diagram(ds=ds):
     output_file = 'test_scatter_diagram.csv'
@@ -587,7 +588,7 @@ def test_table_cca_profile():
     else:
         raise ValueError("Shape is not correct")
 
-
+        
 def test_table_linear_regression():
     output_file='test_table_linear_regerssion.csv'
     df, _, _ = tables.table_linear_regression(df=ds,var='HS',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=output_file)
@@ -598,4 +599,10 @@ def test_table_linear_regression():
     else:
         raise ValueError("Shape linear regression table is not correct")
 
+
+def test_table_monthly_freq_1dspectrum():
+    output_file='test_table_monthly_freq_1dspectrum.csv'
+    df = tables.table_monthly_freq_1dspectrum(data=ds_synthetic_spectra,var='SPEC',output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
 
