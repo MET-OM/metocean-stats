@@ -1576,23 +1576,6 @@ CCA profiles Table
    :header-rows: 1
    :file: files/table_cca_profiles.csv
 
-.. Directional Wave Energy Spectrum Plot
-.. -----------------------------------------
-
-.. .. code-block:: python
-
-..    plots.plot_spectrum(
-..        spectrum, 
-..        frequencies,
-..        directions, 
-..        spec_unit='m**2 s',
-..        radius='frequency',
-..        log_radius=False,
-..        output_file='Spectrum_plot.png')
-..    )
-
-.. .. image:: files/Spectrum_plot.png
-..    :width: 500
 
 Wave Spectrum Plots
 -----------------------------------------
