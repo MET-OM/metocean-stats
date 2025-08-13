@@ -5,7 +5,6 @@ import sys
 import matplotlib.ticker as mticker
 import matplotlib as mpl
 
-
 def rose(data,
          var_dir,
          var,
