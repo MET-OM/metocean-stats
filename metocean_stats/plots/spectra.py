@@ -6,16 +6,22 @@ import matplotlib.colors as mcol
 import matplotlib.cm as cm
 import matplotlib.ticker as mticker
 import matplotlib.patches as patches
+import re
 from ..stats import spec_funcs
 from ..tables import spectra
 
-def plot_monthly_spectra_1d(data, var='SPEC', period=None, month=None, method='mean', output_file='monthly_spectra_1d.png'):
+def plot_spectra_1d(data, var='SPEC', period=None, month=None, method='mean', output_file='monthly_spectra_1d.png'):
     '''
-    Plots 1D wave spectra aggregated by month (12 graphs, one for each month), or for a specific month across multiple years (one graph per year), over a selected time period.
+    Plots 1D spectra aggregated by month, for a specific month across multiple years, or for a single timestamp.
 
-    If no month is specified, plots all monthly spectra plus an overall average spectrum computed as the mean of the monthly 
-    aggregated data. If a specific month is selected, plots the yearly spectra for that month, with the final average row 
-    representing the mean of the yearly aggregated data.
+    - If no month is specified:
+      Plots 12 monthly spectra (one subplot per month) plus an overall average spectrum
+      computed from the monthly aggregates.
+    - If a month is specified:
+      Plots one spectrum per year for that month, with an additional average spectrum
+      across all selected years.
+    - If `period` contains a single timestamp:
+      Plots only the spectrum for that specific time.
 
     Parameters
     - data : xarray.Dataset
@@ -23,8 +29,11 @@ def plot_monthly_spectra_1d(data, var='SPEC', period=None, month=None, method='m
     - var : str, optional, default='SPEC'
         Name of the spectral variable to analyze.
     - period : tuple of two str, optional, default=None
-        Time range to filter the data as (start_time, end_time), e.g., ('2021-01-01T00', '2021-12-31T23').
-        If None, the full time range in the dataset is used.
+        A tuple specifying the desired time range.
+        - (start_time, end_time): Filters between start_time and end_time, e.g., ('2021-01-01T00', '2021-12-31T23').
+        - (start_time): Filters to a single timestamp.
+        - None: Uses the full time range available in data.
+        Both start_time and end_time may be strings or datetime-like objects.
     - month : int or None, optional, default=None
         If set (1 = January, ..., 12 = December), plots only that month.
         If None, plots all monthly spectra.
@@ -83,18 +92,22 @@ def plot_monthly_spectra_1d(data, var='SPEC', period=None, month=None, method='m
 
 
     ######## Plot of monthly aggregation across all years ########
-    if month is None:
+    if month is None and (period is None or isinstance(period, tuple)):
         months = df['Month'].tolist()
 
         for i in range(len(months)):
             color, ls = ('black', '-') if i == len(months) -1 else line_styles_12[i]
-            ax.plot(freq, spec_values[i, :], label=rf"{months[i]} ($H_{{m_0}}$={round(hm0[i], 1)} m)", color=color, linestyle=ls, linewidth=1.5, markevery=5)
-        
+            if period is None or isinstance(period, tuple):
+                ax.plot(freq, spec_values[i, :], label=rf"{months[i]} ($H_{{m_0}}$={round(hm0[i], 1)} m)", color=color, linestyle=ls, linewidth=1.5, markevery=5)
         ax.set_title(f'Period: {year_label}, method = {method}', fontsize=14)
 
+    ######## Single timestamp plot ########
+    elif isinstance(period, str):
+        ax.plot(freq, spec_values[0, :], label=rf"{period_label} ($H_{{m_0}}$={round(hm0[0], 1)} m)", color='blue', linewidth=1.5)    
 
     ######## Plot of yearly aggregation for a specific month ########
     else:
+        print(df)
         for i, label_val in enumerate(df['Year']):
             spec = spec_values[i]
             label = f"{label_val} ($H_{{m_0}}$={hm0[i]:.1f} m)"
@@ -119,16 +132,19 @@ def plot_monthly_spectra_1d(data, var='SPEC', period=None, month=None, method='m
 def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', plot_type='pcolormesh', 
                           freq_mask = False, radius='frequency', dir_letters=False, output_file='spectrum_2d.png'):
     '''
-    Plot a 2D directional wave spectrum for a specific month or time period.
+    Plots a 2D directional spectrum for a specific month or time period.
 
     Parameters:
     - data : xarray.Dataset
         Dataset containing 2D wave spectra over time.
     - var : str, optional, default='SPEC'
         Name of the spectral variable to plot.
-    - period : tuple of two str, optional, default=None
-        Time range to filter the data as (start_time, end_time), e.g., ('2021-01-01T00', '2021-12-31T23').
-        If None, the full time range in the dataset is used.
+    - period : tuple of str, optional, default=None
+        A tuple specifying the desired time range.
+        - (start_time, end_time): Filters between start_time and end_time, e.g., ('2021-01-01T00', '2021-12-31T23').
+        - (start_time): Filters to a single timestamp.
+        - None: Uses the full time range available in data.
+        Both start_time and end_time may be strings or datetime-like objects.
     - month : int or None, optional, default=None
         Filter data by calendar month (1 = January, ..., 12 = December).
         If None, no filtering by month is applied.
@@ -208,7 +224,7 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
     cbar.set_label(r'Variance Density [$\mathrm{' + spec.units.replace('**', '^') + '}$]', fontsize=14)
     cbar.ax.tick_params(labelsize=14)
 
-    label = rf'$\mathbf{{Method:}}\ {method.replace("_", r"\_")}$' + '\n'
+    label = rf'$\mathbf{{Method:}}\ {method.replace("_", r"\_")}$' + '\n' if isinstance(period, tuple) else None
 
     # Labels
     if month is None:
@@ -235,12 +251,26 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
         times = pd.to_datetime(filtered_data.time.values)
         label2 += rf"$\mathbf{{Range:}}$ {(times.min().strftime('%Y-%m-%dT%H') + 'Z' if times.min() == times.max() else f'{times.min().strftime('%Y-%m-%dT%H') + 'Z'} to {times.max().strftime('%Y-%m-%dT%H') + 'Z'}')}" 
 
-    label += label2
-        
-    
+    label = label + label2 if label != None else label2
 
-    ax.text(-0.07,-0.18,label,
+    ax.text(-0.07,-0.15,label,
             transform=ax.transAxes,fontsize=16 if method == 'hm0_top3_mean' else 18, ha='left')
+    
+    lat_str = ", ".join(
+        f"{abs(lat):.1f}°{'N' if lat >= 0 else 'S'}"                                # Format latitudes with N/S
+        for lat in np.unique(data['latitude'].round(1).values))
+
+    lon_str = ", ".join(
+        f"{abs(lon):.1f}°{'E' if lon >= 0 else 'W'}"                                # Format longitudes with E/W
+        for lon in np.unique(data['longitude'].round(1).values))
+
+    label_position = (
+        rf"$\mathbf{{Position:}}$ Lon: {lon_str}, Lat: {lat_str}"                   # Position label
+        + "\u2007" * max(0, 27 - len(f"Lon: {lon_str}, Lat: {lat_str}")) + "\n"
+    )
+
+    ax.text(-0.07,-0.23,label_position,
+        transform=ax.transAxes,fontsize=16 if method == 'hm0_top3_mean' else 18, ha='left')
 
     # Set up polar plot style and tick appearance
     ax.grid(True)
@@ -249,7 +279,7 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
     ax.set_theta_direction(-1)
     ax.tick_params(axis='y', labelsize=12) 
     ax.tick_params(axis='x', labelsize=12, pad=5)
-    plt.tight_layout()
+    plt.tight_layout(pad=0)
 
     if output_file is not None:
         plt.savefig(output_file, dpi=200, bbox_inches='tight')
@@ -269,8 +299,12 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
         Dataset with 2D directional-frequency wave spectra.
     - var : str, optional, default='SPEC'
         Spectral variable name.
-    - period : tuple of str, optional, default=None
-        Time range to filter (start_time, end_time). Full range if None.
+    - period : tuple of two str, optional, default=None
+        A tuple specifying the desired time range.
+        - (start_time, end_time): Filters between start_time and end_time, e.g., ('2021-01-01T00', '2021-12-31T23').
+        - (start_time): Filters to a single timestamp.
+        - None: Uses the full time range available in data.
+        Both start_time and end_time may be strings or datetime-like objects.
     - month : int, optional, default=None
         Filter by month (1 = January, ..., 12 = December). If set, selects data from that month across all years.
         If None, no filtering is applied.
@@ -300,6 +334,14 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     fig_main : matplotlib.figure.Figure
         The generated plot figure.
     '''
+
+    if partition and 'wind_direction' not in data:
+        raise ValueError("Wind data ('wind_direction') is required for partitioning. Change partition to False or add wind data.")
+
+    valid_methods = ['mean', 'top_1_percent_mean', 'hm0_max', 'hm0_top3_mean']
+    if method not in valid_methods:
+        raise ValueError(f"Invalid method '{method}'. Available methods are: {', '.join(valid_methods)}.")
+
 
     ############ Data handling ############
     # Standardize the 2D wave spectrum dataset to match the WINDSURFER/NORA3 format.
@@ -503,8 +545,9 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
 
     # Title of the arrow
     if partition == False:
-        ax_arrow.text(0.05, 0.85, "Mean wave/", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
-        ax_arrow.text(0.72, 0.85, "wind", color=color, transform=ax_arrow.transAxes, fontsize=12, va='bottom')
+        ax_arrow.text(0.05 if'wind_direction' in data else 0.2, 0.85, "Mean wave" + ('/' if'wind_direction' in data else ''), color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
+        if 'wind_direction' in data:
+            ax_arrow.text(0.72, 0.85, "wind", color=color, transform=ax_arrow.transAxes, fontsize=12, va='bottom')
         ax_arrow.text(0.25, 0.75, "direction", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
 
     elif partition == True:
@@ -618,178 +661,191 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     plt.close()
     return fig_main
 
-def plot_monthly_spectra_2d(data,var='SPEC', method='mean', plot_type='pcolormesh', radius='frequency',dir_letters=False,output_file='monthly_mean_spectra_2d.png'):
+def plot_spectra_2d(data,var='SPEC', period=None, method='monthly_mean', plot_type='pcolormesh', cbar='single', radius='frequency',dir_letters=False,output_file='spectra_2d.png'):
     '''
-    Create a 12-panel plot of monthly mean 2D spectra. 
+    Creates a 12-panel plot of aggregated 2D spectra based on method. 
 
     Parameters
     - data : xarray.Dataset
         Dataset with 2D directional-frequency wave spectra.
     - var : str, optional, default='SPEC'
         Spectral variable name.
+    - period : tuple of two str, optional, default=None
+        Time range to filter the data as (start_time, end_time), e.g., ('2021-01-01T00', '2021-12-31T23').
+        If None, the full time range in the dataset is used.
+        Both start_time and end_time may be strings or datetime-like objects.
     -method : str, optional, default='mean'
         Aggregation method:  
-        - 'mean' : Average over month 
+        - 'monthly mean' : Average over month 
+        - 'direction' : average of data with peak direction within the specified sector.
     - plot_type : str, optional, default='pcolormesh'
         2D spectrum plotting method. Choose 'pcolormesh' or 'contour'.
+    - cbar : str, optional, default='single'
+        Number of colorbars
+            - 'single' : one colorbar for all 12 subplots
+            - 'multiple' : one colorbar per subplot
     - radius : str, optional, default='frequency'
         Units for radial axis, period or frequency.
     - dir_letters : bool, optional, default=False
         Use compass labels instead of degrees.
-    - output_file : str, optional, default='monthly_mean_spectra_2d'
+    - output_file : str, optional, default='spectra_2d.png'
         Output filename for saving the figure.
 
     Returns
     fig_main : matplotlib.figure.Figure
         The generated plot figure.
 
-    Function written by clio-met
+    Notes:
+    - If method = 'direction' each panel represents a 30° directional sector and displays the average 2D wave spectrum computed 
+      from all time steps where the peak wave wave direction falls within that sector. The percentage 
+      shown in each panel indicates the fraction of total spectra contributing to that sector's average.
     '''
-    datspec=data[var]
-    dims=list(datspec.dims)
-    # Get the coordinates
-    frequencies=datspec.coords[dims[1]]
-    directions=datspec.coords[dims[2]]
-    # The last direction should be the same as the first
-    if directions[0]!=directions[-1]:
-        if directions[0]<360:
-            dirc=xr.concat([directions,directions[0:1]+360],dim=dims[2])
-        else:
-            dirc=xr.concat([directions,directions[0:1]],dim=dims[2])
-        spec=xr.concat([datspec[:,:,:],datspec[:,:,0:1]],dim=dims[2])
-    months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    # Color map with 10 colors
-    cmap = cm.hot_r(np.linspace(0,1,10))
-    cmap = mcol.ListedColormap(cmap)
-    fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(15, 16), subplot_kw=dict(projection="polar"))
-    mon=1
-    for r in range(4):
-        for c in range(3):
-            if method == 'mean':
-                data=spec.sel(time=spec.time.dt.month.isin([mon])).mean(dim='time')
-            axs[r,c].set_theta_zero_location('N')
-            axs[r,c].set_theta_direction(-1)
-            if radius=='period':
-                rad_data=1/frequencies.values
-            elif radius=='frequency':
-                rad_data=frequencies.values
+
+    valid_methods = ['monthly_mean', 'direction']
+    if method not in valid_methods:
+        raise ValueError(f"Invalid method '{method}'. Available methods are: {', '.join(valid_methods)}.")
+
+    # Standardize the 2D wave spectrum dataset to match the WINDSURFER/NORA3 format.
+    data = spec_funcs.standardize_wave_dataset(data)
+
+    # Filters the dataset to the specified time period.
+    if isinstance(period, str):
+        raise ValueError("Period must include both start and end times, e.g. ('2024-01-01T00', '2024-12-31T23').")
+    filtered_data, period_label = spec_funcs.filter_period(data=data, period=period)
+
+    datspec=filtered_data[var]
+    frequencies = datspec.coords['freq']
+    directions = datspec.coords['direction']
+
+    # Normalize and wrap directional spectral data to 0-360°.
+    spec, dirc = spec_funcs.wrap_directional_spectrum(data, var=var)
+    
+    cmap = plt.cm.hot_r 
+    
+    if method == 'monthly_mean':
+        max_spec = np.round(spec.groupby('time.month').mean(dim='time').max().item(),1) 
+        norm = plt.Normalize(vmin=0, vmax=max_spec)
+
+        months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(15, 16), subplot_kw=dict(projection="polar"))
+        mon=1
+        for r in range(4):
+            for c in range(3):
+                data_spec=spec.sel(time=spec.time.dt.month.isin([mon])).mean(dim='time')
+                axs[r,c].set_theta_zero_location('N')
+                axs[r,c].set_theta_direction(-1)
+
+                if radius=='period':
+                    rad_data=1/frequencies.values
+                elif radius=='frequency':
+                    rad_data=frequencies.values
+
+                if plot_type == 'contour':
+                    cmap = cm.hot_r(np.linspace(0,1,10))
+                    cmap = mcol.ListedColormap(cmap)
+                    cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, data_spec.values, cmap=cmap, vmin=0, vmax=max_spec if cbar=='single' else None)
+                elif plot_type == 'pcolormesh':
+                    cp = axs[r,c].pcolormesh(np.radians(dirc.values), rad_data, data_spec.values, cmap=cmap, shading='auto', vmin=0, vmax=max_spec if cbar=='single' else None)
+                
+                if dir_letters:
+                    ticks_loc = axs[r,c].get_xticks().tolist()
+                    axs[r,c].xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                    axs[r,c].set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
+                
+                if cbar == 'multiple':
+                    plt.colorbar(cp, label=r'[' + re.sub(r'\*\*(\d+)', r'$^\1$', datspec.units) + ']', pad=0.15) 
+                
+                axs[r,c].text(0.015,0.98,months[mon-1],transform=axs[r,c].transAxes,fontsize=14,weight='bold')
+                mon=mon+1
+                axs[r,c].grid(True)
+
+    
+    elif method == 'direction':
+            idir=data[var][:,:,:].argmax(dim=['freq','direction'])['direction'].values
+            dir_mean_spec=np.zeros((len(directions),len(frequencies),len(directions)+1))
+            count=np.zeros((len(directions)))
+
+            for i in range(np.shape(datspec)[0]):
+                id=int(idir[i])
+                dir_mean_spec[id,:,:]=dir_mean_spec[id,:,:]+spec[i,:,:].values
+                count[id]=count[id]+1
+            for i in range(len(directions)):
+                if count[i]!=0:
+                    dir_mean_spec[i,:,:]=dir_mean_spec[i,:,:]/count[i]
+                else:
+                    dir_mean_spec[i,:,:]=np.full((len(frequencies),len(directions)+1),np.nan)
             
-            if plot_type == 'contour':
-                cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, data.values, cmap=cmap)
-            elif plot_type == 'pcolormesh':
-                cp = axs[r,c].pcolormesh(np.radians(dirc.values), rad_data, data.values, cmap=cmap, shading='auto')
+            # Combines the directions into 30 deg sectors
+            dir_mean_spec_1=np.zeros((int(len(directions)/2),len(frequencies),len(directions)+1))
+            count1=np.zeros((int(len(directions)/2)))
+            i1=0
+            for i in range(-1,len(directions)-1,2):
+                dir_mean_spec_1[i1,:,:]=(dir_mean_spec[i,:,:]+dir_mean_spec[i+1,:,:])/2
+                count1[i1]=count[i]+count[i+1]
+                i1=i1+1
+
+            labels=['0$^{\circ}$','30$^{\circ}$','60$^{\circ}$','90$^{\circ}$','120$^{\circ}$','150$^{\circ}$','180$^{\circ}$','210$^{\circ}$',
+                    '240$^{\circ}$','270$^{\circ}$','300$^{\circ}$','330$^{\circ}$']
             
-            axs[r,c].grid(True)
-            if dir_letters:
-                ticks_loc = axs[r,c].get_xticks().tolist()
-                axs[r,c].xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
-                axs[r,c].set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
-            plt.colorbar(cp, label='['+datspec.units+']', pad=0.15) #cax=axs[r,c],
-            axs[r,c].text(0.015,0.98,months[mon-1],transform=axs[r,c].transAxes,fontsize=14,weight='bold')
-            mon=mon+1
-            del data,cp
-    plt.tight_layout()
-    if output_file is not None:
-        plt.savefig(output_file, dpi=200, bbox_inches='tight')
-    plt.close()
-    return fig
+            fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(15, 16), subplot_kw=dict(projection="polar"))
+            i1=0
 
-def plot_direction_spectra_2d(data,var='SPEC', plot_type='pcolormesh', radius='frequency',dir_letters=False, output_file='peak_direction_spectra_2d.png'):
-    '''
-    Create a 12-panel plot of directional wave spectra averaged by peak wave direction.
+            max_spec = np.round(np.nanmax(dir_mean_spec_1),1)
+            norm = plt.Normalize(vmin=0, vmax=max_spec)
+            for r in range(4):
+                for c in range(3):
+                    axs[r,c].set_theta_zero_location('N')
+                    axs[r,c].set_theta_direction(-1)
 
-    Each panel represents a 30° directional sector and displays the average 2D wave spectrum computed 
-    from all time steps where the peak wave wave direction falls within that sector. The percentage 
-    shown in each panel indicates the fraction of total spectra contributing to that sector's average.
+                    if radius=='period':
+                        rad_data=1/frequencies.values
+                    elif radius=='frequency':
+                        rad_data=frequencies.values
+                    
+                    if plot_type == 'contour':
+                        cmap = cm.hot_r(np.linspace(0,1,10))
+                        cmap = mcol.ListedColormap(cmap)
+                        cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, dir_mean_spec_1[i1,:,:], cmap=cmap, vmin=0, vmax=max_spec if cbar=='single' else None)
+                    elif plot_type == 'pcolormesh':
+                        cp = axs[r,c].pcolormesh(np.radians(dirc.values), rad_data, dir_mean_spec_1[i1,:,:], cmap=cmap, shading='auto', vmin=0, vmax=max_spec if cbar=='single' else None)
+                    
+                    if dir_letters:
+                        ticks_loc = axs[r,c].get_xticks().tolist()
+                        axs[r,c].xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                        axs[r,c].set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
+                    
+                    if cbar == 'multiple':
+                        plt.colorbar(cp, label=r'[' + re.sub(r'\*\*(\d+)', r'$^\1$', datspec.units) + ']', pad=0.15) 
+                    
+                    axs[r,c].text(0,1,labels[i1],transform=axs[r,c].transAxes,fontsize=14,weight='bold')
+                    axs[r,c].text(1,1,str(int(np.rint(count1[i1]/np.sum(count1)*100)))+'%',transform=axs[r,c].transAxes,fontsize=14)
+                    i1=i1+1
+                    axs[r,c].grid(True)
+       
 
-    Parameters
-    - data : xarray.Dataset
-        Dataset with 2D directional-frequency wave spectra.
-    - var : str, optional, default='SPEC'
-        Spectral variable name.
-    - plot_type : str, optional, default='pcolormesh'
-        2D spectrum plotting method. Choose 'pcolormesh' or 'contour'.
-    - radius : str, optional, default='frequency'
-        Units for radial axis, period or frequency.
-    - dir_letters : bool, optional, default=False
-        Use compass labels instead of degrees.
-    - output_file : str, optional, default='peak_direction_spectra_2d.png'
-        Output filename for saving the figure. 
+    if cbar == 'single':
+        cbar = fig.add_axes([0.92, 0.15, 0.02, 0.7])  # [left, bottom, width, height]
+        cbar = fig.colorbar(cp, cax=cbar) if plot_type=='pcolormesh' else fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cbar, ticks=np.linspace(0, max_spec, 11))
+        cbar.ax.tick_params(labelsize=14)
+        cbar.ax.set_title(r'[' + re.sub(r'\*\*(\d+)', r'$^\1$', datspec.units) + ']', pad=10, fontsize=14)
 
-    Returns
-    fig_main : matplotlib.figure.Figure
-        The generated plot figure.
+    fig.text(0.1,0.07,rf'$\mathbf{{Period}}$: {period_label}',transform=fig.transFigure,fontsize=16, ha='left')
 
-    Function written by clio-met
-    '''
-    datspec=data[var]
-    dims=list(datspec.dims)
-    # Get the coordinates
-    frequencies=datspec.coords[dims[1]]
-    directions=datspec.coords[dims[2]]
-    # The last direction should be the same as the first
-    if directions[0]!=directions[-1]:
-        if directions[0]<360:
-            dirc=xr.concat([directions,directions[0:1]+360],dim=dims[2])
-        else:
-            dirc=xr.concat([directions,directions[0:1]],dim=dims[2])
-        spec=xr.concat([datspec[:,:,:],datspec[:,:,0:1]],dim=dims[2])
+    lat_str = ", ".join(
+        f"{abs(lat):.1f}°{'N' if lat >= 0 else 'S'}"                                # Format latitudes with N/S
+        for lat in np.unique(data['latitude'].round(1).values))
 
-    idir=data[var][:,:,:].argmax(dim=['freq','direction'])['direction'].values
-    dir_mean_spec=np.zeros((len(directions),len(frequencies),len(directions)+1))
+    lon_str = ", ".join(
+        f"{abs(lon):.1f}°{'E' if lon >= 0 else 'W'}"                                # Format longitudes with E/W
+        for lon in np.unique(data['longitude'].round(1).values))
 
-    count=np.zeros((len(directions)))
+    label_position = (
+        rf"$\mathbf{{Position:}}$ Lon: {lon_str}, Lat: {lat_str}"                   # Position label
+        + "\u2007" * max(0, 27 - len(f"Lon: {lon_str}, Lat: {lat_str}")) + "\n"
+    )
 
-    for i in range(np.shape(datspec)[0]):
-        id=int(idir[i])
-        dir_mean_spec[id,:,:]=dir_mean_spec[id,:,:]+spec[i,:,:].values
-        count[id]=count[id]+1
-    for i in range(len(directions)):
-        if count[i]!=0:
-            dir_mean_spec[i,:,:]=dir_mean_spec[i,:,:]/count[i]
-        else:
-            dir_mean_spec[i,:,:]=np.full((len(frequencies),len(directions)+1),np.nan)
-    # Combines the directions into 30 deg sectors
-    dir_mean_spec_1=np.zeros((int(len(directions)/2),len(frequencies),len(directions)+1))
-    count1=np.zeros((int(len(directions)/2)))
-    i1=0
-    for i in range(-1,len(directions)-1,2):
-        dir_mean_spec_1[i1,:,:]=(dir_mean_spec[i,:,:]+dir_mean_spec[i+1,:,:])/2
-        count1[i1]=count[i]+count[i+1]
-        i1=i1+1
-    del dir_mean_spec
+    fig.text(0.1,0.035,label_position,transform=fig.transFigure,fontsize=16, ha='left')
 
-    labels=['0$^{\circ}$','30$^{\circ}$','60$^{\circ}$','90$^{\circ}$','120$^{\circ}$','150$^{\circ}$','180$^{\circ}$','210$^{\circ}$',
-            '240$^{\circ}$','270$^{\circ}$','300$^{\circ}$','330$^{\circ}$']
-    # Color map with 10 colors
-    cmap = cm.hot_r(np.linspace(0,1,10))
-    cmap = mcol.ListedColormap(cmap)
-    fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(15, 16), subplot_kw=dict(projection="polar"))
-    i1=0
-    for r in range(4):
-        for c in range(3):
-            axs[r,c].set_theta_zero_location('N')
-            axs[r,c].set_theta_direction(-1)
-            if radius=='period':
-                rad_data=1/frequencies.values
-            elif radius=='frequency':
-                rad_data=frequencies.values
-            
-            if plot_type == 'contour':
-                cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, dir_mean_spec_1[i1,:,:], cmap=cmap)
-            elif plot_type == 'pcolormesh':
-                cp = axs[r,c].pcolormesh(np.radians(dirc.values), rad_data, dir_mean_spec_1[i1,:,:], cmap=cmap, shading='auto')
-            axs[r,c].grid(True)
-            if dir_letters:
-                ticks_loc = axs[r,c].get_xticks().tolist()
-                axs[r,c].xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
-                axs[r,c].set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
-            plt.colorbar(cp, label='['+datspec.units+']', pad=0.15) #cax=axs[r,c],
-            axs[r,c].text(0,1,labels[i1],transform=axs[r,c].transAxes,fontsize=14,weight='bold')
-            axs[r,c].text(1,1,str(int(np.rint(count1[i1]/np.sum(count1)*100)))+'%',transform=axs[r,c].transAxes,fontsize=14)
-            i1=i1+1
-            del cp
-    plt.tight_layout()
     if output_file is not None:
         plt.savefig(output_file, dpi=200, bbox_inches='tight')
     plt.close()
@@ -798,7 +854,7 @@ def plot_direction_spectra_2d(data,var='SPEC', plot_type='pcolormesh', radius='f
 
 def plot_1d_spectrum_on_ax(data, ax, var='SPEC', month=None, color='#0463d7ff', alpha=0.22, method='mean'):
     '''
-    Plots a 1D wave spectrum for a specified month on the given Matplotlib axis. Data is aggregated based on method.
+    Plots a 1D spectrum for a specified month on the given Matplotlib axis. Data is aggregated based on method.
     If month=None the full period is selected. 
 
     Parameters:

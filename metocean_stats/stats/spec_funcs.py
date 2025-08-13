@@ -528,8 +528,11 @@ def filter_period(data, period):
     - data : xarray.Dataset or xarray.DataArray
         The input dataset containing a 'time' dimension.
     period : tuple or None
-        Tuple of (start_time, end_time) as strings or datetime-like objects.
-        If None, the full time range in the data is used.
+        A tuple specifying the desired time range.
+        - (start_time, end_time): Filters between start_time and end_time.
+        - (start_time,): Filters to a single timestamp.
+        - None: Uses the full time range available in data.
+        Both start_time and end_time may be strings or datetime-like objects.
 
     Returns
     filtered_data : xarray.Dataset or xarray.DataArray
@@ -539,16 +542,26 @@ def filter_period(data, period):
         If start and end times are equal, only that time is returned.
     '''
 
+    # Finds data time range
     data_start = pd.to_datetime(data.time.min().values)
     data_end = pd.to_datetime(data.time.max().values)
 
+    # Uses the full dataset if period is None
     if period is None:
         start_time, end_time = data_start, data_end
-    else:
+    
+    # Uses the choosen period range
+    elif isinstance(period,tuple):
         start_time, end_time = pd.to_datetime(period[0]), pd.to_datetime(period[1])
 
         if start_time < data_start or end_time > data_end:
             raise ValueError(f"Period {start_time} to {end_time} is outside data range {data_start} to {data_end}.")
+
+    # Uses one timestamp if choosen
+    else:
+        start_time = end_time = pd.to_datetime(period)
+        if start_time not in data.time.values:
+            raise ValueError(f"({start_time}) is outside data range {data_start} to {data_end}.")
 
     filtered_data = data.sel(time=slice(start_time, end_time))
 

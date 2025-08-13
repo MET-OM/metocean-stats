@@ -381,10 +381,12 @@ def test_plot_monthly_stats_month_xticks():
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 
 
-def test_plot_taylor_diagram():
+def test_plot_taylor_diagram(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda: None)  # override plt.show to no-op
     fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    plt.close(fig)
 
 # def test_plot_environmental_contours_hs_tp():
 #     figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
@@ -400,26 +402,26 @@ def test_plot_cca_profile():
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 
-def test_plot_wave_spectrum_1d():
-    output_file = 'test_plot_wave_spectrum_1d.png'
-    fig = plots.plot_wave_spectrum_1d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+def test_plot_spectra_1d():
+    output_file = 'test_plot_monthly_spectra_1d.png'
+    fig = plots.plot_spectra_1d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
 
-def test_plot_wave_spectrum_2d():
-    output_file = 'test_plot_wave_spectrum_2d.png'
-    fig = plots.plot_wave_spectrum_2d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+def test_plot_spectrum_2d():
+    output_file = 'test_plot_spectrum_2d.png'
+    fig = plots.plot_spectrum_2d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
 
 def test_plot_diana_spectrum():
     output_file = 'test_plot_diana_spectrum.png'
-    fig = plots.plot_diana_spectrum(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', partition=True, output_file=output_file)
+    fig = plots.plot_diana_spectrum(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', partition=False, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
 
-def test_plot_peak_direction_spectra():
+def test_plot_spectra_2d():
     output_file = 'test_plot_dir_mean_2dspectrum.png'
-    fig = plots.plot_peak_direction_spectra(data=ds_synthetic_spectra, var='SPEC', method='mean', output_file=output_file)
+    fig = plots.plot_spectra_2d(data=ds_synthetic_spectra, var='SPEC', method='monthly_mean', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)

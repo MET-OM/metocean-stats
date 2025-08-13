@@ -49,20 +49,20 @@ def synthetic_dataset_spectra():
     SPEC = np.clip(SPEC, 0, None)                                                    # Ensure all values are non-negative
 
     # Wrap SPEC array in a DataArray with units and metadata
-    spec_da = xr.DataArray(
+    spec = xr.DataArray(
         SPEC,
         dims=("time", "freq", "direction"),
         coords={"time": time, "freq": freq, "direction": direction},
         attrs={
-            "units": "m**2 s",                                                       # Units: spectral density
-            "long_name": "Wave energy density spectrum"
+            "units": "m**2 s",                                                       
+            "long_name": "Variance density spectrum"
         }
     )
 
     # Construct the full Dataset with SPEC and metadata
     ds = xr.Dataset(
         {
-            "SPEC": spec_da
+            "SPEC": spec
         },
         coords={
             "time": time,

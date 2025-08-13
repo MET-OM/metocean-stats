@@ -1601,13 +1601,13 @@ Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_monthly_spectra_1d(
+   plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
       period = None,
       month = None,
       method = 'mean',
-      output_file  = 'monthly_spectra_1d.png'
+      output_file  = 'wave_spectrum_1d_months.png'
    )
 
 .. image:: files/wave_spectrum_1d_months.png
@@ -1617,13 +1617,13 @@ Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_monthly_spectra_1d(
+   plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
       period = None,
       month = 1,
       method = 'mean',
-      output_file  = 'monthly_spectra_1d.png'
+      output_file  = 'wave_spectrum_1d_month.png'
    )
 
 .. image:: files/wave_spectrum_1d_month.png
@@ -1640,7 +1640,7 @@ Monthly Mean 1D Wave Spectrum
       month = None,
       method = 'hm0_max',
       plot_type = 'pcolormesh',
-      output_file  = 'spectrum_2d.png'
+      output_file  = 'wave_spectrum_2d.png'
    )
 
 .. image:: files/wave_spectrum_2d.png
@@ -1659,7 +1659,7 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
       partition=True,
       plot_type = 'pcolormesh'
       freq_mask=True,
-      output_file  = 'diana_spectrum.png'
+      output_file  = 'wave_spectrum_diana.png'
    )
 
 .. image:: files/wave_spectrum_diana.png
@@ -1669,15 +1669,16 @@ Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with 
 
 .. code-block:: python
 
-   plots.plot_monthly_spectra_2d(
+   plots.plot_spectra_2d(
       data, 
       var = 'SPEC',
       method = 'mean',
       plot_type = 'contour',
-      output_file  = 'monthly_mean_spectra_2d.png'
+      cbar = 'multiple',
+      output_file  = 'wave_spectra_2d_monthly_mean.png'
    )
 
-.. image:: files/wave_spectra_monthly_mean_2d.png
+.. image:: files/wave_spectra_2d_monthly_mean.png
    :width: 500
 
 Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
@@ -1687,11 +1688,12 @@ Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
    plots.plot_direction_spectra_2d(
       data,         
       var = 'SPEC',
-      plot_type = 'contour'
-      output_file  = 'peak_direction_spectra_2d.png'
+      plot_type = 'contour',
+      cbar = 'single',
+      output_file  = 'wave_spectra_2d_direction.png'
    )
 
-.. image:: files/wave_spectra_peak_direction_2d.png
+.. image:: files/wave_spectra_2d_direction.png
    :width: 500
 
 Tidal Levels Table

@@ -1,48 +1,6 @@
 import pandas as pd
 import numpy as np
-from ..stats import spec_funcs
-
-def aggregate_group(df, freq_cols, method):
-    '''
-    Aggregate frequency columns and the 'Hm0' column from a 1D frequency spectrum DataFrame based on the specified method.
-
-    Parameters:
-    - df : pandas.DataFrame
-        Input DataFrame containing frequency columns and an 'Hm0' column.
-    - freq_cols : list of str
-        List of column names in df that contain frequency data to aggregate.
-    - method : str
-        Aggregation method to apply. Supported methods are:
-        - 'mean': average all rows.
-        - 'top_1_percent_mean': average only rows where 'Hm0' is in the top 1% quantile.
-        - 'hm0_max': return the row with the maximum 'Hm0' value.
-        - 'hm0_top3_mean': average the top 3 rows with highest 'Hm0' values.
-
-    Returns:
-    - tuple of (aggregated_freq, aggregated_hm0)
-        - aggregated_freq: pandas Series with aggregated frequency columns.
-        - aggregated_hm0: float, aggregated 'Hm0' value.
-    '''
-
-    if method == 'mean':
-        return df[freq_cols].mean(), df['Hm0'].mean()               # Average all rows for frequency columns and 'Hm0'
-    
-    elif method == 'top_1_percent_mean':
-        p99 = df['Hm0'].quantile(0.99)                              # Calculate 99th percentile of 'Hm0'
-        top = df[df['Hm0'] >= p99]                                  # Filter rows where 'Hm0' >= 99th percentile
-        return top[freq_cols].mean(), top['Hm0'].mean()             # Average frequency columns and 'Hm0' over top 1% rows
-    
-    elif method in ('hm0_max'):
-        max_row = df.loc[df['Hm0'].idxmax()]                        # Find row with maximum 'Hm0' value
-        return max_row[freq_cols], max_row['Hm0']                   # Return frequency columns and 'Hm0' from that row
-    
-    elif method == 'hm0_top3_mean':                                 
-        top3 = df.nlargest(3, 'Hm0')                                # Select top 3 rows with highest 'Hm0' values
-        return top3[freq_cols].mean(), top3['Hm0'].mean()           # Average frequency columns and 'Hm0' over top 3 rows
-    
-    else:
-        raise ValueError(f"Unknown method: {method}")
-    
+from ..stats import spec_funcs 
 
 def table_monthly_freq_1dspectrum(data, var='SPEC', method='mean', month=None, average_over='month', output_file='monthly_table_spectrum.csv'):
     '''
@@ -184,3 +142,44 @@ def table_monthly_freq_1dspectrum(data, var='SPEC', method='mean', month=None, a
             df.to_csv(f, index=False)
 
     return df
+
+def aggregate_group(df, freq_cols, method):
+    '''
+    Aggregate frequency columns and the 'Hm0' column from a 1D frequency spectrum DataFrame based on the specified method.
+
+    Parameters:
+    - df : pandas.DataFrame
+        Input DataFrame containing frequency columns and an 'Hm0' column.
+    - freq_cols : list of str
+        List of column names in df that contain frequency data to aggregate.
+    - method : str
+        Aggregation method to apply. Supported methods are:
+        - 'mean': average all rows.
+        - 'top_1_percent_mean': average only rows where 'Hm0' is in the top 1% quantile.
+        - 'hm0_max': return the row with the maximum 'Hm0' value.
+        - 'hm0_top3_mean': average the top 3 rows with highest 'Hm0' values.
+
+    Returns:
+    - tuple of (aggregated_freq, aggregated_hm0)
+        - aggregated_freq: pandas Series with aggregated frequency columns.
+        - aggregated_hm0: float, aggregated 'Hm0' value.
+    '''
+
+    if method == 'mean':
+        return df[freq_cols].mean(), df['Hm0'].mean()               # Average all rows for frequency columns and 'Hm0'
+    
+    elif method == 'top_1_percent_mean':
+        p99 = df['Hm0'].quantile(0.99)                              # Calculate 99th percentile of 'Hm0'
+        top = df[df['Hm0'] >= p99]                                  # Filter rows where 'Hm0' >= 99th percentile
+        return top[freq_cols].mean(), top['Hm0'].mean()             # Average frequency columns and 'Hm0' over top 1% rows
+    
+    elif method in ('hm0_max'):
+        max_row = df.loc[df['Hm0'].idxmax()]                        # Find row with maximum 'Hm0' value
+        return max_row[freq_cols], max_row['Hm0']                   # Return frequency columns and 'Hm0' from that row
+    
+    elif method == 'hm0_top3_mean':                                 
+        top3 = df.nlargest(3, 'Hm0')                                # Select top 3 rows with highest 'Hm0' values
+        return top3[freq_cols].mean(), top3['Hm0'].mean()           # Average frequency columns and 'Hm0' over top 3 rows
+    
+    else:
+        raise ValueError(f"Unknown method: {method}")
