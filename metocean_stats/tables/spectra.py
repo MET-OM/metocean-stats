@@ -28,8 +28,7 @@ def table_monthly_freq_1dspectrum(data, var='SPEC', method='mean', month=None, a
         Path to save the output CSV file. If None, no file is saved.
 
     Returns
-    -------
-    pandas.DataFrame
+    - pandas.DataFrame
         Aggregated spectra with frequency columns and Hm0 values.
         Includes one row per month/year and a final 'Average' row.
     '''
