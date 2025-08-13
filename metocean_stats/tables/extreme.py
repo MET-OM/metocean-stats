@@ -14,11 +14,29 @@ def table_monthly_joint_distribution_Hs_Tp_param(
         var_tp='tp',
         model = "lonowe",
         output_file='monthly_Hs_Tp_joint_param.csv'):
+    """
+    Return a table of Hs/Tp joint model parameters, after fitting to each month of the dataset.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The dataset
+    var_hs : str
+        Name of the data column representing Hs.
+    var_tp : str
+        The data column representing Tp
+    model : str, default lonowe
+        The model to use:
+
+         - lonowe: Lognormal+Weibull / Lognormal model. Note - uses variance of log-Tp intervals.
+         - hs_tp: Weibull / Lognormal model. Note - uses standard deviation of the log-Tp intervals.
+    """
+
     # Calculate LoNoWe parameters for each month
 
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
-    if model != "lonowe":
+    if model.lower() != "lonowe":
         month_params = {}
         model = JointProbabilityModel(model)
         for m,month in enumerate(months[:-1]):
@@ -49,35 +67,76 @@ def table_monthly_joint_distribution_Hs_Tp_param(
     # Create DataFrame
     df = pd.DataFrame(params, columns=headers[1:], index=months)
     df.index.name='Month'
-    df = df.round(3)
 
     if output_file:
-        df.to_csv(output_file)    
+        df.to_csv(output_file,float_format="%.3f")
 
     return df
 
-def table_directional_joint_distribution_Hs_Tp_param(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],output_file='directional_Hs_Tp_joint_param.csv'):
-    # Calculate LoNoWe parameters for each month
-    params = []
-    dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
+def table_directional_joint_distribution_Hs_Tp_param(
+        data,
+        var_hs='hs',
+        var_tp='tp',
+        var_dir='pdir',
+        model='lonowe',
+        sectors=12,
+        output_file='directional_Hs_Tp_joint_param.csv'):
+    """
+    Calculate Hs/Tp joint model parameters according to direction.
 
-    aux_funcs.add_direction_sector(data=data,var_dir=var_dir)
-    for dir in range(0,360,30):
-        sector_data = data[data['direction_sector']==dir]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-        params.append((a1, a2, a3, b1, b2, b3))
-    # add annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-    params.append((a1, a2, a3, b1, b2, b3))       
-    headers = ['Direction', 'a1', 'a2', 'a3', 'b1', 'b2', 'b3']
-    # Create DataFrame
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The dataset.
+    var_hs : str
+        Column name for Hs
+    var_tp : str
+        Column name for Tp
+    var_dir : str
+        Name for the direction column. Must be defined in degrees.
+    model : str, default lonowe
+        The model to use:
 
-    df = pd.DataFrame(params, columns=headers[1:], index=dir_label)
+         - lonowe: Lognormal+Weibull / Lognormal model. Note - uses variance of log-Tp intervals.
+         - hs_tp: Weibull / Lognormal model. Note - uses standard deviation of the log-Tp intervals.
+    sectors : int, default 12
+        Number of directional sectors. These are always defined with the first sector centered on north.
+    """
+    periods = [1]
+    params = {}
+    #dir_label = [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
+    aux_funcs.add_direction_sector(data=data,var_dir=var_dir,num=sectors)
+
+    jpm = JointProbabilityModel("hs_tp")
+    for dir,sector_data in data.groupby("direction_sector"):
+        try:
+            if model != "lonowe":
+                jpm.fit(sector_data,var_hs,var_tp)
+                params[dir] = jpm.parameters(complete=False)
+
+            else:
+                a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=sector_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
+                params[dir] = (a1, a2, a3, b1, b2, b3)
+        except Exception as e:
+            warnings.warn(f"Failed to fit sector {dir} with {sector_data.shape[0]} entries due to {e}.")
+            params[dir] = [np.nan]*6 if model=="lonowe" else {k:np.nan for k,_ in jpm.parameters(complete=False).items()}
+
+    if model != "lonowe":
+        jpm.fit(data,var_hs,var_tp)
+        params["Omni"] = jpm.parameters(complete=False)
+        df = pd.DataFrame(params).T
+    else:
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
+        params["Omni"] = (a1, a2, a3, b1, b2, b3)
+        headers = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3']
+        df = pd.DataFrame(params).T
+        df.columns = headers
+
+    df.index = [str(dir)+'°' for dir in params.keys()]
     df.index.name='Direction'
-    df = df.round(3)
 
     if output_file:
-        df.to_csv(output_file)    
+        df.to_csv(output_file,float_format="%.3f")
 
     return df  
 
