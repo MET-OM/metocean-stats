@@ -944,8 +944,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         contour = get_contour(self,return_period=return_period,state_duration=state_duration,
                               method=method,point_distribution="random",n_samples=n_samples)
 
-
-
         for i,level in enumerate(slice_values):
             coords = contour.coordinates
             coords = coords[np.abs(coords[:,slice_dim]-level)<slice_width]
@@ -1254,6 +1252,149 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         return ax
 
+    def get_contour_maximum(
+            self,
+            return_period,
+            state_duration = 1,
+            dim = 0,
+            n_samples = 1000,
+            contour_method="IFORM",
+            ):
+        """
+        Method to retrieve the marginal extreme and corresponding conditional values, 
+        from a contour corresponding to a given return period.
+
+        Parameters
+        -----------
+        return_period : int
+            Return period, in years.
+        state_duration : float
+            The average duration (hours) of each sample 
+            in the data used to fit the model.
+        primary_dim : int
+            Get the point on the contour which is largest in this dimension.
+        n_samples : int, default 720
+            Number of contour points to generate. May need to be tuned for 
+            accuracy vs speed, depending on contour method.
+        contour_method : str
+            The method of calculating a contour. One of:
+
+             - "IFORM", the inverse first-order reliability method
+             - "ISORM", the inverse second-order reliability method
+             - "HighestDensity"
+             - "DirectSampling"
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+        """
+
+        contour = get_contour(self,return_period=return_period,state_duration=state_duration,method=contour_method,n_samples=n_samples)
+        coords = contour.coordinates.T
+        idxmax = np.argmax(coords[dim])
+        return {p:v for p,v in zip(self.data.columns,coords[:,idxmax])}
+
+    def table_contour(
+            self,
+            return_period,
+            range_values = None,
+            range_dim = -2,
+            slice_value = None,
+            slice_dim = -3,
+            state_duration = 1,
+            range_interval = 0.5,
+            n_samples = None,
+            contour_method = "IFORM"
+        ):
+        """
+        Summarize a contour in the form of a table, i.e., a list of points lying on the contour.
+        The function is general to 2 or 3 dimensions.
+
+        For example: Get the Tp values corresponding to Hs = 1,2,3,4,5 for a 100-year return period.
+
+        Parameters
+        ----------
+        return_period : float
+            Return period in years.
+        range_values : float or list of floats
+            A value or list of values, to sample the contour along range_dim.
+            This becomes the rows of the resulting table.
+        range_dim : int
+            The dimension along which to sample the range_values.
+        fixed_value : float
+            A value for the fixed dimension. Only needed if the model is 3D.
+        fixed_dim : int
+            The dimension to slice at.
+        state_duration : float
+            The average duration (hours) of each sample 
+            in the data used to fit the model.
+        n_samples : int, default 1e3 (2D) or 1e6 (3D)
+            Number of contour points to generate. May need to be tuned for 
+            accuracy vs speed, depending on contour method.
+        contour_method : str
+            The method of calculating a contour. One of:
+
+             - "IFORM", the inverse first-order reliability method
+             - "ISORM", the inverse second-order reliability method
+             - "HighestDensity"
+             - "DirectSampling"
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+
+        Notes
+        -----
+        The method relies on generating many contour points, then 
+        a thin 2D "slice" at a fixed value (if the model is 3D),
+        then a thin "band" at different values of the range-dimension.
+        For each such band, the smallest and highest contour value of the 
+        last "free" dimension is found.
+        
+        There is a significant tradeoff - a large number of points 
+        is expensive, but a smaller number of points requires 
+        wider margins to guarantee at least one small and large
+        point within each slice/band, this increases error.
+
+        A more elegant solution would be interpolation, requiring fewer points.
+        """
+
+        if not n_samples: n_samples = int(1e6) if self.n_dim==3 else int(1e5)
+
+        contour = get_contour(
+            self,return_period=return_period,state_duration=state_duration,
+            method=contour_method,n_samples=n_samples,point_distribution="random")
+        coords = contour.coordinates.T
+
+        if range_dim<0:range_dim=self.n_dim+range_dim
+        if slice_dim<0:slice_dim=self.n_dim+slice_dim
+        free_dim = [i for i in range(3) if (i!=range_dim) and (i!=slice_dim)]
+        if len(free_dim) != 1: raise ValueError(
+            "range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
+        free_dim = free_dim[0]
+
+        column_names = [
+            f'{self.semantics['names'][slice_dim]}',
+            f'{self.semantics['names'][range_dim]}',
+            f'{self.semantics['names'][free_dim]}: {return_period}-year-low',
+            f'{self.semantics['names'][free_dim]}: {return_period}-year-high'
+        ]
+
+        if self.n_dim == 3:
+            coords = coords[:,np.abs(coords[slice_dim]-slice_value)<0.05]
+            coords = coords[[i for i in range(3) if i!=slice_dim]]
+            if range_dim > slice_dim: range_dim -= 1
+            if free_dim > slice_dim: free_dim -= 1
+
+        if not range_values: 
+            range_from = np.ceil(coords[range_dim].min()/range_interval)*range_interval
+            range_to = np.ceil(coords[range_dim].max()/range_interval)*range_interval
+            range_values = np.arange(range_from,range_to,range_interval)
+
+        table = []
+        for range_value in range_values:
+            band = coords[:,np.abs(coords[range_dim]-range_value)<0.05]
+            free_low, free_high = band[free_dim].min(),band[free_dim].max()
+            table.append((slice_value,range_value,free_low,free_high))
+
+        return pd.DataFrame(table,columns=column_names)
+
 
     def get_default_semantics(self):
         """
@@ -1296,7 +1437,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if self.n_dim == 2:
                 x,y = (1,0) if self.swap_axis else (0,1)
             if self.n_dim == 3:
-                #x,y,z = (0,2,1) if self.swap_axis else 
                 x,y,z = (0,1,2)
 
         if ax is None:
