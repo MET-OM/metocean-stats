@@ -725,7 +725,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     start = 1
     x = mean_hs[start:]
     y = variance_lnTp[start:]
-    parameters, covariance = curve_fit(aux_funcs.Gauss4, x, y)#,maxfev=10000)
+    parameters, covariance = curve_fit(aux_funcs.Gauss4, x, y, maxfev=10000)
     b1 = 0.005
     b2 = parameters[0]
     b3 = parameters[1]

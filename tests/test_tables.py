@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 from metocean_stats import tables
+from metocean_stats.tables.climate import *
 from metocean_stats.stats.aux_funcs import readNora10File
 from .data import synthetic_dataset
 
@@ -587,8 +588,21 @@ def test_table_cca_profile():
     else:
         raise ValueError("Shape is not correct")
 
+        
+def test_table_linear_regression():
+    output_file='test_table_linear_regerssion.csv'
+    df, _, _ = tables.table_linear_regression(df=ds,var='HS',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (13, 9):
+        pass
+    else:
+        raise ValueError("Shape linear regression table is not correct")
+
+
 def test_table_monthly_freq_1dspectrum():
     output_file='test_table_monthly_freq_1dspectrum.csv'
     df = tables.table_monthly_freq_1dspectrum(data=ds_synthetic_spectra,var='SPEC',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
+
