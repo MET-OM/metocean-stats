@@ -208,26 +208,51 @@ def table_directional_return_periods(data: pd.DataFrame, var='hs', var_dir='dir'
     
     return df
 
-def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000],output_file='monthly_Hs_Tp_joint_reurn_values.csv'):
+def table_monthly_joint_distribution_Hs_Tp_return_values(
+        data,
+        var_hs='hs',
+        var_tp='tp',
+        periods=[1,10,100,10000],
+        output_file='monthly_Hs_Tp_joint_reurn_values.csv',
+        model = 'lonowe'
+        ):
     # Calculate LoNoWe parameters for each month
     rv_hs = np.zeros((13,len(periods)))
     rv_tp = np.zeros((13,len(periods)))
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Year']
 
+    days_per_month = np.array([31,28.2425,31,30,31,30,31,31,30,31,30,31])
     for month in range(1,len(months)):
-        #print(month)
         month_data = data[data.index.month == month]
-        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=month_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-        for i in range(len(periods)):
-            rv_hs[month-1,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
-            rv_tp[month-1,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
+        if model == 'lonowe':
+            a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=month_data,var_hs=var_hs,var_tp=var_tp,periods=periods)
+            for i in range(len(periods)):
+                rv_hs[month-1,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+                rv_tp[month-1,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
+        else:
+            jpm = JointProbabilityModel(model)
+            jpm.fit(month_data,var_hs,var_tp)
+            for i,p in enumerate(periods):
+                days_in_month = days_per_month[month-1]
+                rv = jpm.get_contour_maximum(return_period=p*(days_in_month/365.25))
+                rv_hs[month-1,i] = rv[var_hs]
+                rv_tp[month-1,i] = rv[var_tp]
+
 
     #append annual
-    a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-    for i in range(len(periods)):
-        rv_hs[12,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
-        rv_tp[12,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
-    
+    if model == 'lonowe':
+        a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph  =  stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
+        for i in range(len(periods)):
+            rv_hs[12,i] = np.round(hs_tpl_tph['hs_'+str(periods[i])].max(),2)
+            rv_tp[12,i] = np.round(hs_tpl_tph['t2_'+str(periods[i])].where(hs_tpl_tph['hs_'+str(periods[i])]==hs_tpl_tph['hs_'+str(periods[i])].max()).max(),2)
+    else:
+        jpm = JointProbabilityModel(model)
+        jpm.fit(data,var_hs,var_tp)
+        for i,p in enumerate(periods):
+            rv = jpm.get_contour_maximum(p)
+            rv_hs[12,i] = rv[var_hs]
+            rv_tp[12,i] = rv[var_tp]
+
     # Initialize lists to store table data
     annual_prob =  [np.round(100/12,2)] * 12 + [100.00]
 
@@ -247,8 +272,86 @@ def table_monthly_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp
 
     return df
 
+def _table_directional_joint_hs_tp(
+        data,
+        var_hs,
+        var_tp,
+        var_dir,
+        periods,
+        NORSOK=False,
+        output_file="",
+        model="hs_tp",
+        sectors=12,
+        limit_to_omni=True,
+        empirical_dir_distribution=True):
 
-def table_directional_joint_distribution_Hs_Tp_return_values(data,var_hs='hs',var_tp='tp',var_dir='pdir',periods=[1,10,100,10000],adjustment='NORSOK', output_file='directional_Hs_Tp_joint_reurn_values.csv'):
+    aux_funcs.add_direction_sector(data,var_dir,sectors)
+    model = JointProbabilityModel(model)
+
+    if (not limit_to_omni) and NORSOK:
+        warnings.warn("NORSOK standard recommends Omni as upper bound for directional estimates, but got limit_to_omni==False.")
+    norsok_factor = sectors/2 if NORSOK else 1
+
+    RV = {}
+    for k,g in data.groupby("direction_sector"):
+        k = str(k)+'°'
+        RV[k] = {"Sector probability":len(g)/len(data)}
+
+        # Fit model
+        try:
+            model.fit(g,var_hs,var_tp)
+        except Exception as e:
+            warnings.warn(f"Could not fit sector {k}, most likely due to lack of data (N={len(g)}). Error message: {e}")
+            for rp in periods: RV[k][f"{rp}-year Hs"] = np.nan
+            continue
+        
+        # Adjust return periods for expected occurance frequency
+        if empirical_dir_distribution:
+            direction_factor = len(g)/len(data)
+        else:
+            direction_factor = 1/sectors
+
+        # Get joint return values
+        adjusted_return_periods = np.array(periods) * direction_factor * norsok_factor
+
+        for dir_rp,rp in zip(adjusted_return_periods,periods):
+            rv = model.get_contour_maximum(dir_rp)
+            RV[k][f"{rp}-year Hs"] = rv[var_hs]
+            RV[k][f"{rp}-year Tp"] = rv[var_tp]
+
+    # Annual
+    model.fit(data,var_hs,var_tp)
+    RV["Omni"] = {"Sector probability":100.}
+    for rp in periods:
+        rv = model.get_contour_maximum(rp)
+        RV["Omni"][f"{rp}-year Hs"] = rv[var_hs]
+        RV["Omni"][f"{rp}-year Tp"] = rv[var_tp]
+
+    RV = pd.DataFrame(RV).T
+
+    # Clip exeedances above omni
+    if limit_to_omni:
+        RV = RV.clip(upper=RV.loc["Omni"],axis=1)
+
+    if output_file:
+        RV.to_csv(output_file,float_format="%.2f")
+
+    return RV
+
+
+def table_directional_joint_distribution_Hs_Tp_return_values(
+        data,
+        var_hs='hs',
+        var_tp='tp',
+        var_dir='pdir',
+        periods=[1,10,100,10000],
+        adjustment='NORSOK', 
+        output_file='directional_Hs_Tp_joint_return_values.csv',
+        model="lonowe"):
+
+    if model != "lonowe": return _table_directional_joint_hs_tp(
+        data,var_hs,var_tp,var_dir,periods,(adjustment=="NORSOK"),output_file,model)
+
     weibull_params, return_periods, sector_prob, threshold_values, num_events_per_year = stats.directional_extremes(data=data, var=var_hs, var_dir=var_dir, periods=periods,distribution='Weibull3P_MOM', adjustment=adjustment)
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']    
     dir = ['-'] + [str(angle) + '°' for angle in np.arange(0,360,30)] + ['Omni']
