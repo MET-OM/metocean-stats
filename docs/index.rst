@@ -1954,7 +1954,13 @@ Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on
 .. image:: files/Bathymetry_cross_section_with_variable=salinity.png
 
 Verification Functions
-===================
+======================
+
+.. code-block:: python
+
+   from plots import verification
+   from tables import verification
+
 Scatter Plot
 ------------
 
@@ -1994,7 +2000,9 @@ Comparison tables between variables
 -----------------------------------
 
 For the comparison between two variables
+
 .. code-block:: python
+
    tables.table_error_metric(
       df,
       var_ref='HS',var_comp='HS.1',
@@ -2006,7 +2014,9 @@ For the comparison between two variables
    :file: files/table_error_metric.csv
 
 For the comparison between three variables or more
+
 .. code-block:: python
+
    plots.table_error_metric_multiple(
       df,
       var_ref='TP',var_comp=['TP.1','TP.2'],
@@ -2021,6 +2031,7 @@ Comparison table between 2 variables as a function of another variable
 ----------------------------------------------------------------------
 
 .. code-block:: python
+
    plots.table_binned_error_metric(
       df,
       var_bin='TP',var_bin_size=0.5,var_ref='HS',var_comp='HS.1',
@@ -2036,7 +2047,9 @@ Comparison plots between variables as a function of another variable
 --------------------------------------------------------------------
 
 For the comparison between two variables
+
 .. code-block:: python
+
    plots.plot_binned_error_metric(
       df,
       var_bin='W10',var_bin_size=0.5,var_bin_unit='m/s',
@@ -2049,7 +2062,9 @@ For the comparison between two variables
    :width: 500
 
 For the comparison between three variables
+
 .. code-block:: python
+
    plots.plot_binned_error_metric(
       df,
       var_bin='TP',var_bin_size=0.5,var_bin_unit='s',
@@ -2065,6 +2080,12 @@ For the comparison between three variables
 
 Climate and trends
 ==================
+
+.. code-block:: python
+
+   from plots import climate
+   from tables import climate
+
 Yearly stripes
 --------------
 
