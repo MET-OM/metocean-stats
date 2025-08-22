@@ -85,7 +85,7 @@ def table_yearly_1stat_vertical_levels(df, rad_colname='current_speed_', method=
     return result
 
 
-def table_linear_regression(df,var='air_temperature_2m',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=None):
+def table_linear_regression(df,var='air_temperature_2m',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file='table_linreg.csv'):
     
     """
     This function calculates linear regression parameters using Ordinary Least Squares,
@@ -109,21 +109,27 @@ def table_linear_regression(df,var='air_temperature_2m',stat='mean',method=['Lea
 
     Returns
     -------
-    pd.DataFrame
-    For Least-Squares: slope, intercept, and coefficient of determination R^2
-    For Theil-Sen: median slope, intercept, smallest, and highest slope
-    For Kendall: gives the tau and p-value
+    3 pd.DataFrame
+
+    DataFrame 1 is the linear regression table
+        For Least-Squares: slope, intercept, and coefficient of determination R^2
+        For Theil-Sen: median slope, intercept, smallest, and highest slope
+        For Kendall: gives the tau and p-value
+    DataFrame 2 is the statistic for all months over the whole period
+    DataFrame 3 is the yearly statistic
+    DataFrames 2 and 3 are the actual data from which the regressions are calculated and can be used for plotting purposes. 
+
+    If interested only in DataFrame 1, the function's usage is df1,_,_ = table_linear_regression(...)
 
     Authors
     -------
     Written by Dung M. Nguyen and clio-met
     """ 
+    months_names = calendar.month_abbr[1:]
+    months_names=months_names+['Year']
     
     df2=sg.stats_monthly_every_year(df,var=var,method=[stat])
     df3=table_yearly_stats(df,var=var,percentiles=[stat],output_file="")
-
-    months_names = calendar.month_abbr[1:]
-    months_names=months_names+['Year']
 
     df_out=pd.DataFrame()
 
@@ -204,12 +210,14 @@ def table_linear_regression(df,var='air_temperature_2m',stat='mean',method=['Lea
         tau_test.append(tau)
         tau_p_value.append(p_value)
         df_out['Kendall_tau']=tau_test
-        df_out['Kendal_p_value']=tau_p_value
+        df_out['Kendall_p_value']=tau_p_value
 
     df_out['index']=months_names
     df_out=df_out.set_index('index')
 
-    if output_file != None:
-        df_out.to_csv(output_file, index=True)
+    if output_file != '':
+        df_out1=df_out
+        df_out1=df_out1.round(3)
+        df_out1.to_csv(output_file, index=True)
 
     return df_out,df2,df3.iloc[:-1,:]
