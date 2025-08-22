@@ -269,23 +269,6 @@ Prob. of Non-Exceedance (fitted)
 .. image:: files/prob_non_exceedance_fitted_3p_weibull.png
   :width: 700  
 
-Joint Distribution - new system!
----------------------------------
-
-
-.. code-block:: python
-
-   from metocean_stats.CMA import JointProbabilityModel, predefined
-   model = JointProbabilityModel(predefined.get_DNVGL_Hs_Tz)
-   model.fit(df,"HS","TP")
-   ax = model.plot_contours(periods = [1,10,100,1000], method = "IFORM")
-   model.plot_dependent_percentiles(ax,percentiles=[0.05,0.5,0.95])
-   model.plot_data_scatter(ax)
-   model.plot_legend(ax)
-   ax.get_figure().savefig("hs_tp_contours.png")
-
-.. image:: files/metocean_contours_new.png
-   :width: 500
 
 Joint Distribution Hs-Tp Plot
 ------------------------------
@@ -303,6 +286,38 @@ Joint Distribution Hs-Tp Plot
    )
 
 .. image:: files/Hs.Tp.joint.distribution.png
+   :width: 500
+
+Joint 3D distribution Ws-Hs-Tp
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_3D_contour(
+       df, 
+       var1 = 'W10',
+       var2 = 'HS', 
+       var3 = 'TP', 
+       return_period=100
+   )
+
+.. image:: files/3D_contour.png
+   :width: 500
+
+Joint 3D distribution Ws-Hs-Tp cross-sections
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_3D_contour_slices(
+      df,
+      var1 = 'W10',
+      var2 = 'HS',
+      var3 = 'TP',
+      slice_values = [5,10,15,20,25]
+   )
+
+.. image:: files/3D_contour_slices.png
    :width: 500
 
 Monthly Joint Distribution Hs-Tp Parameter Table
