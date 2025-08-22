@@ -288,7 +288,22 @@ Joint Distribution Hs-Tp Plot
 .. image:: files/Hs.Tp.joint.distribution.png
    :width: 500
 
-Joint 3D distribution Ws-Hs-Tp
+Joint 2D distribution contours
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_2D_contour(
+       df, 
+       var1='HS', 
+       var2='TP', 
+       return_periods=[1,10,100,1000], 
+   )
+
+.. image:: files/contours.png
+   :width: 500
+
+Joint 3D distribution contour
 ------------------------------
 
 .. code-block:: python
@@ -304,7 +319,7 @@ Joint 3D distribution Ws-Hs-Tp
 .. image:: files/3D_contour.png
    :width: 500
 
-Joint 3D distribution Ws-Hs-Tp cross-sections
+Joint 3D distribution contour cross-sections
 ------------------------------
 
 .. code-block:: python

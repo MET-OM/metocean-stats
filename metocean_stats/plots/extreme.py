@@ -653,6 +653,7 @@ def plot_joint_3D_contour(
         return_period = return_period,
         state_duration = state_duration)
     model.plot_legend(ax)
+    ax.set_box_aspect(None,zoom=0.85)
     if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
     return ax
 
