@@ -7,6 +7,7 @@ from collections.abc import Callable
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import patches as mpatches
+from scipy.interpolate import interp1d
 
 import pyextremes
 import virocon
@@ -32,6 +33,7 @@ from .predefined import (
 from .contours import (
     get_contour,
     sort_contour,
+    split_contour,
 )
 
 def _load_preset(preset:str|Callable):
@@ -323,7 +325,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             elif "ContourSet" in str(artist): # The isodensity contours.
 
                 # The contour doesn't set correct limits, these must be manually provided.
-                contour = np.concatenate([np.array(seg).squeeze() for seg in artist.allsegs],axis=0)
+                contour = np.concatenate([np.array(line) for seg in artist.allsegs for line in seg],axis=0)
                 ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
                 self._reset_axlim(ax)
 
@@ -948,7 +950,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             coords = contour.coordinates
             coords = coords[np.abs(coords[:,slice_dim]-level)<slice_width]
             if len(coords)==0:
-                print(f"Warning: Found no contour points at level {level}+-{slice_width}. Skipped.")
+                warnings.warn(f"Found no contour points at level {level}+-{slice_width}. Skipped.")
                 continue
             coords = np.delete(coords,slice_dim,axis=1)
             coords = sort_contour(coords)
@@ -1145,7 +1147,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         # The contour doesn't set correct limits, these must be manually provided.
         if CS.allsegs:
-            contour = np.concatenate([np.array(seg).squeeze() for seg in CS.allsegs],axis=0)
+            contour = np.concatenate([np.array(line) for seg in CS.allsegs for line in seg],axis=0)
             ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
             self._reset_axlim(ax)
         else:
@@ -1302,6 +1304,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             state_duration = 1,
             range_interval = 0.5,
             n_samples = None,
+            slice_width = 0.01,
             contour_method = "IFORM"
         ):
         """
@@ -1364,37 +1367,144 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         if range_dim<0:range_dim=self.n_dim+range_dim
         if slice_dim<0:slice_dim=self.n_dim+slice_dim
-        free_dim = [i for i in range(3) if (i!=range_dim) and (i!=slice_dim)]
+        free_dim = [i for i in range(self.n_dim) if (i!=range_dim) and (i!=slice_dim)]
         if len(free_dim) != 1: raise ValueError(
             "range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
         free_dim = free_dim[0]
 
-        column_names = [
-            f'{self.semantics['names'][slice_dim]}',
-            f'{self.semantics['names'][range_dim]}',
-            f'{self.semantics['names'][free_dim]}: {return_period}-year-low',
-            f'{self.semantics['names'][free_dim]}: {return_period}-year-high'
-        ]
+        column_names = [] if self.n_dim==2 else [f'{self.semantics['names'][slice_dim]}']
+        column_names.append(f'{self.semantics['names'][range_dim]}')
+        column_names.append(f'{self.semantics['names'][free_dim]}: {return_period}-year-low')
+        column_names.append(f'{self.semantics['names'][free_dim]}: {return_period}-year-high')
 
         if self.n_dim == 3:
-            coords = coords[:,np.abs(coords[slice_dim]-slice_value)<0.05]
+            coords = coords[:,np.abs(coords[slice_dim]-slice_value)<slice_width]
             coords = coords[[i for i in range(3) if i!=slice_dim]]
             if range_dim > slice_dim: range_dim -= 1
             if free_dim > slice_dim: free_dim -= 1
 
-        if not range_values: 
+        if range_values is None:
             range_from = np.ceil(coords[range_dim].min()/range_interval)*range_interval
             range_to = np.ceil(coords[range_dim].max()/range_interval)*range_interval
             range_values = np.arange(range_from,range_to,range_interval)
+        else:
+            range_values = np.atleast_1d(range_values)
 
         table = []
         for range_value in range_values:
-            band = coords[:,np.abs(coords[range_dim]-range_value)<0.05]
+            band = coords[:,np.abs(coords[range_dim]-range_value)<slice_width]
+            if len(band[0])<10: 
+                warnings.warn(f"Too little data ({len(band[0])}) at {range_value}, outside contour? Or increase n_samples.")
+                continue
             free_low, free_high = band[free_dim].min(),band[free_dim].max()
-            table.append((slice_value,range_value,free_low,free_high))
+            row = [] if self.n_dim==2 else [slice_value]
+            table.append(row+[range_value,free_low,free_high])
 
         return pd.DataFrame(table,columns=column_names)
 
+    def table_isodensity_contour(
+            self,
+            range_values = None,
+            range_dim = -2,
+            slice_value = None,
+            slice_dim = -3,
+            range_interval = 0.5,
+            levels:list[float]=None,
+            points:np.ndarray=None,
+            n_grid_steps=720,
+            ):
+        """
+        Retrieve iso-density contour values in table format.
+
+        Parameters
+        -----------
+        levels : list[float]
+            List of probabilities to plot. Either this or return_values
+            can be specified.
+        points : np.ndarray
+            A list of marginal return values, of e.g. Hs,
+            from which to draw the isodensity contours.
+            This can also be a list of 2D points,
+            in which case they will be considered 
+            joint extremes (any point on a contour).
+        labels : list of strings, optional
+            Labels to use in the figure legend.
+        limits : tuple
+            Plot limits, e.g. ([0,10],[0,20])
+        n_grid_steps : int, default 720
+            The resolution of the contours (higher is better).
+            Increase this number if the contours are not smooth.
+        cmap : matplotlib colormap, optional
+            E.g. "viridis", "Spectral", etc.
+        contour_kwargs : dict, optional
+            Any other keyword arguments for matplotlib.pyplot.contour().
+            Example: {"linewidths": [1,2,3], "linestyles": ["solid","dotted","dashed"]}.
+        """
+
+        # Check dimensions
+        if range_dim<0:range_dim=self.n_dim+range_dim
+        if slice_dim<0:slice_dim=self.n_dim+slice_dim
+        free_dim = [i for i in range(self.n_dim) if (i!=range_dim) and (i!=slice_dim)]
+        if len(free_dim) != 1: raise ValueError("range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
+        free_dim = free_dim[0]
+
+        column_names = [] if self.n_dim==2 else [f'{self.semantics['names'][slice_dim]}']
+        column_names.append(f'{self.semantics['names'][range_dim]}')
+
+        self.reset_labels()
+        swap_axis_flag = self.swap_axis
+        self.swap_axis = False
+
+        if self.n_dim == 2:
+            ax = self.plot_isodensity_contours(levels=levels,points=points,n_grid_steps=n_grid_steps)
+
+        if self.n_dim == 3:
+            ax = self.plot_3D_isodensity_contour_slice(
+                density_levels=levels,
+                marginal_values=points,
+                slice_dim=slice_dim,
+                slice_value=slice_value,
+                grid_steps=n_grid_steps)            
+        self.swap_axis = swap_axis_flag
+
+        contours = [c for c in ax.get_children() if "QuadContourSet" in str(c)][0].allsegs[::-1]
+
+        for label in self.legend_labels:
+            column_names += ["Contour: "+label + f', {self.semantics['symbols'][slice_dim]}=low']
+            column_names += ["Contour: "+label + f', {self.semantics['symbols'][slice_dim]}=high']
+
+        # plt.close()
+
+        # Reduce to 2 dimensions
+        if self.n_dim == 3:
+            if range_dim > slice_dim: range_dim -= 1
+            if free_dim > slice_dim: free_dim -= 1
+
+        # Check range_values
+        if range_values is None:
+            min_val = np.min([c[0][:,range_dim].min() for c in contours])
+            max_val = np.max([c[0][:,range_dim].max() for c in contours])
+            range_from = np.ceil(min_val/range_interval)*range_interval
+            range_to   = np.floor(max_val/range_interval)*range_interval
+            range_values = np.arange(range_from.round(5),range_to.round(5)+range_interval,range_interval)
+        else:
+            range_values = np.atleast_1d(range_values)
+
+        if self.n_dim == 2:
+            table = []
+        elif self.n_dim == 3:
+            table = [[slice_value]*len(range_values)]
+        table.append(range_values)
+        for i,contour in enumerate(contours):
+            lhs,rhs = split_contour(contour[0],split_dim=free_dim)
+
+            tp_lhs = interp1d(lhs[:,range_dim],lhs[:,free_dim],bounds_error=False)(range_values)
+            tp_rhs = interp1d(rhs[:,range_dim],rhs[:,free_dim],bounds_error=False)(range_values)
+
+            table.append(tp_lhs)
+            table.append(tp_rhs)
+
+        return pd.DataFrame(table,index=column_names).T
 
     def get_default_semantics(self):
         """

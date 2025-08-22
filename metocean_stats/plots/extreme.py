@@ -598,7 +598,9 @@ def plot_joint_2D_contour(
     model = JointProbabilityModel(model)
     model.fit(data,var1,var2)
     ax = model.plot_contours(periods=return_periods,state_duration=state_duration)
-    model.plot_data_scatter(ax)
+    model.plot_data_density(ax)
+    model.plot_dependent_percentiles(ax)
+    model.plot_DNVGL_steepness_criterion(ax,label="Steepness\nlimit")
     model.plot_legend(ax)
     if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
     return ax
@@ -608,7 +610,7 @@ def plot_joint_3D_contour(
         model="u_hs_tp",
         return_period=100,
         state_duration=1,
-        output_file="3D_contour.pdf"
+        output_file="3D_contour.png"
         ):
     """
     Plot 3-dimensional IFORM contour.
@@ -660,7 +662,7 @@ def plot_joint_3D_contour_slices(
         slice_values=[5,10,15,20,25],
         return_period=100,
         state_duration=1,
-        output_file="3D_contour_slices.pdf"
+        output_file="3D_contour_slices.png"
         ):
     """
     Plot 3-dimensional IFORM contour.

@@ -41,7 +41,8 @@ __all__ = [
     "IFORMContour",
     "ISORMContour",
     "get_contour",
-    "sort_contour"
+    "sort_contour",
+    "split_contour",
 ]
 
 def get_contour(
@@ -153,6 +154,55 @@ def sort_contour(contour):
         # Eventually we should arrive back at the start.
         if nearest_idx == 0:
             return contour[ordered_indices]
+
+def split_contour(contour,split_dim):
+    """
+    Where "contour" is a Nx2 array, 
+    where each point in the array is placed to the previous, 
+    divide into left hand side and right hand side on the second coordinate (e.g., Tp),
+    and sort from low to high on the first coordinate (e.g., Hs).
+    """
+    range_dim = 0 if split_dim else 1
+
+    bot_idx = np.argmin(contour[:,range_dim])
+    top_idx = np.argmax(contour[:,range_dim])
+    i = 0
+    state = "none"
+    lhs = []
+    rhs = []
+    while True:
+        if i == len(contour): i = 0
+        
+        # We start counting at the bottom of the contour
+        if state == "none" and i == bot_idx:
+            if contour[i-1,split_dim] < contour[i,split_dim]:
+                state = "rhs"
+            else:
+                state = "lhs"
+
+        # If we reached top, switch side
+        elif i == top_idx:
+            if state == "lhs": 
+                state = "rhs"
+            elif state == "rhs":
+                state = "lhs"
+                
+        # If we reached bottom again, we stop
+        elif i == bot_idx: break
+
+        # Adding values depending on state
+        if state == "lhs": lhs.append(contour[i])
+        if state == "rhs": rhs.append(contour[i])
+
+        # Increment
+        i += 1
+
+    lhs = np.array(lhs)
+    lhs = lhs[np.argsort(lhs[:,range_dim])]
+    rhs = np.array(rhs)
+    rhs = rhs[np.argsort(rhs[:,range_dim])]
+
+    return lhs,rhs
 
 def get_random_unit_sphere_points(n_dim,n_samples):
     """

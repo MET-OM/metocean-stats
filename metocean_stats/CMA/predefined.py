@@ -70,8 +70,8 @@ def get_DNVGL_Hs_Tz():
         conditions and environmental loads.
 
     """
-    # def _lnsquare2(x, a1, a2, a3):
-    #     return np.log(a1 + a2 * np.sqrt(a3*x))
+    def _lnsquare(x, a1, a2, a3):
+        return np.log(a1 + a2 * np.sqrt(a3*x))
 
     def _power3(x, a1, a2, a3):
         return a1 + a2 * x**a3
@@ -92,8 +92,8 @@ def get_DNVGL_Hs_Tz():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {
-            #"mu": virocon.DependenceFunction(_lnsquare, bounds_mu, latex="$\ln(a1 + a2 \sqrt{a3 * x})$"), 
-            "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
+            "mu": virocon.DependenceFunction(_lnsquare, bounds_mu, latex="$\ln(a1 + a2 \sqrt{a3 * x})$"), 
+            # "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
             "sigma": virocon.DependenceFunction(_exp3, bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$")
             },
     }
