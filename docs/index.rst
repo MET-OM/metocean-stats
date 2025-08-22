@@ -2017,7 +2017,7 @@ For the comparison between three variables or more
 
 .. code-block:: python
 
-   plots.table_error_metric_multiple(
+   tables.table_error_metric_multiple(
       df,
       var_ref='TP',var_comp=['TP.1','TP.2'],
       error_metric=['scatter_index','rmse','bias','mae','corr'],
@@ -2032,7 +2032,7 @@ Comparison table between 2 variables as a function of another variable
 
 .. code-block:: python
 
-   plots.table_binned_error_metric(
+   tables.table_binned_error_metric(
       df,
       var_bin='TP',var_bin_size=0.5,var_ref='HS',var_comp='HS.1',
       threshold_min=0,
