@@ -609,3 +609,40 @@ def magnitude_calculation(u,v):
     return(magnitude)
 
 
+def merge_identical_dataframes(data):
+    """
+    The function merges two or more dataframes
+    if the index is not similar, it should give NaN
+
+    Parameters
+    ----------
+    data: list of pd.DataFrame
+        Should contain at least two dataframes
+
+    Returns
+    -------
+    df_out: pd.DataFrame
+        One dataframe containing all dataframes in data
+
+    Authors
+    -------
+    clio-met
+    """
+    col_names=[]
+    for i in range(len(data)):
+        col_names.append(list(data[i].columns.values))
+
+    col_names_new=[]
+    for i in range(len(col_names)):
+        new_names=[n+'_'+str(i) for n in col_names[i]]
+        col_names_new.append(new_names)
+
+    df_out=pd.DataFrame()
+    for i in range(len(col_names)):
+        my_dictionary = dict(zip(col_names[i], col_names_new[i]))
+        data[i].rename(columns=my_dictionary,inplace=True)
+        del my_dictionary
+        
+    df_out=data[0].join(data[1:])
+
+    return df_out
