@@ -4,13 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from metocean_stats import plots
+from metocean_stats.plots.climate import *
 from metocean_stats.stats.aux_funcs import readNora10File
+from .data import synthetic_dataset
 
 # Define TimeSeries-object for NORA3
 dirname = os.path.dirname(__file__)
 ds =    readNora10File(os.path.join(dirname, 'data/NORA_test.txt'))
 ds_ocean = pd.read_csv(os.path.join(dirname, 'data/NorkystDA_test.csv'),comment='#',index_col=0, parse_dates=True)
 depth = ['0m', '1m', '2.5m', '5m', '10m', '15m', '20m', '25m', '30m', '40m', '50m', '75m', '100m', '150m', '200m']
+ds_synthetic_spectra = synthetic_dataset.synthetic_dataset_spectra()
 
 
 def test_plot_scatter(ds=ds):
@@ -243,19 +246,19 @@ def test_plot_monthly_return_periods_cur_pot(ds=ds_ocean):
     else:
         raise ValueError("FigValue is not correct")
 
-#def test_threshold_sensitivity(ds=ds):
-#    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
-#                                        thresholds=[1,1.5])
+# #def test_threshold_sensitivity(ds=ds):
+# #    extreme_stats.threshold_sensitivity(data=ds.data, var='hs', 
+# #                                        thresholds=[1,1.5])
                                         
-#def test_joint_distribution_Hs_Tp(ds=ds):
-#    extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
-#    os.remove('test.png')
+# #def test_joint_distribution_Hs_Tp(ds=ds):
+# #    extreme_stats.joint_distribution_Hs_Tp(df=ds.data, file_out='test.png')
+# #    os.remove('test.png')
 
-#def test_mean_profile(ds=ds):
-#    profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
+# #def test_mean_profile(ds=ds):
+# #    profile_stats.mean_profile(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], perc = [25,75], output_file=False)
     
-#def test_profile_shear(ds=ds):
-#    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
+# #def test_profile_shear(ds=ds):
+# #    profile_stats.profile_shear(data = ds.data, vars = ['wind_speed_10m','wind_speed_20m','wind_speed_50m','wind_speed_100m','wind_speed_250m','wind_speed_500m','wind_speed_750m'],height_levels=[10,20,50,100,250,500,750], z=[20,250], perc = [25,75], output_file=False)
 
 def test_plot_nb_hours_below_threshold(ds=ds):
     output_file = 'test_plot_nb_hr_below_t.png'
@@ -280,7 +283,7 @@ def test_plot_multi_diagnostic_with_uncertainty(ds=ds):
     
 
 def test_plot_multi_joint_distribution_Hs_Tp_var3(ds=ds):
-    output_file = 'test_mulit_joint_distribution_Hs_Tp_var3.png'
+    output_file = 'test_mutli_joint_distribution_Hs_Tp_var3.png'
     fig = plots.plot_multi_joint_distribution_Hs_Tp_var3(ds,var_hs='HS',var_tp='TP',var3='W10',var3_units='m/s',periods=[100],var3_bin=10,threshold_min=100,output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
@@ -379,10 +382,12 @@ def test_plot_monthly_stats_month_xticks():
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 
 
-def test_plot_taylor_diagram():
+def test_plot_taylor_diagram(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda: None)  # override plt.show to no-op
     fig = plots.taylor_diagram(ds,var_ref=['HS'],var_comp=['HS.1','HS.2'],norm_std=True,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+    plt.close(fig)
 
 # def test_plot_environmental_contours_hs_tp():
 #     figures = plot_environmental_contours(ds,'HS','TP',config='DNVGL_hs_tp',save_path='total_sea_hs_tp_')
@@ -397,3 +402,28 @@ def test_plot_cca_profile():
     fig = plots.plot_cca_profiles(ds_ocean,var='current_speed_',month=None,return_period=10,output_file="")
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
+
+def test_plot_spectra_1d():
+    output_file = 'test_plot_monthly_spectra_1d.png'
+    fig = plots.plot_spectra_1d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_spectrum_2d():
+    output_file = 'test_plot_spectrum_2d.png'
+    fig = plots.plot_spectrum_2d(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_diana_spectrum():
+    output_file = 'test_plot_diana_spectrum.png'
+    fig = plots.plot_diana_spectrum(data=ds_synthetic_spectra, var='SPEC', period=None, month=None, method='mean', partition=False, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+def test_plot_spectra_2d():
+    output_file = 'test_plot_dir_mean_2dspectrum.png'
+    fig = plots.plot_spectra_2d(data=ds_synthetic_spectra, var='SPEC', method='monthly_mean', output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+

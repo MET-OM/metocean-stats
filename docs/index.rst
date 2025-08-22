@@ -1608,22 +1608,108 @@ CCA profiles Table
    :header-rows: 1
    :file: files/table_cca_profiles.csv
 
-Directional Wave Energy Spectrum Plot
+
+Wave Spectrum Plots
 -----------------------------------------
+
+Monthly Mean 1D Wave Spectrum
 
 .. code-block:: python
 
-   plots.plot_spectrum(
-       spectrum, 
-       frequencies,
-       directions, 
-       spec_unit='m**2 s',
-       radius='frequency',
-       log_radius=False,
-       output_file='Spectrum_plot.png')
+   plots.plot_spectra_1d(
+      data, 
+      var = 'SPEC',
+      period = None,
+      month = None,
+      method = 'mean',
+      output_file  = 'wave_spectrum_1d_months.png'
    )
 
-.. image:: files/Spectrum_plot.png
+.. image:: files/wave_spectrum_1d_months.png
+   :width: 500
+
+1D Spectrum Mean for a Specific Month Across Several Years
+
+.. code-block:: python
+
+   plots.plot_spectra_1d(
+      data, 
+      var = 'SPEC',
+      period = None,
+      month = 1,
+      method = 'mean',
+      output_file  = 'wave_spectrum_1d_month.png'
+   )
+
+.. image:: files/wave_spectrum_1d_month.png
+   :width: 500
+
+2D Wave Spectrum at Time of Maximum Hm0 in Selected Period
+
+.. code-block:: python
+
+   plots.plot_spectrum_2d(
+      data, 
+      var = 'SPEC',
+      period = ('2021-01-01T00', '2024-12-31T23'),
+      month = None,
+      method = 'hm0_max',
+      plot_type = 'pcolormesh',
+      output_file  = 'wave_spectrum_2d.png'
+   )
+
+.. image:: files/wave_spectrum_2d.png
+   :width: 500
+
+Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile
+
+.. code-block:: python
+
+   plots.plot_diana_spectrum(
+      data, 
+      var = 'SPEC',
+      period = ('2022-01-01T00', '2022-07-31T23'),
+      month = None,
+      method = 'top_1_percent_mean',
+      partition=True,
+      plot_type = 'pcolormesh'
+      freq_mask=True,
+      output_file  = 'wave_spectrum_diana.png'
+   )
+
+.. image:: files/wave_spectrum_diana.png
+   :width: 500
+
+2D Monthly Mean Wave Spectra
+
+.. code-block:: python
+
+   plots.plot_spectra_2d(
+      data, 
+      var = 'SPEC',
+      method = 'mean',
+      plot_type = 'contour',
+      cbar = 'multiple',
+      output_file  = 'wave_spectra_2d_monthly_mean.png'
+   )
+
+.. image:: files/wave_spectra_2d_monthly_mean.png
+   :width: 500
+
+Directional Wave Spectra Averaged by Peak Wave Direction in 30° Sectors
+
+.. code-block:: python
+
+   plots.plot_spectra_2d(
+      data,         
+      var = 'SPEC',
+      method = 'direction'
+      plot_type = 'contour',
+      cbar = 'single',
+      output_file  = 'wave_spectra_2d_direction.png'
+   )
+
+.. image:: files/wave_spectra_2d_direction.png
    :width: 500
 
 Tidal Levels Table
@@ -1935,6 +2021,115 @@ Taylor diagram
 
 .. image:: files/Taylor_diagram.png
    :width: 500
+
+
+Climate and trends
+==================
+Yearly stripes
+--------------
+
+.. code-block:: python
+
+   plots.plot_yearly_stripes(
+      df,
+      var_name='HS',
+      method= 'mean',
+      ylabel='Hs [m]',
+      output_file='Yearly_stripes.png')
+
+.. image:: files/Yearly_stripes.png
+   :width: 500
+
+Monthly and yearly heatmap
+--------------------------
+
+.. code-block:: python
+
+   plots.plot_heatmap_monthly_yearly(
+      df,
+      var_name='T2m',
+      method= 'mean',
+      cb_label='2-m temperature [°C]',
+      output_file='Heatmap_monthly_yearly.png')
+
+.. image:: files/Heatmap_monthly_yearly.png
+   :width: 500
+
+Yearly vertical profiles
+------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='current_speed_',
+      method= 'mean',
+      yaxis_direction='down',
+      xlabel='Current speed [m/s]',
+      output_file='Yearly_vertical_profiles_current.png')
+
+.. image:: files/Yearly_vertical_profiles_current.png
+   :width: 500
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='W',
+      method= 'mean',
+      yaxis_direction='up',
+      xlabel='Wind speed [m/s]',
+      output_file='Yearly_vertical_profiles_wind.png')
+
+.. image:: files/Yearly_vertical_profiles_wind.png
+   :width: 500
+
+.. code-block:: python
+
+   plots.plot_heatmap_profiles_yearly(
+      df,
+      rad_colname='W',
+      cb_label='Wind speed [m/s]',
+      yaxis_direction='up',
+      method='P80',
+      output_file='Heatmap_yearly_profiles_wind.png')
+
+.. image:: files/Heatmap_yearly_profiles_wind.png
+   :width: 500
+
+Linear regression Plot and Table
+--------------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      var='HS',
+      time='Year',
+      stat='P70',
+      method=['Least-Squares','Theil-Sen'],
+      confidence_interval=0.95,
+      ylabel='Hs [m]',
+      output_figure='Linear_regression.png')
+
+.. image:: files/Linear_regression.png
+   :width: 500
+
+.. code-block:: python
+
+   tables.table_linear_regression(
+      df,
+      var='HS',
+      stat='mean',
+      method=['Least-Squares','Theil-Sen','Kendall-tau'],
+      confidence_interval=0.95,
+      intercept=True, 
+      output_file='table_linear_regression.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_linear_regression.csv
 
 Auxiliary Functions
 ===================

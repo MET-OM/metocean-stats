@@ -130,7 +130,7 @@ plots.taylor_diagram(
 # # fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum',title='Min. Sea Temperature [°C]', output_file='plot_min_temp_profile_monthly_stats.png')
 # # fig = plots.plot_profile_monthly_stats(ds_ocean, var=['temp_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='maximum',title='Max. Sea Temperature [°C]', output_file='plot_max_temp_profile_monthly_stats.png')
 
-# # # Sainity:
+# # # Salinity:
 # # df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='mean', output_file='table_mean_sal_profile_monthly_stats.png')
 # # df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='std.dev', output_file='table_std_sal_profile_monthly_stats.png')
 # # df = tables.table_profile_monthly_stats(ds_ocean, var=['salt_' + d for d in depth], z=[float(d[:-1]) for d in depth], method='minimum', output_file='table_min_sal_profile_monthly_stats.png')
@@ -150,3 +150,4 @@ plots.taylor_diagram(
 # #fig = plots.plot_storm_surge_for_given_hs(df,var_surge='zeta_0m', var_hs='HS', max_hs=20, output_file='surge_for_given_hs.png')
 # #df = tables.table_extreme_total_water_level(df, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[100,10000], output_file='table_extreme_total_water_level.csv')
 # #df = tables.table_storm_surge_for_rv_hs(df, var_hs='HS',var_tp='TP',var_surge='zeta_0m', var_tide='tide', periods=[1,10,100,10000],depth=200, output_file='table_storm_surge_for_rv_hs.csv')
+# #tide_type = stats.tidal_type(ds_tide,var='tide')

@@ -1243,6 +1243,6 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     ax.set_xlim(lev[0],lev[-1])
     plt.grid(color='lightgray',linestyle=':')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
     return fig
 
