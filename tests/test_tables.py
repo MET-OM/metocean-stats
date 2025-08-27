@@ -53,7 +53,7 @@ def test_table_directional_non_exceedance(ds=ds):
 
 def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
     output_file = 'test_monthly_joint_distribution_Hs_Tp_param.csv'
-    df = tables.table_monthly_joint_distribution_Hs_Tp_param(ds, var_hs='HS', var_tp='TP', periods=[1, 10, 100, 10000], output_file=output_file)
+    df = tables.table_monthly_joint_distribution_Hs_Tp_param(ds, var_hs='HS', var_tp='TP', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (13, 6):
@@ -63,7 +63,7 @@ def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
 
 def test_table_directional_joint_distribution_Hs_Tp_param(ds=ds):
     output_file = 'test_directional_joint_distribution_Hs_Tp_param.csv'
-    df = tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100],output_file=output_file)
+    df = tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (13, 6):

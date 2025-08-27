@@ -559,6 +559,7 @@ Monthly Joint Distribution Hs-Tp Return Values Table
        var_hs='HS', 
        var_tp='TP', 
        periods=[1,10,100,10000], 
+       model='lonowe' # change to 'hs_tp' for DNV model
        output_file='monthly_Hs_Tp_joint_return_values.csv'
    )
 
@@ -578,6 +579,7 @@ Directional Joint Distribution Hs-Tp Return Values Table
        var_dir='DIRM', 
        periods=[1,10,100,1000], 
        adjustment='NORSOK', 
+       model='lonowe' # change to 'hs_tp' for DNV model
        output_file='directional_Hs_Tp_joint_return_values.csv'
    )
 
