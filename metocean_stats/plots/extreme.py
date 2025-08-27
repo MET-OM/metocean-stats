@@ -848,7 +848,7 @@ def plot_joint_distribution_Hs_Tp(
     plt.ylim([0,np.round(hs_tpl_tph['hs_'+str(np.max(periods))].max()+1)])
     plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
     
-    return ax
+    return fig
 
 def plot_bounds(file='NORA10_6036N_0336E.1958-01-01.2022-12-31.txt'):
     

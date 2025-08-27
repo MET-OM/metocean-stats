@@ -295,7 +295,7 @@ def _table_directional_joint_hs_tp(
     RV = {}
     for k,g in data.groupby("direction_sector"):
         k = str(k)+'°'
-        RV[k] = {"Sector probability":len(g)/len(data)}
+        RV[k] = {"Sector probability":100*len(g)/len(data)}
 
         # Fit model
         try:
