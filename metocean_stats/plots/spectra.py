@@ -224,7 +224,8 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
     cbar.set_label(r'Variance Density [$\mathrm{' + spec.units.replace('**', '^') + '}$]', fontsize=14)
     cbar.ax.tick_params(labelsize=14)
 
-    label = rf'$\mathbf{{Method:}}\ {method.replace("_", r"\_")}$' + '\n' if isinstance(period, tuple) else None
+    method_label = method.replace("_", r"\_")
+    label = f'$\mathbf{{Method:}}\ {method_label}$' + '\n' if isinstance(period, tuple) else None
 
     # Labels
     if month is None:
@@ -241,7 +242,11 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
         label2 = (rf"$\mathbf{{Timestamp:}}$ {period_label}" + rf"  (Hm0 = {np.round(data_aggregated['hm0'].values.item(), 1)})" + "\n")
 
         times = pd.to_datetime(filtered_data.time.values)
-        label2 += rf"$\mathbf{{Range:}}$ {(times.min().strftime('%Y-%m-%dT%H') + 'Z' if times.min() == times.max() else f'{times.min().strftime('%Y-%m-%dT%H') + 'Z'} to {times.max().strftime('%Y-%m-%dT%H') + 'Z'}')}"
+        label2 += rf"$\mathbf{{Range:}}$ " + (
+            f"{times.min().strftime('%Y-%m-%dT%H')}Z"
+            if times.min() == times.max()
+            else f"{times.min().strftime('%Y-%m-%dT%H')}Z to {times.max().strftime('%Y-%m-%dT%H')}Z"
+        )
 
     elif method == 'hm0_top3_mean':
         hm0_top3_timesteps = [pd.to_datetime(t).strftime('%Y-%m-%dT%H') + 'Z' for t in data_aggregated.attrs['hm0_top3_timesteps']]
@@ -249,8 +254,14 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
 
         label2 = (rf"$\mathbf{{Timestamps:}}$ {period_label}" + " " * 15 + "\n")
         times = pd.to_datetime(filtered_data.time.values)
-        label2 += rf"$\mathbf{{Range:}}$ {(times.min().strftime('%Y-%m-%dT%H') + 'Z' if times.min() == times.max() else f'{times.min().strftime('%Y-%m-%dT%H') + 'Z'} to {times.max().strftime('%Y-%m-%dT%H') + 'Z'}')}" 
-
+        label2 += (
+            rf"$\mathbf{{Range:}}$ "
+            f"{times.min().strftime('%Y-%m-%dT%H')}Z"
+            if times.min() == times.max()
+            else rf"$\mathbf{{Range:}}$ "
+            f"{times.min().strftime('%Y-%m-%dT%H')}Z to {times.max().strftime('%Y-%m-%dT%H')}Z"
+        )
+        
     label = label + label2 if label != None else label2
 
     ax.text(-0.07,-0.15,label,
