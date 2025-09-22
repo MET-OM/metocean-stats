@@ -1630,7 +1630,8 @@ Wave Spectrum Plots
    :width: 500
 
 **Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:**         
-   - note: Partitioning requires that the wave spetra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
+
+- note: Partitioning requires that the wave spetra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
 
 .. code-block:: python
 
