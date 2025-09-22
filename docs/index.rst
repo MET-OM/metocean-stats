@@ -2003,7 +2003,13 @@ Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on
 .. image:: files/Bathymetry_cross_section_with_variable=salinity.png
 
 Verification Functions
-===================
+======================
+
+.. code-block:: python
+
+   from plots import verification
+   from tables import verification
+
 Scatter Plot
 ------------
 
@@ -2025,7 +2031,7 @@ Scatter Plot
    :width: 500
 
 Taylor diagram
-------------
+--------------
 
 .. code-block:: python
 
@@ -2039,9 +2045,96 @@ Taylor diagram
 .. image:: files/Taylor_diagram.png
    :width: 500
 
+Comparison tables between variables
+-----------------------------------
+
+For the comparison between two variables
+
+.. code-block:: python
+
+   tables.table_error_metric(
+      df,
+      var_ref='HS',var_comp='HS.1',
+      error_metric=['bias','mae','rmse','scatter_index','corr'],
+      output_file='table_error_metric.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_error_metric.csv
+
+For the comparison between three variables or more
+
+.. code-block:: python
+
+   tables.table_error_metric_multiple(
+      df,
+      var_ref='TP',var_comp=['TP.1','TP.2'],
+      error_metric=['scatter_index','rmse','bias','mae','corr'],
+      output_file='table_error_metric_multiple.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_error_metric_multiple.csv
+
+Comparison table between 2 variables as a function of another variable
+----------------------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_binned_error_metric(
+      df,
+      var_bin='TP',var_bin_size=0.5,var_ref='HS',var_comp='HS.1',
+      threshold_min=0,
+      error_metric=['bias','scatter_index'],
+      output_file='table_binned_error_metric.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_binned_error_metric.csv
+
+Comparison plots between variables as a function of another variable
+--------------------------------------------------------------------
+
+For the comparison between two variables
+
+.. code-block:: python
+
+   plots.plot_binned_error_metric(
+      df,
+      var_bin='W10',var_bin_size=0.5,var_bin_unit='m/s',
+      var_ref='HS',var_comp=['HS.1'],var_comp_unit='m',
+      threshold_min=100,
+      error_metric='bias',
+      output_file='plot_binned_error_metric_2var.png')
+
+.. image:: files/plot_binned_error_metric_2var.png
+   :width: 500
+
+For the comparison between three variables
+
+.. code-block:: python
+
+   plots.plot_binned_error_metric(
+      df,
+      var_bin='TP',var_bin_size=0.5,var_bin_unit='s',
+      var_ref='HS',var_comp=['HS.1','HS.2'],var_comp_unit='m',
+      threshold_min=100,
+      error_metric='corr',
+      output_file='plot_binned_error_metric_3var.png')
+
+.. image:: files/plot_binned_error_metric_3var.png
+   :width: 500
+
+
 
 Climate and trends
 ==================
+
+.. code-block:: python
+
+   from plots import climate
+   from tables import climate
+
 Yearly stripes
 --------------
 

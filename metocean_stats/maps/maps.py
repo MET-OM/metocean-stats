@@ -182,8 +182,12 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
 
     if bathymetry == 'NORA3':
         ds = xr.open_dataset('https://thredds.met.no/thredds/dodsC/windsurfer/mywavewam3km_files/2022/12/20221231_MyWam3km_hindcast.nc')
-        standard_lon, standard_lat, _ = get_transformed_coordinates(ds, 'rlon', 'rlat', projection_type='rotated_pole')
         depth = ds['model_depth'].values
+        lonarr = ds['longitude'].values
+        latarr = ds['latitude'].values
+        ds.close()
+        del ds
+        print(np.shape(lonarr))
     else:
         pass
 
@@ -196,20 +200,28 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
         lon_min, lon_max = max(min(lon_list) - 5, -180), min(max(lon_list) + 5, 180)
     else:
         lon_min, lon_max = lon_lim
+    print(lon_min,lon_max)
+    print(lat_min,lat_max)
 
     # Central longitude
     c_l=lon_min+(lon_max-lon_min)/2
 
     # Markers customization
-    nl=len(label)-1
-    if nl>14:
-        print('The number of points to plot should be < 14')
-        return
-    colors=['k']*nl+['r']
-    markers_symb=['+','D','x','s','o','^','*','v','d','<','p','>','h']
-    markers=markers_symb[0:nl]+['o']
-    markerfacecolors=["None"]*nl+['r']
-    markersize=[10]*nl+[8]
+    if len(lon)>1:
+        nl=len(label)-1
+        if nl>14:
+            print('The number of points to plot should be < 14')
+            return
+        colors=['k']*nl+['r']
+        markers_symb=['+','D','x','s','o','^','*','v','d','<','p','>','h']
+        markers=markers_symb[0:nl]+['o']
+        markerfacecolors=["None"]*nl+['r']
+        markersize=[10]*nl+[8]
+    else:
+        colors=['r']
+        markers=['o']
+        markerfacecolors=colors
+        markersize=[10]
 
     # Plotting
     fig = plt.figure(figsize=(10, 8))
@@ -225,12 +237,11 @@ def plot_points_on_map_lc(lon,lat,label,bathymetry='NORA3',output_file='map.png'
 
     if bathymetry == 'NORA3':
         mask_extent = (
-            (standard_lon >= lon_min-2) & (standard_lon <= lon_max-2) &
-            (standard_lat >= lat_min-2) & (standard_lat <= lat_max-2)
+            (lonarr <= lon_min-2) | (lonarr >= lon_max+2) &
+            (latarr <= lat_min-2) | (latarr >= lat_max+2)
         )
-        depth_extent = np.ma.masked_where(~mask_extent, depth)
-        cont = ax.contourf(standard_lon, standard_lat, depth_extent, levels=np.arange(0,np.nanmax(depth_extent)+100,int(np.nanmax(depth_extent)/30)),
-                           cmap='binary', transform=ccrs.PlateCarree())
+        depth_extent = np.ma.masked_where(mask_extent, depth)
+        cont = ax.contourf(lonarr, latarr, depth_extent, cmap='binary', levels=30, transform=ccrs.PlateCarree())
         cbar = plt.colorbar(cont, orientation='vertical', pad=0.02, aspect=16, shrink=0.8)
         cbar.ax.tick_params(labelsize=14)
         cbar.set_label('Depth [m]',fontsize=15)
