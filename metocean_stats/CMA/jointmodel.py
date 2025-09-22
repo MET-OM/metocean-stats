@@ -128,12 +128,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 semantics = self.get_default_semantics()
         
         if "swap_axis" not in semantics:
-            semantics["swap_axis"] = False
+            semantics['swap_axis'] = False
 
         self.dist_descriptions = dist_descriptions
         self.fit_descriptions = fit_descriptions
         self.semantics = semantics
-        self.swap_axis = semantics["swap_axis"]
+        self.swap_axis = semantics['swap_axis']
 
         # Store of handles and labels, for producing a legend.
         self.legend_handles = []
@@ -281,7 +281,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             levels = self.pdf(points)
 
             if labels is None:
-                sym0,sym1 = self.semantics["symbols"]
+                sym0,sym1 = self.semantics['symbols']
                 if marginal_labels:
                     labels = [sym0+f"={p[0]:.1f}" for p in points]
                 else:
@@ -569,7 +569,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
 
         if limit is None:
-            limit = 1.5*np.max(self.data.values[:,0])
+            limit = 1.1*np.max(self.data.values[:,0])
         marginal = np.arange(0,limit,0.001)
 
         # Plot percentile lines.
@@ -1249,7 +1249,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         if ax is None:
             _,ax = plt.subplots(subplot_kw={"projection":"3d"})
-        ax.plot_surface(Z,X,Y,**kwargs)
+        ax.plot_surface(Z,Y,X,**kwargs)
         self.plot_semantics(ax=ax)
 
         return ax
@@ -1372,10 +1372,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             "range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
         free_dim = free_dim[0]
 
-        column_names = [] if self.n_dim==2 else [f'{self.semantics['names'][slice_dim]}']
-        column_names.append(f'{self.semantics['names'][range_dim]}')
-        column_names.append(f'{self.semantics['names'][free_dim]}: {return_period}-year-low')
-        column_names.append(f'{self.semantics['names'][free_dim]}: {return_period}-year-high')
+        column_names = [] if self.n_dim==2 else [f"{self.semantics['names'][slice_dim]}"]
+        column_names.append(f"{self.semantics['names'][range_dim]}")
+        column_names.append(f"{self.semantics['names'][free_dim]}: {return_period}-year-low")
+        column_names.append(f"{self.semantics['names'][free_dim]}: {return_period}-year-high")
 
         if self.n_dim == 3:
             coords = coords[:,np.abs(coords[slice_dim]-slice_value)<slice_width]
@@ -1448,8 +1448,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if len(free_dim) != 1: raise ValueError("range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
         free_dim = free_dim[0]
 
-        column_names = [] if self.n_dim==2 else [f'{self.semantics['names'][slice_dim]}']
-        column_names.append(f'{self.semantics['names'][range_dim]}')
+        column_names = [] if self.n_dim==2 else [f"{self.semantics['names'][slice_dim]}"]
+        column_names.append(f"{self.semantics['names'][range_dim]}")
 
         self.reset_labels()
         swap_axis_flag = self.swap_axis
@@ -1470,10 +1470,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         contours = [c for c in ax.get_children() if "QuadContourSet" in str(c)][0].allsegs[::-1]
 
         for label in self.legend_labels:
-            column_names += ["Contour: "+label + f', {self.semantics['symbols'][slice_dim]}=low']
-            column_names += ["Contour: "+label + f', {self.semantics['symbols'][slice_dim]}=high']
+            column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=low"]
+            column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=high"]
 
-        # plt.close()
+        plt.close()
 
         # Reduce to 2 dimensions
         if self.n_dim == 3:
@@ -1595,9 +1595,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                             eq = conditional.latex # dependency function
                             parameters.append({
                                 "Distribution":type(dis.distribution).__name__.removesuffix("Distribution"),
-                                "Variable":self.semantics["symbols"][i],
+                                "Variable":self.semantics['symbols'][i],
                                 "Distribution parameter":param,
-                                "Dependent on":self.semantics["symbols"][self.conditional_on[i]],
+                                "Dependent on":self.semantics['symbols'][self.conditional_on[i]],
                                 "Dependency function":"Missing" if eq is None else eq.replace("$",""),
                                 "Dependency parameter":p,
                                 "Value":v})
@@ -1619,7 +1619,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 if complete:
                     parameters.append({
                         "Distribution":dist_type.__name__.removesuffix("Distribution"),
-                        "Variable":self.semantics["symbols"][i],
+                        "Variable":self.semantics['symbols'][i],
                         "Distribution parameter":param,
                         "Dependent on":"-" if self.conditional_on[i] is None else "Fixed",
                         "Dependency function":"-",
