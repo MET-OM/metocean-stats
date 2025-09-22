@@ -1580,7 +1580,7 @@ CCA profiles Table
 Wave Spectrum Plots
 -----------------------------------------
 
-Monthly Mean 1D Wave Spectrum
+Monthly Mean 1D Wave Spectrum:
 
 .. code-block:: python
 
@@ -1596,7 +1596,7 @@ Monthly Mean 1D Wave Spectrum
 .. image:: files/wave_spectrum_1d_months.png
    :width: 500
 
-1D Spectrum Mean for a Specific Month Across Several Years
+1D Spectrum Mean for a Specific Month Across Several Years:
 
 .. code-block:: python
 
@@ -1612,7 +1612,7 @@ Monthly Mean 1D Wave Spectrum
 .. image:: files/wave_spectrum_1d_month.png
    :width: 500
 
-2D Wave Spectrum at Time of Maximum Hm0 in Selected Period
+2D Wave Spectrum at Time of Maximum Hm0 in Selected Period:
 
 .. code-block:: python
 
@@ -1629,7 +1629,15 @@ Monthly Mean 1D Wave Spectrum
 .. image:: files/wave_spectrum_2d.png
    :width: 500
 
-Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile
+Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:
+- note: Partitioning requires that the wave spetra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
+
+.. code-block:: python
+
+   spec_funcs.combine_spec_wind(NORA3_wave_spec, NORA3_wind_sub)
+
+The plotting function can also be used without combining with wind data. However, in that case, partitioning will not be available.
+Once the datasets are combined, the following code can be used to generate the plot:
 
 .. code-block:: python
 
