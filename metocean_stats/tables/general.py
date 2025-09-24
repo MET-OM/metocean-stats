@@ -365,9 +365,9 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var: str, step_var: float, 
 
     # Categorize data into bins
     data[var+'-level'] = pd.cut(data[var], bins=bins, labels=labels[1:])
-    
+
     # Group by month and var bin, then count occurrences
-    grouped = data.groupby([data.index.month, var+'-level'], observed=True).size().unstack(fill_value=0)
+    grouped = data.groupby([data.index.month, var+'-level'], observed=False).size().unstack(fill_value=0)
 
     # Calculate percentage of time each data bin occurs in each month
     percentage_by_month = grouped.div(grouped.sum(axis=1), axis=0) * 100
@@ -376,13 +376,13 @@ def table_monthly_non_exceedance(data: pd.DataFrame, var: str, step_var: float, 
     cumulative_percentage = percentage_by_month.T.cumsum()
 
     # Insert 'Annual', 'Mean', 'P99', 'Maximum' rows
-    cumulative_percentage.loc['Minimum'] = data.groupby(data.index.month, observed=True)[var].min()
-    cumulative_percentage.loc['Mean'] = data.groupby(data.index.month, observed=True)[var].mean()
-    cumulative_percentage.loc['P50'] = data.groupby(data.index.month, observed=True)[var].quantile(0.50)
-    cumulative_percentage.loc['P75'] = data.groupby(data.index.month, observed=True)[var].quantile(0.75)
-    cumulative_percentage.loc['P95'] = data.groupby(data.index.month, observed=True)[var].quantile(0.95)
-    cumulative_percentage.loc['P99'] = data.groupby(data.index.month, observed=True)[var].quantile(0.99)
-    cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month, observed=True)[var].max()
+    cumulative_percentage.loc['Minimum'] = data.groupby(data.index.month, observed=False)[var].min()
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index.month, observed=False)[var].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index.month, observed=False)[var].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index.month, observed=False)[var].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index.month, observed=False)[var].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index.month, observed=False)[var].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index.month, observed=False)[var].max()
     cumulative_percentage['Year'] = cumulative_percentage.mean(axis=1)[:-6]
 
     cumulative_percentage.loc[cumulative_percentage.index[-7], 'Year'] = data[var].min()
@@ -448,18 +448,18 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
     data.index.name = 'direction_sector'
     # Group by direction and var bin, then count occurrences
     # Calculate percentage of time each var bin occurs in each month
-    percentage_by_dir = 100*data.groupby([data.index, var+'-level'], observed=True)[var].count().unstack()/len(data[var])
+    percentage_by_dir = 100*data.groupby([data.index, var+'-level'], observed=False)[var].count().unstack()/len(data[var])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
     cumulative_percentage = cumulative_percentage.fillna(method='ffill')
 
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
-    cumulative_percentage.loc['Mean'] = data.groupby(data.index, observed=True)[var].mean()
-    cumulative_percentage.loc['P50'] = data.groupby(data.index, observed=True)[var].quantile(0.50)
-    cumulative_percentage.loc['P75'] = data.groupby(data.index, observed=True)[var].quantile(0.75)
-    cumulative_percentage.loc['P95'] = data.groupby(data.index, observed=True)[var].quantile(0.95)
-    cumulative_percentage.loc['P99'] = data.groupby(data.index, observed=True)[var].quantile(0.99)
-    cumulative_percentage.loc['Maximum'] = data.groupby(data.index, observed=True)[var].max()
+    cumulative_percentage.loc['Mean'] = data.groupby(data.index, observed=False)[var].mean()
+    cumulative_percentage.loc['P50'] = data.groupby(data.index, observed=False)[var].quantile(0.50)
+    cumulative_percentage.loc['P75'] = data.groupby(data.index, observed=False)[var].quantile(0.75)
+    cumulative_percentage.loc['P95'] = data.groupby(data.index, observed=False)[var].quantile(0.95)
+    cumulative_percentage.loc['P99'] = data.groupby(data.index, observed=False)[var].quantile(0.99)
+    cumulative_percentage.loc['Maximum'] = data.groupby(data.index, observed=False)[var].max()
     cumulative_percentage['Omni'] = cumulative_percentage.sum(axis=1)[:-6]
     cumulative_percentage.loc[cumulative_percentage.index[-6], 'Omni'] = data[var].mean()
     cumulative_percentage.loc[cumulative_percentage.index[-5], 'Omni'] = data[var].quantile(0.50)
