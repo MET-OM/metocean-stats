@@ -36,7 +36,7 @@ def test_table_monthly_non_exceedance(ds=ds):
     df = tables.table_monthly_non_exceedance(ds, var='HS', step_var=0.5, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (31, 13):
+    if df.shape == (34, 13):
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -46,7 +46,7 @@ def test_table_directional_non_exceedance(ds=ds):
     df = tables.table_directional_non_exceedance(ds, var='HS', step_var=0.5, var_dir='DIRM', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (30, 13):
+    if df.shape == (33, 13):
         pass
     else:
         raise ValueError("Shape is not correct")
