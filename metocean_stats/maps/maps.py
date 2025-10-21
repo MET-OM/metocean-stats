@@ -1,10 +1,12 @@
 import numpy as np
+import pandas as pd
 import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from matplotlib.colors import ListedColormap
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
+import re
 
 # Helper function to handle projection and coordinate transformation
 def get_transformed_coordinates(ds, lon_var, lat_var, projection_type='rotated_pole'):
@@ -498,7 +500,7 @@ def plot_extreme_wind_map(return_period=100, product='NORA3', z=0, title='empty 
     return fig
 
 # Function to plot extreme current map
-def plot_extreme_current_map(return_period=100, z='surface', distribution='gumbel', product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_current_map.png', method='hexbin', percentile_contour=50):
+def plot_extreme_current_map(return_period=100, z='surface', distribution='gum', product='NORA3', title='empty title', set_extent=[0, 30, 52, 73], output_file='extreme_current_map.png', method='hexbin', percentile_contour=50):
     '''
     Plots a map of extreme current speeds for a given return period using the specified dataset and visualization method.
 
@@ -507,10 +509,13 @@ def plot_extreme_current_map(return_period=100, z='surface', distribution='gumbe
         The return period in years (e.g., 100 years) for calculating the extreme current speeds. Choose between 25, 50 or 100 years.
     - z : str, optional, default='surface'
         The depth level at which the current speed is analyzed. Choose between 'surface' or 'seafloor'.
-    - distribution : str, optional, default='gumbel'
+    - distribution : str, optional, default='gum'
         Statistical distribution used to model the extreme values. Options:
-            - 'gumbel'       : Gumbel distribution.
-            - 'genextreme'   : Generalized Extreme Value (GEV) distribution.
+            - 'gev' : Generalized Extreme Value distribution.
+            - 'gum' : Gumbel distribution.
+            - 'gp' :  Generalized Pareto distribution
+            - 'exp' : Exponential distribution.
+            - 'wei' : Weibull distribution.
     - product : str, optional, default='NORA3'
         The dataset to use for current speed data. Currently, only 'NORA3' is supported.
     - title : str, optional, default='empty title'
@@ -533,20 +538,35 @@ def plot_extreme_current_map(return_period=100, z='surface', distribution='gumbe
         The figure object containing the generated map plot.
     '''
 
-    if product == 'NORA3':
-        ds = xr.open_dataset(f'https://thredds.met.no/thredds/dodsC/nora3_subset_stats/ocean/norkyst2400_annual_maxima_rve.nc')
+    if product.lower() == 'nora3':
+        ds = xr.open_dataset('https://thredds.met.no/thredds/dodsC/nora3_subset_stats/ocean/norkyst2400-2010-2021-rve.nc').sel(threshold=0.98)
         
     else:
         print(product, 'is not available')
         return
 
-    parameter = f'{distribution}_{z}_{return_period}year' 
-    data = xr.DataArray(ds[parameter])
+    distribution = {
+        "gumbel":"gum",
+        "expon":"exp",
+        "weibull":"wei",
+        "genextreme":"gev",
+        "genpareto":"gp",
+    }.get(distribution,distribution)
+
+    if distribution not in ["gum","wei","gp","exp","gev"]:
+        raise ValueError("Unknown distribution.")
+    if z not in ["surface","seafloor"]:
+        raise ValueError("z must be surface or seafloor.")
+    if return_period not in [25,50,100]:
+        raise ValueError("Return period should be 25, 50 or 100 years.")
+
+    parameter = distribution+"_est"
+    data = ds[parameter].sel(depth=z.encode("ascii"),return_period=return_period)
     standard_lon = xr.DataArray(ds['lon'])
     standard_lat = xr.DataArray(ds['lat'])
 
     # Flatten values and remove NaN
-    data_flat = ds[parameter].values.flatten()
+    data_flat = data.values.flatten()
     mask = ~np.isnan(data_flat)
     data_flat = data_flat[mask]
     lon_flat = ds['lon'].values.flatten()[mask]
@@ -688,7 +708,7 @@ def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_exte
         print('Chosen unit not correct, should be K or degC')
         return
 
-    cmap = ListedColormap(plt.cm.get_cmap('RdYlBu_r', int((vmax-vmin)/1))(np.linspace(0, 1, int((vmax-vmin)/1))))
+    cmap = mcolors.ListedColormap(plt.cm.get_cmap('RdYlBu_r', int((vmax-vmin)/1))(np.linspace(0, 1, int((vmax-vmin)/1))))
 
     fig = plt.figure(figsize=(9, 10))
     ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=set_extent[0]+(set_extent[1]-set_extent[0])/2))
@@ -714,11 +734,6 @@ def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_exte
     plt.savefig(output_file, dpi=300)
     return fig
 
-
-#####
-
-import re
-from matplotlib import colors as mcolors
 #############--------------------Extract which depths we have data from in the NORKYST800-----------------#########################
 def extract_unique_depths_from_NORKYST800(df):
     # Get column names from the df
