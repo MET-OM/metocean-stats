@@ -1,0 +1,9 @@
+[project]
+license = { file = "LICENSE" } 
+classifiers = [
+  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)"
+]
+
+[tool.setuptools]
+license-files = ["LICENSE"]  
+
