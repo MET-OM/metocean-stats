@@ -9,10 +9,9 @@ dynamic = ["version"]
 authors = [
   { name = "Konstantinos Christakos MET Norway & NTNU" }
 ]
-
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 classifiers = [
   "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
@@ -28,7 +27,6 @@ dependencies = [
   "xarray",
   "matplotlib>=3.1",
   "pandas",
-  "pip",
   "scipy",
   "windrose",
   "seaborn>=0.12.2",
@@ -53,4 +51,4 @@ exclude = []
 namespaces = false
 
 [tool.setuptools.dynamic]
-version = { attr = "version:__version__" }
+version = { attr = "version.__version__" }
