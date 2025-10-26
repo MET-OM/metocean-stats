@@ -36,8 +36,8 @@ jobs:
       - name: Build wheels
         run: |
           conda activate test
-          python setup.py sdist
-          python setup.py bdist_wheel
+          python -m build sdist
+          python -m build bdist_wheel
 
       - name: Upload wheels
         if: matrix.python-version == '3.12' && matrix.os == 'ubuntu'
