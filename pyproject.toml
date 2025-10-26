@@ -1,9 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-license = { file = "LICENSE" } 
-classifiers = [
-  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)"
+name = "metocean-stats"
+description = "metocean-stats - Tool for generation of metocean statistics"
+dynamic = ["version"]
+authors = [
+  { name = "Konstantinos Christakos MET Norway & NTNU" }
 ]
 
-[tool.setuptools]
-license-files = ["LICENSE"]  
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.8"
 
+classifiers = [
+  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+  "numpy>=1.17",
+  "xarray",
+  "matplotlib>=3.1",
+  "pandas",
+  "pip",
+  "scipy",
+  "windrose",
+  "seaborn>=0.12.2",
+  "pyextremes",
+  "cartopy",
+  "python-docx",
+  "netcdf4",
+  "pydap",
+  "virocon>=2.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/MET-OM/metocean-stats"
+Repository = "https://github.com/MET-OM/metocean-stats"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = []
+namespaces = false
+
+[tool.setuptools.dynamic]
+version = { attr = "version:__version__" }
