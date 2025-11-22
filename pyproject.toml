@@ -51,4 +51,6 @@ exclude = []
 namespaces = false
 
 [tool.setuptools.dynamic]
-version = { attr = "version.__version__" }
+version = { attr = "metocean_stats.version.__version__" }
+
+
