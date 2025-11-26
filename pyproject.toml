@@ -44,6 +44,7 @@ Repository = "https://github.com/MET-OM/metocean-stats"
 
 [tool.setuptools]
 include-package-data = true
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -52,5 +53,6 @@ namespaces = false
 
 [tool.setuptools.dynamic]
 version = { attr = "metocean_stats.version.__version__" }
+
 
 
