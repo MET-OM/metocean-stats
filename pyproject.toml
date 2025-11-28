@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=42", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "metocean-stats"
 description = "metocean-stats - Tool for generation of metocean statistics"
-dynamic = ["version"]
+version = "1.1.7"
 authors = [
   { name = "Konstantinos Christakos MET Norway & NTNU" }
 ]
@@ -42,13 +42,9 @@ Repository = "https://github.com/MET-OM/metocean-stats"
 [tool.setuptools]
 license-files = ["LICENSE"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-exclude = []
-namespaces = false
+[tool.setuptools_scm]
+write_to = "metocean_stats/_version.py"
 
-[tool.setuptools.dynamic]
-version = { attr = "metocean_stats.version.__version__" }
 
 
 
