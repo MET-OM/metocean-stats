@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "metocean-stats"
 description = "metocean-stats - Tool for generation of metocean statistics"
-version = "1.1.8"
+version = "1.1.9"
 authors = [
   { name = "Konstantinos Christakos MET Norway & NTNU" }
 ]
@@ -40,10 +40,11 @@ Homepage = "https://github.com/MET-OM/metocean-stats"
 Repository = "https://github.com/MET-OM/metocean-stats"
 
 [tool.setuptools]
-license-files = ["LICENSE"]
+license-files = []
 
 [tool.setuptools_scm]
 write_to = "metocean_stats/_version.py"
+
 
 
 
