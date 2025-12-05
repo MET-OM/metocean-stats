@@ -1579,6 +1579,8 @@ CCA profiles Table
 
 Wave Spectrum Plots
 -----------------------------------------
+In all the spectra functions, the data can be filtered using the selected start_time and end_time. 
+If start_time and end_time is set to None the full dataset will be used. 
 
 **Monthly Mean 1D Wave Spectrum:**
 
@@ -1587,7 +1589,8 @@ Wave Spectrum Plots
    plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
-      period = None,
+      start_time = None,
+      end_time = None,
       month = None,
       method = 'mean',
       output_file  = 'wave_spectrum_1d_months.png'
@@ -1603,7 +1606,8 @@ Wave Spectrum Plots
    plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
-      period = None,
+      start_time = None,
+      end_time = None,
       month = 1,
       method = 'mean',
       output_file  = 'wave_spectrum_1d_month.png'
@@ -1619,7 +1623,7 @@ Wave Spectrum Plots
    plots.plot_spectrum_2d(
       data, 
       var = 'SPEC',
-      period = ('2021-01-01T00', '2024-12-31T23'),
+      period = ['2021-01-01T00','2024-12-31T23']
       month = None,
       method = 'hm0_max',
       plot_type = 'pcolormesh',
@@ -1631,7 +1635,7 @@ Wave Spectrum Plots
 
 **Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:**         
 
-- note: Partitioning requires that the wave spetra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
+- note: Partitioning requires that the wave spectra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
 
 .. code-block:: python
 
@@ -1645,7 +1649,7 @@ Once the datasets are combined, the following code can be used to generate the p
    plots.plot_diana_spectrum(
       data, 
       var = 'SPEC',
-      period = ('2022-01-01T00', '2022-07-31T23'),
+      period = ['2022-01-01T00', '2022-07-31T23'],
       month = None,
       method = 'top_1_percent_mean',
       partition=True,
