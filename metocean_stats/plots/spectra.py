@@ -280,7 +280,7 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
         for lon in np.unique(data['longitude'].round(3).values))
 
     label_position = (
-        rf"$\mathbf{{Position:}}$ {lon_str}, {lat_str}"                   # Position label
+        rf"$\mathbf{{Position:}}$" +f" {lon_str}, {lat_str}"                   # Position label
         + "\u2007" * max(0, 27 - len(f"Lon: {lon_str}, Lat: {lat_str}")) + "\n"
     )
 
@@ -314,8 +314,8 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
         Dataset with 2D directional-frequency wave spectra.
     - var : str, optional, default='SPEC'
         Spectral variable name.
-    - period : tuple of two str, optional, default=None
-        A tuple specifying the desired time range.
+    - period : list of two str, optional, default=None
+        A list specifying the desired time range.
         - [start_time, end_time]: Filters between start_time and end_time, e.g., ('2021-01-01T00', '2021-12-31T23').
         - [start_time]: Filters to a single timestamp.
         - None: Uses the full time range available in data.
@@ -342,6 +342,9 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
         Use compass labels instead of degrees.
     - bar : str, optional, default='hm0'
         Show colorbar for 'density' or significant wave height 'hm0'.
+    - mean_arrow_dir: str, optional, default='mean_dir'
+        - 'mean_dir': Computes the mean wave direction.
+        - 'pdir': Computes the mean peak wave direction. 
     - max_spec_value : float, optional, default=None
         Sets the 2D-spectrum `vmax`. If None, uses the aggregated dataset maximum. 
     - output_file : str, optional, default='diana_spectrum.png'
@@ -626,7 +629,7 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     )
 
     label = (
-        rf"$\mathbf{{Position:}}$ {lon_str}, {lat_str}"                   # Position label
+        rf"$\mathbf{{Position:}}$" + f" {lon_str}, {lat_str}"                   # Position label
         + "\u2007" * max(0, 27 - len(f"Lon: {lon_str}, Lat: {lat_str}")) + "\n"
     )
 
@@ -871,7 +874,7 @@ def plot_spectra_2d(data,var='SPEC', period=None, method='monthly_mean', plot_ty
         for lon in np.unique(data['longitude'].round(1).values))
 
     label_position = (
-        rf"$\mathbf{{Position:}}$ Lon: {lon_str}, Lat: {lat_str}"                   # Position label
+        rf"$\mathbf{{Position:}}$" + f" Lon: {lon_str}, Lat: {lat_str}"                   # Position label
         + "\u2007" * max(0, 27 - len(f"Lon: {lon_str}, Lat: {lat_str}")) + "\n"
     )
 

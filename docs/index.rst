@@ -1623,7 +1623,7 @@ If start_time and end_time is set to None the full dataset will be used.
    plots.plot_spectrum_2d(
       data, 
       var = 'SPEC',
-      period = ['2021-01-01T00','2024-12-31T23']
+      period = ['2021-01-01T00','2024-12-31T23'],
       month = None,
       method = 'hm0_max',
       plot_type = 'pcolormesh',
@@ -1653,8 +1653,10 @@ Once the datasets are combined, the following code can be used to generate the p
       month = None,
       method = 'top_1_percent_mean',
       partition=True,
-      plot_type = 'pcolormesh'
+      plot_type = 'pcolormesh',
+      mean_arrow_dir = 'pdir',
       freq_mask=True,
+      
       output_file  = 'wave_spectrum_diana.png'
    )
 
