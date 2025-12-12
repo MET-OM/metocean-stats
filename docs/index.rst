@@ -1634,6 +1634,7 @@ If start_time and end_time is set to None the full dataset will be used.
    :width: 500
 
 **Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:**         
+
 The function takes an xarray Dataset as input. If the wind data are provided in a CSV file, they must first be converted to an xarray Dataset.
 This can be done as follows:
 
