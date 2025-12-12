@@ -1634,8 +1634,17 @@ If start_time and end_time is set to None the full dataset will be used.
    :width: 500
 
 **Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:**         
+The function takes an xarray Dataset as input. If the wind data are provided in a CSV file, they must first be converted to an xarray Dataset.
+This can be done as follows:
 
-- note: Partitioning requires that the wave spectra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
+.. code-block:: python
+
+   df = pd.read_csv('NORA3_wind_wave.csv', comment="#", index_col=0, parse_dates=True)
+   df1=df[['wind_speed_10m','wind_direction_10m']]
+   df1.columns=['wind_speed','wind_direction']
+   NORA3_wind_sub=df1.to_xarray()
+
+Partitioning requires that the wave spectra data (NORA3_wave_spec) are merged with the wind data (NORA3_wind_sub) beforehand, using:
 
 .. code-block:: python
 
@@ -1654,7 +1663,7 @@ Once the datasets are combined, the following code can be used to generate the p
       method = 'top_1_percent_mean',
       partition=True,
       plot_type = 'pcolormesh',
-      mean_arrow_dir = 'pdir',
+      arrow_dir = 'pdir',
       freq_mask=True,
       
       output_file  = 'wave_spectrum_diana.png'
