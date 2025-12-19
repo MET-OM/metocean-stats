@@ -1092,7 +1092,7 @@ def plot_1d_spectrum_on_ax(data, ax, var='SPEC', color='#0463d7ff', alpha=0.22):
     ax.text(0.3*(x_max - x_min), (y_max + y_ext * 1.05)*1.1, r'Variance Density [m$^2$/Hz]', va='bottom', ha='center', fontsize=10, color=None)
 
 
-def plot_direction_arrow(ax, direction, x0, y0, color='black', draw_ticks=False, speed_data=None, arrow_length=0.25, style='arrow'):
+def plot_direction_arrow_on_ax(ax, direction, x0, y0, color='black', draw_ticks=False, speed_data=None, arrow_length=0.25, style='arrow'):
     '''
     Plots the direction as an arrow or line on the specified axes. 
 
@@ -1164,7 +1164,7 @@ def plot_direction_arrow(ax, direction, x0, y0, color='black', draw_ticks=False,
             return mean_rad
         
 
-def plot_partition_spec(ax, sp, sp_aggregated, wave_partition, freq_mask_percentile, cmap):  
+def plot_partition_spec_on_ax(ax, sp, sp_aggregated, wave_partition, freq_mask_percentile, cmap):  
     '''
     Generates a 2D direction-frequency polar plot showing the number of occurrences of peak direction-frequency 
     pairs on the given Matplotlib axis.
