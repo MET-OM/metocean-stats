@@ -1589,8 +1589,7 @@ If start_time and end_time is set to None the full dataset will be used.
    plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
-      start_time = None,
-      end_time = None,
+      period = None,
       month = None,
       method = 'mean',
       output_file  = 'wave_spectrum_1d_months.png'
@@ -1606,8 +1605,7 @@ If start_time and end_time is set to None the full dataset will be used.
    plots.plot_spectra_1d(
       data, 
       var = 'SPEC',
-      start_time = None,
-      end_time = None,
+      period = None,
       month = 1,
       method = 'mean',
       output_file  = 'wave_spectrum_1d_month.png'
@@ -1674,7 +1672,7 @@ Once the datasets are combined, the following code can be used to generate the p
    :width: 500
 
 **Wind Sea and Swell Wave Peak Direction-Frequency Occurrences**   
- 
+
 This function requires the wave spectra data (NORA3_wave_spec) to be merged with the wind data (NORA3_wind_sub) beforehand. Refer to the Diana section for instructions.
 
 .. code-block:: python
