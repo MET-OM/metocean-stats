@@ -85,16 +85,25 @@ def Weibull_method_of_moment(X):
   
     return cHat, aHat, bHat # shape, location, scale
 
-def add_direction_sector(data,var_dir):
-    direction_bins = np.arange(15, 360, 30)
-    direction_labels = [value for value in np.arange(30, 360, 30)]
-    data['direction_sector'] = pd.Series(np.nan, index=data.index)
-    for i in range(len(direction_bins)-1):
-        condition = (data[var_dir] > direction_bins[i]) & (data[var_dir] <= direction_bins[i + 1])
-        data['direction_sector'] = data['direction_sector'].where(~condition, direction_labels[i])
+def add_direction_sector(data,var_dir,num=12):
+    """
+    Add a column "direction_sector" to a dataframe, which gives the directional sector.
+    The sectors start from north and are ordered clockwise, e.g., [-15, 15) is the first sector in the case of 12 sectors.
 
-    data['direction_sector'].fillna(0, inplace=True)
-    return data 
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The data.
+    var_dir : str
+        Column of the dataframe containing direction (in degrees).
+    num : int
+        The number of directional sectors to use.
+    """
+    bins = np.linspace(0,360,num=num+1,endpoint=True,dtype=int)
+    labels = np.linspace(0,360,num=num,endpoint=False,dtype=int)
+    offset = 180/num
+    data["direction_sector"] = pd.cut((data[var_dir]+offset)%360,bins=bins,labels=labels,right=False)
+    return data
 
 def consecutive_indices(lst):
     result = []
@@ -600,3 +609,40 @@ def magnitude_calculation(u,v):
     return(magnitude)
 
 
+def merge_identical_dataframes(data):
+    """
+    The function merges two or more dataframes
+    if the index is not similar, it should give NaN
+
+    Parameters
+    ----------
+    data: list of pd.DataFrame
+        Should contain at least two dataframes
+
+    Returns
+    -------
+    df_out: pd.DataFrame
+        One dataframe containing all dataframes in data
+
+    Authors
+    -------
+    clio-met
+    """
+    col_names=[]
+    for i in range(len(data)):
+        col_names.append(list(data[i].columns.values))
+
+    col_names_new=[]
+    for i in range(len(col_names)):
+        new_names=[n+'_'+str(i) for n in col_names[i]]
+        col_names_new.append(new_names)
+
+    df_out=pd.DataFrame()
+    for i in range(len(col_names)):
+        my_dictionary = dict(zip(col_names[i], col_names_new[i]))
+        data[i].rename(columns=my_dictionary,inplace=True)
+        del my_dictionary
+        
+    df_out=data[0].join(data[1:])
+
+    return df_out

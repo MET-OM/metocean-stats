@@ -288,6 +288,53 @@ Joint Distribution Hs-Tp Plot
 .. image:: files/Hs.Tp.joint.distribution.png
    :width: 500
 
+Joint 2D distribution contours
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_2D_contour(
+       df, 
+       var1='HS', 
+       var2='TP', 
+       return_periods=[1,10,100,1000], 
+   )
+
+.. image:: files/contours.png
+   :width: 500
+
+Joint 3D distribution contour
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_3D_contour(
+       df, 
+       var1 = 'W10',
+       var2 = 'HS', 
+       var3 = 'TP', 
+       return_period=100
+   )
+
+.. image:: files/3D_contour.png
+   :width: 500
+
+Joint 3D distribution contour cross-sections
+------------------------------
+
+.. code-block:: python
+
+   plots.plot_joint_3D_contour_slices(
+      df,
+      var1 = 'W10',
+      var2 = 'HS',
+      var3 = 'TP',
+      slice_values = [5,10,15,20,25]
+   )
+
+.. image:: files/3D_contour_slices.png
+   :width: 500
+
 Monthly Joint Distribution Hs-Tp Parameter Table
 ------------------------------------------------
 
@@ -512,6 +559,7 @@ Monthly Joint Distribution Hs-Tp Return Values Table
        var_hs='HS', 
        var_tp='TP', 
        periods=[1,10,100,10000], 
+       model='lonowe' # change to 'hs_tp' for DNV model
        output_file='monthly_Hs_Tp_joint_return_values.csv'
    )
 
@@ -531,6 +579,7 @@ Directional Joint Distribution Hs-Tp Return Values Table
        var_dir='DIRM', 
        periods=[1,10,100,1000], 
        adjustment='NORSOK', 
+       model='lonowe' # change to 'hs_tp' for DNV model
        output_file='directional_Hs_Tp_joint_return_values.csv'
    )
 
@@ -1999,7 +2048,13 @@ Plot bathymetry with a variable (magnitude.v,u,temperature or salinity) based on
 .. image:: files/Bathymetry_cross_section_with_variable=salinity.png
 
 Verification Functions
-===================
+======================
+
+.. code-block:: python
+
+   from plots import verification
+   from tables import verification
+
 Scatter Plot
 ------------
 
@@ -2021,7 +2076,7 @@ Scatter Plot
    :width: 500
 
 Taylor diagram
-------------
+--------------
 
 .. code-block:: python
 
@@ -2034,6 +2089,202 @@ Taylor diagram
 
 .. image:: files/Taylor_diagram.png
    :width: 500
+
+Comparison tables between variables
+-----------------------------------
+
+For the comparison between two variables
+
+.. code-block:: python
+
+   tables.table_error_metric(
+      df,
+      var_ref='HS',var_comp='HS.1',
+      error_metric=['bias','mae','rmse','scatter_index','corr'],
+      output_file='table_error_metric.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_error_metric.csv
+
+For the comparison between three variables or more
+
+.. code-block:: python
+
+   tables.table_error_metric_multiple(
+      df,
+      var_ref='TP',var_comp=['TP.1','TP.2'],
+      error_metric=['scatter_index','rmse','bias','mae','corr'],
+      output_file='table_error_metric_multiple.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_error_metric_multiple.csv
+
+Comparison table between 2 variables as a function of another variable
+----------------------------------------------------------------------
+
+.. code-block:: python
+
+   tables.table_binned_error_metric(
+      df,
+      var_bin='TP',var_bin_size=0.5,var_ref='HS',var_comp='HS.1',
+      threshold_min=0,
+      error_metric=['bias','scatter_index'],
+      output_file='table_binned_error_metric.csv')
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_binned_error_metric.csv
+
+Comparison plots between variables as a function of another variable
+--------------------------------------------------------------------
+
+For the comparison between two variables
+
+.. code-block:: python
+
+   plots.plot_binned_error_metric(
+      df,
+      var_bin='W10',var_bin_size=0.5,var_bin_unit='m/s',
+      var_ref='HS',var_comp=['HS.1'],var_comp_unit='m',
+      threshold_min=100,
+      error_metric='bias',
+      output_file='plot_binned_error_metric_2var.png')
+
+.. image:: files/plot_binned_error_metric_2var.png
+   :width: 500
+
+For the comparison between three variables
+
+.. code-block:: python
+
+   plots.plot_binned_error_metric(
+      df,
+      var_bin='TP',var_bin_size=0.5,var_bin_unit='s',
+      var_ref='HS',var_comp=['HS.1','HS.2'],var_comp_unit='m',
+      threshold_min=100,
+      error_metric='corr',
+      output_file='plot_binned_error_metric_3var.png')
+
+.. image:: files/plot_binned_error_metric_3var.png
+   :width: 500
+
+
+
+Climate and trends
+==================
+
+.. code-block:: python
+
+   from plots import climate
+   from tables import climate
+
+Yearly stripes
+--------------
+
+.. code-block:: python
+
+   plots.plot_yearly_stripes(
+      df,
+      var_name='HS',
+      method= 'mean',
+      ylabel='Hs [m]',
+      output_file='Yearly_stripes.png')
+
+.. image:: files/Yearly_stripes.png
+   :width: 500
+
+Monthly and yearly heatmap
+--------------------------
+
+.. code-block:: python
+
+   plots.plot_heatmap_monthly_yearly(
+      df,
+      var_name='T2m',
+      method= 'mean',
+      cb_label='2-m temperature [°C]',
+      output_file='Heatmap_monthly_yearly.png')
+
+.. image:: files/Heatmap_monthly_yearly.png
+   :width: 500
+
+Yearly vertical profiles
+------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='current_speed_',
+      method= 'mean',
+      yaxis_direction='down',
+      xlabel='Current speed [m/s]',
+      output_file='Yearly_vertical_profiles_current.png')
+
+.. image:: files/Yearly_vertical_profiles_current.png
+   :width: 500
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      rad_colname='W',
+      method= 'mean',
+      yaxis_direction='up',
+      xlabel='Wind speed [m/s]',
+      output_file='Yearly_vertical_profiles_wind.png')
+
+.. image:: files/Yearly_vertical_profiles_wind.png
+   :width: 500
+
+.. code-block:: python
+
+   plots.plot_heatmap_profiles_yearly(
+      df,
+      rad_colname='W',
+      cb_label='Wind speed [m/s]',
+      yaxis_direction='up',
+      method='P80',
+      output_file='Heatmap_yearly_profiles_wind.png')
+
+.. image:: files/Heatmap_yearly_profiles_wind.png
+   :width: 500
+
+Linear regression Plot and Table
+--------------------------------
+
+.. code-block:: python
+
+   plots.plot_yearly_vertical_profiles(
+      df,
+      var='HS',
+      time='Year',
+      stat='P70',
+      method=['Least-Squares','Theil-Sen'],
+      confidence_interval=0.95,
+      ylabel='Hs [m]',
+      output_figure='Linear_regression.png')
+
+.. image:: files/Linear_regression.png
+   :width: 500
+
+.. code-block:: python
+
+   tables.table_linear_regression(
+      df,
+      var='HS',
+      stat='mean',
+      method=['Least-Squares','Theil-Sen','Kendall-tau'],
+      confidence_interval=0.95,
+      intercept=True, 
+      output_file='table_linear_regression.csv'
+   )
+
+.. csv-table::
+   :header-rows: 1
+   :file: files/table_linear_regression.csv
 
 Auxiliary Functions
 ===================

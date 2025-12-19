@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=80", "wheel", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metocean-stats"
+description = "metocean-stats - Tool for generation of metocean statistics"
+version = "1.1.9"
+authors = [
+  { name = "Konstantinos Christakos MET Norway & NTNU" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+  "numpy>=1.17",
+  "xarray",
+  "matplotlib>=3.1",
+  "pandas",
+  "scipy",
+  "windrose",
+  "seaborn>=0.12.2",
+  "pyextremes",
+  "cartopy",
+  "python-docx",
+  "netcdf4",
+  "pydap",
+  "virocon>=2.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/MET-OM/metocean-stats"
+Repository = "https://github.com/MET-OM/metocean-stats"
+
+[tool.setuptools]
+license-files = []
+
+[tool.setuptools_scm]
+write_to = "metocean_stats/_version.py"
+
+
+
+
+
+
+
+

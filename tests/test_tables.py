@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 from metocean_stats import tables
+from metocean_stats.tables.climate import *
 from metocean_stats.stats.aux_funcs import readNora10File
 from .data import synthetic_dataset
 
@@ -35,7 +36,7 @@ def test_table_monthly_non_exceedance(ds=ds):
     df = tables.table_monthly_non_exceedance(ds, var='HS', step_var=0.5, output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (31, 13):
+    if df.shape == (34, 13):
         pass
     else:
         raise ValueError("Shape is not correct")
@@ -45,14 +46,14 @@ def test_table_directional_non_exceedance(ds=ds):
     df = tables.table_directional_non_exceedance(ds, var='HS', step_var=0.5, var_dir='DIRM', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
-    if df.shape == (30, 13):
+    if df.shape == (33, 13):
         pass
     else:
         raise ValueError("Shape is not correct")
 
 def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
     output_file = 'test_monthly_joint_distribution_Hs_Tp_param.csv'
-    df = tables.table_monthly_joint_distribution_Hs_Tp_param(ds, var_hs='HS', var_tp='TP', periods=[1, 10, 100, 10000], output_file=output_file)
+    df = tables.table_monthly_joint_distribution_Hs_Tp_param(ds, var_hs='HS', var_tp='TP', output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (13, 6):
@@ -62,7 +63,7 @@ def test_table_monthly_joint_distribution_Hs_Tp_param(ds=ds):
 
 def test_table_directional_joint_distribution_Hs_Tp_param(ds=ds):
     output_file = 'test_directional_joint_distribution_Hs_Tp_param.csv'
-    df = tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',periods=[1,10,100],output_file=output_file)
+    df = tables.table_directional_joint_distribution_Hs_Tp_param(ds,var_hs='HS',var_tp='TP',var_dir='DIRM',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (13, 6):
@@ -587,8 +588,21 @@ def test_table_cca_profile():
     else:
         raise ValueError("Shape is not correct")
 
+        
+def test_table_linear_regression():
+    output_file='test_table_linear_regerssion.csv'
+    df, _, _ = tables.table_linear_regression(df=ds,var='HS',stat='mean',method=['Least-Squares','Theil-Sen','Kendall-tau'],confidence_interval=0.95,intercept=True,output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    if df.shape == (13, 9):
+        pass
+    else:
+        raise ValueError("Shape linear regression table is not correct")
+
+
 def test_table_monthly_freq_1dspectrum():
     output_file='test_table_monthly_freq_1dspectrum.csv'
     df = tables.table_monthly_freq_1dspectrum(data=ds_synthetic_spectra,var='SPEC',output_file=output_file)
     if os.path.exists(output_file):
         os.remove(output_file)
+
