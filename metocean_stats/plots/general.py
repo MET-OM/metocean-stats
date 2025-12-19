@@ -720,7 +720,7 @@ def plot_tidal_levels(data, var='tide',start_time=None , end_time=None ,output_f
     plt.plot(data,color='lightgrey')
     plt.axhline(y=df.loc[df['Tidal Level'] == 'HAT'].values[0][1], color='r', linestyle='--',label='HAT')
     plt.axhline(y=df.loc[df['Tidal Level'] == 'MSL'].values[0][1], color='k', linestyle='-',label='MSL')
-    plt.axhline(y=df.loc[df['Tidal Level'] == 'LAT'].values[0][1], color='r', linestyle='--',label='LAT')
+    plt.axhline(y=df.loc[df['Tidal Level'] == 'LAT'].values[0][1], color='r', linestyle='-.',label='LAT')
 
     plt.ylabel('tidal elevation [m]')
     plt.grid()
@@ -734,6 +734,7 @@ def plot_tidal_levels(data, var='tide',start_time=None , end_time=None ,output_f
     plt.tight_layout()
     # Save the figure
     plt.savefig(output_file)
+    plt.close()
 
     return fig
 

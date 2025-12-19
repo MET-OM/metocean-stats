@@ -3,7 +3,6 @@ import numpy as np
 
 import virocon.dependencies
 from virocon.predefined import (
-    get_DNVGL_Hs_U,
     get_OMAE2020_V_Hs
 )
 
@@ -46,26 +45,6 @@ def get_OMAE2020_Hs_Tz():
     return dist_descriptions,fit_descriptions,semantics
 
 
-
-def get_weiblognormal_independent_Hs_Tz():
-    dist_description_hs = {
-        "distribution": virocon.WeibullDistribution(),
-    }
-
-    dist_description_tz = {
-        "distribution": virocon.LogNormalDistribution(),
-    }
-    dist_descriptions = [dist_description_hs, dist_description_tz]
-    fit_descriptions = [{"method": "mom"}, {"method":"mom"}]
-    semantics = {
-        "names": ["Significant wave height", "Peak wave period"],
-        "symbols": ["H_s", "T_p"],
-        "units": ["m", "s"],
-        "swap_axis":True
-    }
-    return dist_descriptions, fit_descriptions, semantics
-
-
 def get_DNVGL_Hs_Tz():
     """
     Get DNVGL significant wave height and wave period model.
@@ -91,8 +70,8 @@ def get_DNVGL_Hs_Tz():
         conditions and environmental loads.
 
     """
-    # def _lnsquare2(x, a1, a2, a3):
-    #     return np.log(a1 + a2 * np.sqrt(a3*x))
+    def _lnsquare(x, a1, a2, a3):
+        return np.log(a1 + a2 * np.sqrt(a3*x))
 
     def _power3(x, a1, a2, a3):
         return a1 + a2 * x**a3
@@ -113,8 +92,8 @@ def get_DNVGL_Hs_Tz():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {
-            #"mu": virocon.DependenceFunction(_lnsquare, bounds_mu, latex="$\ln(a1 + a2 \sqrt{a3 * x})$"), 
-            "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
+            "mu": virocon.DependenceFunction(_lnsquare, bounds_mu, latex="$\ln(a1 + a2 \sqrt{a3 * x})$"), 
+            # "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
             "sigma": virocon.DependenceFunction(_exp3, bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$")
             },
     }
@@ -171,6 +150,7 @@ def get_LoNoWe_hs_tp():
         "names": ["Significant wave height", "Peak wave period"],
         "symbols": ["H_s", "T_p"],
         "units": ["m", "s"],
+        "swap_axis": True
     }
     
     return dist_descriptions,fit_descriptions,semantics
@@ -255,6 +235,8 @@ def get_LiGaoMoan_U_hs_tp():
         return d1 + d2 * x ** d3
     def _lnsquare2(x, e1, e2, e3):
         return np.log(e1 + e2 * np.sqrt(e3*x))
+    def _mu(x, e1, e2, e3):
+        return e1 + e2 * x ** e3
     def _sigma(x, f1=0.001, f2=0.1, f3=-0.3):
         return f1 + f2 * np.exp(f3 * x)
     def _linear(x,a):
@@ -285,7 +267,7 @@ def get_LiGaoMoan_U_hs_tp():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 1,
         "parameters": {
-            "mu":   virocon.DependenceFunction(_lnsquare2,bounds, latex="$\ln(e1 + e2 \sqrt{e3 * x})$"),
+            "mu":   virocon.DependenceFunction(_mu,bounds, latex="$e1 + e2 * x^{e3}$"),
             "sigma":virocon.DependenceFunction(_sigma,   sigma_bounds, latex="$f1 + f2 * \exp(f3 * x)$")},
     }
 
@@ -359,20 +341,10 @@ def get_vonmises_wind_misalignment():
     of wind speed and misalignment between wind and wave direction.
     """
 
-    # def _mu(x, e1, e2, e3):
-    #     #return e1 + e2 * np.power(x,e3,out=np.zeros_like(x),where=x>0)
-    #     return e1 + e2 * np.power(x,e3)
-    def _sigma(x, f1, f2, f3):
-        return f1 + f2 * x**f3
     def _linear(x,g1,g2):
         return g1+g2*x
-    def _const(x,a):
-        return np.ones_like(x)*a
     def _kappa(x, h1=1, h2=-1, h3=-1, h4=1):
         return h1 + h2 / (1 + np.exp(h3 * (x - h4)))
-        
-    def _exp3(x, b1,b2,b3):
-        return b1 + b2 * np.exp(b3 * x)
 
     #bounds = [(None, None), (0, None), (None, None)]
     logistics_bounds = [(0, None), (None, None), (None, 0), (0, None)]
@@ -421,9 +393,12 @@ def get_cT_Hs_Tp():
     def _gamma(x,k1,k2):
         return k1+k2*x
 
-    def _lnsquare2(x, l1, l2, l3):
-        return np.log(l1 + l2 * np.sqrt(l3*x))
-    def _exp3(x, m1,m2,m3):
+    # def _lnsquare2(x, l1, l2, l3):
+    #     return np.log(l1 + l2 * np.sqrt(l3*x))
+
+    def _mu(x, l1, l2, l3):
+        return l1 + l2 * x ** l3
+    def _sigma(x, m1,m2,m3):
         return m1 + m2 * np.exp(m3 * x)
     
     bounds_mu = [(0, None), (None, None), (None, None)]
@@ -451,8 +426,8 @@ def get_cT_Hs_Tp():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 1,
         "parameters": {
-            "mu":   virocon.DependenceFunction(_lnsquare2,bounds_mu, latex="$\log(l1 + l2 \sqrt{l3 * x})$"),
-            "sigma":virocon.DependenceFunction(_exp3,   bounds_sigma, latex="$m1 + m2 * \exp(m3 * x)$")},
+            "mu":   virocon.DependenceFunction(_mu, bounds_mu, latex="$l1 + l2 * x^{l3}$"),
+            "sigma":virocon.DependenceFunction(_sigma, bounds_sigma, latex="$m1 + m2 * \exp(m3 * x)$")},
     }
 
     dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
@@ -466,6 +441,66 @@ def get_cT_Hs_Tp():
         "symbols": ["Cs_θ", "H_s", "T_p"],
         "units": ["m/s", "m", "s"],
         "swap_axis":True
+    }
+
+    return dist_descriptions, fit_descriptions, semantics
+
+def get_DNVGL_Hs_U():
+    """
+    Get DNVGL significant wave height and wind speed model.
+
+    Get the descriptions necessary to create the significant wave height
+    and wind speed model as defined in DNVGL [2]_ in section 3.6.4.
+
+    Returns
+    -------
+    dist_descriptions : list of dict
+        List of dictionaries containing the dist descriptions for each dimension.
+        Can be used to create a GlobalHierarchicalModel.
+    fit_descriptions : None
+        Default fit is used so None is returned.
+        Can be passed to fit function of GlobalHierarchicalModel.
+    semantics : dict
+        Dictionary with a semantic description of the model.
+        Can be passed to plot functions.
+
+    References
+    ----------
+    .. [2] DNV GL (2017). Recommended practice DNVGL-RP-C205: Environmental
+        conditions and environmental loads.
+    """
+
+    def _power3(x, a, b, c):
+        return a + b * x**c
+
+    bounds = [(0, None), (0, None), (None, None)]
+
+    alpha_dep = virocon.DependenceFunction(_power3, bounds=bounds, latex="$a + b * x^c$")
+    beta_dep = virocon.DependenceFunction(_power3, bounds=bounds, latex="$a + b * x^c$")
+
+    dist_description_hs = {
+        "distribution": virocon.WeibullDistribution(),
+        "intervals": virocon.NumberOfIntervalsSlicer(n_intervals=20),
+    }
+
+    dist_description_u = {
+        "distribution": virocon.WeibullDistribution(f_gamma=0),
+        "conditional_on": 0,
+        "parameters": {
+            "alpha": alpha_dep,
+            "beta": beta_dep,
+        },
+    }
+
+    dist_descriptions = [dist_description_hs, dist_description_u]
+
+    fit_descriptions = None
+
+    semantics = {
+        "names": ["Significant wave height", "Wind speed"],
+        "symbols": ["H_s", "U"],
+        "units": ["m", "m s$^{-1}$"],
+        "swap_axis": True
     }
 
     return dist_descriptions, fit_descriptions, semantics

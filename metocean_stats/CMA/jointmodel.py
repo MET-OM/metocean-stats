@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 import numpy as np
 from collections.abc import Callable
@@ -5,6 +7,7 @@ from collections.abc import Callable
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import patches as mpatches
+from scipy.interpolate import interp1d
 
 import pyextremes
 import virocon
@@ -22,12 +25,15 @@ from .predefined import (
     get_DNVGL_Hs_U,
     get_OMAE2020_Hs_Tz,
     get_OMAE2020_V_Hs,
-    get_LoNoWe_hs_tp,
+    get_cT_Hs_Tp,
+    get_vonmises_wind_misalignment,
+    get_LiGaoMoan_U_hs_tp,
 )
 
 from .contours import (
     get_contour,
     sort_contour,
+    split_contour,
 )
 
 def _load_preset(preset:str|Callable):
@@ -43,26 +49,20 @@ def _load_preset(preset:str|Callable):
         except:
             raise TypeError(f"Invalid input: Preset should be either callable or a string, got {type(preset)}.")
     
-    if preset == 'omae_hs_tp':
-        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_Hs_Tz()
-        semantics["swap_axis"] = True
-    elif preset == 'dnvgl_hs_tp':
+    if preset == 'hs_tp':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_Tz()
-        semantics["swap_axis"] = True
-    elif preset == 'omae_u_hs':
-        dist_descriptions,fit_descriptions,semantics = get_OMAE2020_V_Hs()
-        semantics["swap_axis"] = False
-    elif preset == 'dnvgl_hs_u':
+    elif preset == 'hs_u':
         dist_descriptions,fit_descriptions,semantics = get_DNVGL_Hs_U()
-        semantics["swap_axis"] = True
-    elif preset == 'lonowe_hs_tp':
-        dist_descriptions,fit_descriptions,semantics = get_LoNoWe_hs_tp()
-        semantics["swap_axis"] = True
+    elif preset == 'u_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_LiGaoMoan_U_hs_tp()
+    elif preset == 'u_misalignment':
+        dist_descriptions,fit_descriptions,semantics = get_vonmises_wind_misalignment()
+    elif preset == 'ct_hs_tp':
+        dist_descriptions,fit_descriptions,semantics = get_cT_Hs_Tp()
     else:
-        raise ValueError(f'Preset {preset} not found.'
-                            'See docstring for available presets.')
-    return dist_descriptions,fit_descriptions,semantics
+        raise ValueError(f'Preset {preset} not found. See docstring for available presets.')
 
+    return dist_descriptions,fit_descriptions,semantics
 
 class JointProbabilityModel(GlobalHierarchicalModel):
     """
@@ -73,7 +73,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def __init__(
             self,
-            model:str|Callable = "DNVGL_hs_tp",
+            model:str|Callable = "hs_tp",
             dist_descriptions:list[dict] = None,
             fit_descriptions:list[dict] = None,
             semantics:dict = None,
@@ -91,13 +91,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         model : str or Callable
             Choose model from any predefined model with a string:
 
-             - DNVGL_Hs_Tp
-             - DNVGL_Hs_U
-             - OMAE_Hs_Tp
-             - OMAE2020_V_Hs
-             - LoNoWe_Hs_Tp
-             - windsea_hs_tp
+             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
+             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
+             - U_Hs_Tp: Model of wind speed, significant wave height and peak wave period, from a paper by Li et. al., 2015.
+             - U_misalignment: Model of wind speed and wind-wave misalignment.
+             - cT_Hs_Tp: Model of aligned current, significant wave height and peak wave period.
 
+            Note that the name signifies the order of dependency of the variables in the model.
             This argument can alternatively be a custom callable (function) that
             returns the three parts - dist_descriptions, fit_descriptions and semantics.
             Examples of this function are found in predefined.py.
@@ -128,12 +128,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 semantics = self.get_default_semantics()
         
         if "swap_axis" not in semantics:
-            semantics["swap_axis"] = False
+            semantics['swap_axis'] = False
 
         self.dist_descriptions = dist_descriptions
         self.fit_descriptions = fit_descriptions
         self.semantics = semantics
-        self.swap_axis = semantics["swap_axis"]
+        self.swap_axis = semantics['swap_axis']
 
         # Store of handles and labels, for producing a legend.
         self.legend_handles = []
@@ -277,11 +277,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 marginal_labels = False
 
             if points.ndim > 2 or points.shape[1] > 2:
-                raise ValueError("Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
+                raise ValueError(f"Invalid shape of points {points.shape}. Should be (N) or (Nx2).")
             levels = self.pdf(points)
 
             if labels is None:
-                sym0,sym1 = self.semantics["symbols"]
+                sym0,sym1 = self.semantics['symbols']
                 if marginal_labels:
                     labels = [sym0+f"={p[0]:.1f}" for p in points]
                 else:
@@ -322,7 +322,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         for artist in new_artists:
             if "PathCollection" in str(artist): # The scatter.
                 artist.remove()
-            elif "ContourSet" in str(artist): # The contours.
+            elif "ContourSet" in str(artist): # The isodensity contours.
+
+                # The contour doesn't set correct limits, these must be manually provided.
+                contour = np.concatenate([np.array(line) for seg in artist.allsegs for line in seg],axis=0)
+                ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
+                self._reset_axlim(ax)
+
                 CShandles,CSlabels = artist.legend_elements()
                 self.legend_handles += list(np.array(CShandles)[inverse_sort_idx])
                 if labels is None:
@@ -547,7 +553,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         elif np.array(labels).size != percentiles.size:
             raise ValueError("Number of labels does not fit the number of percentiles.")
         if "color" not in kwargs and "c" not in kwargs:
-            kwargs["c"] = "tab:green"
+            kwargs["c"] = "tab:orange"
         if "linestyles" not in kwargs:
             if len(percentiles) == 3:
                 kwargs["linestyles"] = ["dashed","solid","dashed"]
@@ -563,7 +569,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             _,ax = plt.subplots()
 
         if limit is None:
-            limit = 1.5*np.max(self.data.values[:,0])
+            limit = 1.1*np.max(self.data.values[:,0])
         marginal = np.arange(0,limit,0.001)
 
         # Plot percentile lines.
@@ -587,7 +593,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             use_peak_wave_period = True,
             ylim = None,
             xlim = None,
-            legend = "Steepness",
+            label = "Steepness",
             **kwargs
             ):
         """
@@ -624,8 +630,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # These are defaults, to be overwritten by **kwargs.
         plot_params = {**{'linestyle':'--','color':'black',},**kwargs}
         handle = ax.plot(t,h,**plot_params)
-        if legend is not None:
-            self.legend_labels.append(legend)
+        if label is not None:
+            self.legend_labels.append(label)
             self.legend_handles += handle
         return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
     
@@ -666,6 +672,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if data.shape[1] != 2:
             raise NotImplementedError("Only 2-dimensional data is supported.")
         
+        kwargs.setdefault("s",2)
+
         x,y = (1,0) if self.swap_axis else (0,1)
         handle = ax.scatter(data[:,x],data[:,y],**kwargs)
         if label is not None:
@@ -677,7 +685,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             self,
             ax=None,
             data=None,
-            bins=None,
+            bins=100,
             label:str=None,
             norm=LogNorm(),
             density=False,
@@ -728,13 +736,13 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         x,y = (1,0) if self.swap_axis else (0,1)
         
-        if bins is None:
-            bins = [
-                np.arange(np.floor(np.min(data[:,x])),
-                          np.ceil(np.max(data[:,x])),0.02),
-                np.arange(np.floor(np.min(data[:,y])),
-                          np.ceil(np.max(data[:,y])),0.01)
-            ]
+        # if bins is None:
+        #     bins = [
+        #         np.arange(np.floor(np.min(data[:,x])),
+        #                   np.ceil(np.max(data[:,x])),0.02),
+        #         np.arange(np.floor(np.min(data[:,y])),
+        #                   np.ceil(np.max(data[:,y])),0.01)
+        #     ]
 
         handle = ax.hist2d(data[:,x],data[:,y],norm=norm,
                            bins=bins,density=density,**kwargs)
@@ -752,6 +760,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             
             self.legend_handles.append(handle)
             self.legend_labels.append(label)
+
+        self._reset_axlim(ax)
+
         return ax
 
 
@@ -761,8 +772,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             return_period:float=100,
             state_duration:float=1,
             method:str="IFORM",
-            surface_plot=False,
-            n_samples = 360,
+            # surface_plot=False, # currently not working.
+            n_samples = 1000,
             label:str=None,
             **kwargs
             ):
@@ -785,8 +796,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - "DirectSampling", monte carlo sampling
              - "ConstantAndExceedance"
              - "ConstantOrExceedance"
-        surface_plot : bool, default False
-            Plot contour as a continuous surface.
         labels : list of str, optional
             A name for each contour.
         kwargs : keyword arguments
@@ -801,6 +810,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         elif "3d" not in ax.name:
             raise ValueError(f"The axis argument must be 3D, got {ax.name}.")
 
+        surface_plot = False  # TODO - fix surface plot (gridded distribution in IFORMContour and ISORMContour)
         if surface_plot:
             x,y,z = get_contour(self,return_period=return_period,state_duration=state_duration,
                                 method=method,point_distribution="gridded",n_samples=n_samples)
@@ -814,6 +824,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if label is not None:
             self.legend_handles.append(handle)
             self.legend_labels.append(label)
+
+        self.plot_semantics(ax)
 
         return ax
 
@@ -934,13 +946,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         contour = get_contour(self,return_period=return_period,state_duration=state_duration,
                               method=method,point_distribution="random",n_samples=n_samples)
 
-
-
         for i,level in enumerate(slice_values):
             coords = contour.coordinates
             coords = coords[np.abs(coords[:,slice_dim]-level)<slice_width]
             if len(coords)==0:
-                print(f"Warning: Found no contour points at level {level}+-{slice_width}. Skipped.")
+                warnings.warn(f"Found no contour points at level {level}+-{slice_width}. Skipped.")
                 continue
             coords = np.delete(coords,slice_dim,axis=1)
             coords = sort_contour(coords)
@@ -1011,7 +1021,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         limits : list of 2 tuples of 2 floats, optional
             Two tuples defining upper and lower limits of pdf sampling,
             for the two remaining dimensions.
-            If not given, they will be guessed based on the data (2x max).
+            If not given, they will be guessed based on the data (3x max).
         invalid_density_policy : str, default "drop"
             What to do with densities that are outside the scope of the sampled pdf,
             i.e., smaller than pdf.min() or larger than pdf.max(). Options:
@@ -1033,6 +1043,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                              " corresponding to lower and upper"
                              " limits per dimension.")
         limits = np.sort(limits,axis=1)
+
         # Create query with shape (samples x 3) and sample pdf
         gridpoints = [
             np.linspace(limits[0,0],limits[0,1],grid_steps),
@@ -1045,7 +1056,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         gridpoints = gridpoints.reshape(3,-1).T # 3xN**2
         Z = self.pdf(gridpoints).reshape([grid_steps,grid_steps]) # NxN
         if np.any(np.isnan(Z)):
-            print("WARNING: Found NaN values in pdf, these are set to 0. "\
+            warnings.warn("Found NaN values in pdf, these are set to 0. "\
                   "This is usually due to sampling limits being outside " \
                   "the domain of the model (distributions or dep. funcs).")
         Z = np.nan_to_num(Z)
@@ -1054,7 +1065,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if density_levels is not None and marginal_values is not None:
             raise ValueError("Density_levels and marginal_values cannot both be defined.")
         if marginal_values is not None:
-            if np.array(marginal_values).size == 1:
+            marginal_values = np.array(marginal_values)
+            if marginal_values.ndim == 0:
                 marginal_values = np.array([marginal_values])
             marginal_dim = np.squeeze(np.where(np.array(self.conditional_on)==None))
             secondary_dim = np.squeeze(np.where(np.array(self.conditional_on)==marginal_dim))
@@ -1073,10 +1085,16 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 density_levels = np.array([density_levels])
             level_sort = np.argsort(density_levels)
             density_levels = density_levels[level_sort]
+            if marginal_values is not None: marginal_values = marginal_values[level_sort]
 
         # Set labels
         if labels is None:
-            labels = np.array([f"p = {d:.0e}" for d in density_levels])
+            if marginal_values is None:
+                labels = np.array([f"p = {d:.0e}" for d in density_levels])
+            else:
+                labels = np.array(
+                    [r"Contour $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+                     f" = {m} {self.semantics['units'][slice_dim]}" for m in marginal_values])
         elif np.array(labels).size != density_levels.size:
             raise ValueError("Number of labels does not match levels.")
         else:
@@ -1121,11 +1139,19 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         handles,_ = CS.legend_elements()
         self.plot_semantics(ax,*axis_labels)
 
-        ax.set_title(r" $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
+        ax.set_title(r"Slice at $\it{"+f"{self.semantics['symbols'][slice_dim]}"+r"}$"+
             f" = {slice_value} {self.semantics['units'][slice_dim]}")
 
         self.legend_handles += handles
         self.legend_labels += list(labels)
+
+        # The contour doesn't set correct limits, these must be manually provided.
+        if CS.allsegs:
+            contour = np.concatenate([np.array(line) for seg in CS.allsegs for line in seg],axis=0)
+            ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
+            self._reset_axlim(ax)
+        else:
+            warnings.warn("No contours of the model exist for these values.")
 
         return ax
 
@@ -1223,11 +1249,262 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         if ax is None:
             _,ax = plt.subplots(subplot_kw={"projection":"3d"})
-        ax.plot_surface(Z,X,Y,**kwargs)
+        ax.plot_surface(Z,Y,X,**kwargs)
         self.plot_semantics(ax=ax)
 
         return ax
 
+    def get_contour_maximum(
+            self,
+            return_period,
+            state_duration = 1,
+            dim = 0,
+            n_samples = 1000,
+            contour_method="IFORM",
+            ):
+        """
+        Method to retrieve the marginal extreme and corresponding conditional values, 
+        from a contour corresponding to a given return period.
+
+        Parameters
+        -----------
+        return_period : int
+            Return period, in years.
+        state_duration : float
+            The average duration (hours) of each sample 
+            in the data used to fit the model.
+        primary_dim : int
+            Get the point on the contour which is largest in this dimension.
+        n_samples : int, default 720
+            Number of contour points to generate. May need to be tuned for 
+            accuracy vs speed, depending on contour method.
+        contour_method : str
+            The method of calculating a contour. One of:
+
+             - "IFORM", the inverse first-order reliability method
+             - "ISORM", the inverse second-order reliability method
+             - "HighestDensity"
+             - "DirectSampling"
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+        """
+
+        contour = get_contour(self,return_period=return_period,state_duration=state_duration,method=contour_method,n_samples=n_samples)
+        coords = contour.coordinates.T
+        idxmax = np.argmax(coords[dim])
+        return {p:v for p,v in zip(self.data.columns,coords[:,idxmax])}
+
+    def table_contour(
+            self,
+            return_period,
+            range_values = None,
+            range_dim = -2,
+            slice_value = None,
+            slice_dim = -3,
+            state_duration = 1,
+            range_interval = 0.5,
+            n_samples = None,
+            slice_width = 0.01,
+            contour_method = "IFORM"
+        ):
+        """
+        Summarize a contour in the form of a table, i.e., a list of points lying on the contour.
+        The function is general to 2 or 3 dimensions.
+
+        For example: Get the Tp values corresponding to Hs = 1,2,3,4,5 for a 100-year return period.
+
+        Parameters
+        ----------
+        return_period : float
+            Return period in years.
+        range_values : float or list of floats
+            A value or list of values, to sample the contour along range_dim.
+            This becomes the rows of the resulting table.
+        range_dim : int
+            The dimension along which to sample the range_values.
+        fixed_value : float
+            A value for the fixed dimension. Only needed if the model is 3D.
+        fixed_dim : int
+            The dimension to slice at.
+        state_duration : float
+            The average duration (hours) of each sample 
+            in the data used to fit the model.
+        n_samples : int, default 1e3 (2D) or 1e6 (3D)
+            Number of contour points to generate. May need to be tuned for 
+            accuracy vs speed, depending on contour method.
+        contour_method : str
+            The method of calculating a contour. One of:
+
+             - "IFORM", the inverse first-order reliability method
+             - "ISORM", the inverse second-order reliability method
+             - "HighestDensity"
+             - "DirectSampling"
+             - "ConstantAndExceedance"
+             - "ConstantOrExceedance"
+
+        Notes
+        -----
+        The method relies on generating many contour points, then 
+        a thin 2D "slice" at a fixed value (if the model is 3D),
+        then a thin "band" at different values of the range-dimension.
+        For each such band, the smallest and highest contour value of the 
+        last "free" dimension is found.
+        
+        There is a significant tradeoff - a large number of points 
+        is expensive, but a smaller number of points requires 
+        wider margins to guarantee at least one small and large
+        point within each slice/band, this increases error.
+
+        A more elegant solution would be interpolation, requiring fewer points.
+        """
+
+        if not n_samples: n_samples = int(1e6) if self.n_dim==3 else int(1e5)
+
+        contour = get_contour(
+            self,return_period=return_period,state_duration=state_duration,
+            method=contour_method,n_samples=n_samples,point_distribution="random")
+        coords = contour.coordinates.T
+
+        if range_dim<0:range_dim=self.n_dim+range_dim
+        if slice_dim<0:slice_dim=self.n_dim+slice_dim
+        free_dim = [i for i in range(self.n_dim) if (i!=range_dim) and (i!=slice_dim)]
+        if len(free_dim) != 1: raise ValueError(
+            "range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
+        free_dim = free_dim[0]
+
+        column_names = [] if self.n_dim==2 else [f"{self.semantics['names'][slice_dim]}"]
+        column_names.append(f"{self.semantics['names'][range_dim]}")
+        column_names.append(f"{self.semantics['names'][free_dim]}: {return_period}-year-low")
+        column_names.append(f"{self.semantics['names'][free_dim]}: {return_period}-year-high")
+
+        if self.n_dim == 3:
+            coords = coords[:,np.abs(coords[slice_dim]-slice_value)<slice_width]
+            coords = coords[[i for i in range(3) if i!=slice_dim]]
+            if range_dim > slice_dim: range_dim -= 1
+            if free_dim > slice_dim: free_dim -= 1
+
+        if range_values is None:
+            range_from = np.ceil(coords[range_dim].min()/range_interval)*range_interval
+            range_to = np.ceil(coords[range_dim].max()/range_interval)*range_interval
+            range_values = np.arange(range_from,range_to,range_interval)
+        else:
+            range_values = np.atleast_1d(range_values)
+
+        table = []
+        for range_value in range_values:
+            band = coords[:,np.abs(coords[range_dim]-range_value)<slice_width]
+            if len(band[0])<10: 
+                warnings.warn(f"Too little data ({len(band[0])}) at {range_value}, outside contour? Or increase n_samples.")
+                continue
+            free_low, free_high = band[free_dim].min(),band[free_dim].max()
+            row = [] if self.n_dim==2 else [slice_value]
+            table.append(row+[range_value,free_low,free_high])
+
+        return pd.DataFrame(table,columns=column_names)
+
+    def table_isodensity_contour(
+            self,
+            range_values = None,
+            range_dim = -2,
+            slice_value = None,
+            slice_dim = -3,
+            range_interval = 0.5,
+            levels:list[float]=None,
+            points:np.ndarray=None,
+            n_grid_steps=720,
+            ):
+        """
+        Retrieve iso-density contour values in table format.
+
+        Parameters
+        -----------
+        levels : list[float]
+            List of probabilities to plot. Either this or return_values
+            can be specified.
+        points : np.ndarray
+            A list of marginal return values, of e.g. Hs,
+            from which to draw the isodensity contours.
+            This can also be a list of 2D points,
+            in which case they will be considered 
+            joint extremes (any point on a contour).
+        labels : list of strings, optional
+            Labels to use in the figure legend.
+        limits : tuple
+            Plot limits, e.g. ([0,10],[0,20])
+        n_grid_steps : int, default 720
+            The resolution of the contours (higher is better).
+            Increase this number if the contours are not smooth.
+        cmap : matplotlib colormap, optional
+            E.g. "viridis", "Spectral", etc.
+        contour_kwargs : dict, optional
+            Any other keyword arguments for matplotlib.pyplot.contour().
+            Example: {"linewidths": [1,2,3], "linestyles": ["solid","dotted","dashed"]}.
+        """
+
+        # Check dimensions
+        if range_dim<0:range_dim=self.n_dim+range_dim
+        if slice_dim<0:slice_dim=self.n_dim+slice_dim
+        free_dim = [i for i in range(self.n_dim) if (i!=range_dim) and (i!=slice_dim)]
+        if len(free_dim) != 1: raise ValueError("range_dim and slice_dim must be in [-3,-2,-1,0,1,2] and different.")
+        free_dim = free_dim[0]
+
+        column_names = [] if self.n_dim==2 else [f"{self.semantics['names'][slice_dim]}"]
+        column_names.append(f"{self.semantics['names'][range_dim]}")
+
+        self.reset_labels()
+        swap_axis_flag = self.swap_axis
+        self.swap_axis = False
+
+        if self.n_dim == 2:
+            ax = self.plot_isodensity_contours(levels=levels,points=points,n_grid_steps=n_grid_steps)
+
+        if self.n_dim == 3:
+            ax = self.plot_3D_isodensity_contour_slice(
+                density_levels=levels,
+                marginal_values=points,
+                slice_dim=slice_dim,
+                slice_value=slice_value,
+                grid_steps=n_grid_steps)            
+        self.swap_axis = swap_axis_flag
+
+        contours = [c for c in ax.get_children() if "QuadContourSet" in str(c)][0].allsegs[::-1]
+
+        for label in self.legend_labels:
+            column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=low"]
+            column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=high"]
+
+        plt.close()
+
+        # Reduce to 2 dimensions
+        if self.n_dim == 3:
+            if range_dim > slice_dim: range_dim -= 1
+            if free_dim > slice_dim: free_dim -= 1
+
+        # Check range_values
+        if range_values is None:
+            min_val = np.min([c[0][:,range_dim].min() for c in contours])
+            max_val = np.max([c[0][:,range_dim].max() for c in contours])
+            range_from = np.ceil(min_val/range_interval)*range_interval
+            range_to   = np.floor(max_val/range_interval)*range_interval
+            range_values = np.arange(range_from.round(5),range_to.round(5)+range_interval,range_interval)
+        else:
+            range_values = np.atleast_1d(range_values)
+
+        if self.n_dim == 2:
+            table = []
+        elif self.n_dim == 3:
+            table = [[slice_value]*len(range_values)]
+        table.append(range_values)
+        for i,contour in enumerate(contours):
+            lhs,rhs = split_contour(contour[0],split_dim=free_dim)
+
+            tp_lhs = interp1d(lhs[:,range_dim],lhs[:,free_dim],bounds_error=False)(range_values)
+            tp_rhs = interp1d(rhs[:,range_dim],rhs[:,free_dim],bounds_error=False)(range_values)
+
+            table.append(tp_lhs)
+            table.append(tp_rhs)
+
+        return pd.DataFrame(table,index=column_names).T
 
     def get_default_semantics(self):
         """
@@ -1270,7 +1547,6 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             if self.n_dim == 2:
                 x,y = (1,0) if self.swap_axis else (0,1)
             if self.n_dim == 3:
-                #x,y,z = (0,2,1) if self.swap_axis else 
                 x,y,z = (0,1,2)
 
         if ax is None:
@@ -1319,9 +1595,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                             eq = conditional.latex # dependency function
                             parameters.append({
                                 "Distribution":type(dis.distribution).__name__.removesuffix("Distribution"),
-                                "Variable":self.semantics["symbols"][i],
+                                "Variable":self.semantics['symbols'][i],
                                 "Distribution parameter":param,
-                                "Dependent on":self.semantics["symbols"][self.conditional_on[i]],
+                                "Dependent on":self.semantics['symbols'][self.conditional_on[i]],
                                 "Dependency function":"Missing" if eq is None else eq.replace("$",""),
                                 "Dependency parameter":p,
                                 "Value":v})
@@ -1343,7 +1619,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 if complete:
                     parameters.append({
                         "Distribution":dist_type.__name__.removesuffix("Distribution"),
-                        "Variable":self.semantics["symbols"][i],
+                        "Variable":self.semantics['symbols'][i],
                         "Distribution parameter":param,
                         "Dependent on":"-" if self.conditional_on[i] is None else "Fixed",
                         "Dependency function":"-",
@@ -1361,6 +1637,26 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         Printout of the model.
         """
         return self.parameters(complete=True)
+
+    def _reset_axlim(self,ax):
+        """
+        Set appropriate plot limits based on content.
+        """
+        x0,y0,x1,y1 = ax.dataLim.bounds
+
+        x1 *= 1.05
+        y1 *= 1.05
+
+
+        if x0>=0 and x1>=0:
+            ax.set_xlim([0,x1])
+        else:
+            ax.set_xlim([x0,x1])
+
+        if y0>=0 and y1>=0:
+            ax.set_ylim([0,y1])
+        else:
+            ax.set_ylim([y0,y1])
 
     def reset_labels(self):
         """

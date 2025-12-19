@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.ticker as mticker
 import scipy.stats as st
+from matplotlib.patches import Patch
+
 
 #from ..stats.general import *
 from .. import stats
+from ..tables.verification import *
 
 
 
@@ -359,7 +362,92 @@ def taylor_diagram(df,var_ref,var_comp,norm_std=True,output_file='Taylor_diagram
         print('The option you have sent in is invalid.')
     if output_file != "": plt.savefig(output_file,dpi=200,facecolor='white',bbox_inches='tight')
     
+    plt.close()
+    return fig
+
+
+def plot_binned_error_metric(data,var_bin,var_bin_size,var_bin_unit,var_ref,var_comp,var_comp_unit,threshold_min=100,error_metric='bias',output_file='plot_binned_error_metric.png'):
+    """
+    Plots the error_metric between two or more datasets binned along one variable.
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+
+    var_bin: string
+        Name of the variable the data should be binned into. This is the variable that will be on the x-axis.
+    var_bin_unit: string
+        Uunit of var_bin
+    var_ref: string
+        Name of the reference variable
+    var_comp: string or list of strings
+        Name(s) of the variable(s) to be compared to the reference
+    var_comp_unit: string
+        Unit of var_comp (should be the same as fro var_ref)
+    var_bin_size: float
+        Bin size for var_bin
+    threshold_min: integer
+        If the number of data within the given bin is less than the threshold, this data is highlighted in the plot
+    error_metric: string
+        Error/statisctic to be calculated and plotted. The user decides which of ['rmse','bias','mae','corr','scatter_index'] should be calculated.
+    output_file: string
+        Name of the figure
     
-    plt.show()
+    Returns
+    -------
+    Matplotlib figure
+    If there is only one variable to compare to the reference, a bar plot will be output.
+    If multiple variables are compared to the reference, a line plot will be output.
+
+    Authors
+    -------
+    Written by teaje and clio-met
+    """
+    if error_metric in ['scatter_index','corr']:
+        var_comp_unit=''
+
+    fig, ax = plt.subplots(figsize=(8,6))
+
+    if len(var_comp)==1:
+        ds = table_binned_error_metric(data=data,var_bin=var_bin,var_bin_size=var_bin_size,var_ref=var_ref,var_comp=var_comp[0],threshold_min=0,error_metric=[error_metric],output_file='')
+        bins = ds.index.to_numpy()
+        hatch_symb = [None if nn>=threshold_min else '//' for nn in ds['nb_val']]
+        ax.bar(bins,ds[error_metric],width=0.9*var_bin_size,bottom=[0]*len(ds[error_metric]),color='lightgray',hatch=hatch_symb)
+        ax.hlines(y=0,xmin=0,xmax=100,colors='k',linestyles='-',linewidth=1)
+        ax.set_ylabel(error_metric+' ['+var_comp_unit+']',fontsize=16)  # Depends on the metric plotted
+        ax.set_xlabel(var_bin+' ['+var_bin_unit+']',fontsize=16)
+        ax.tick_params(axis='both', labelsize=16)
+        ax.set_title(var_comp[0]+' vs '+var_ref,fontsize=16)
+        ax.set_xlim(bins[0]-var_bin_size/2,bins[-1]+var_bin_size/2)
+        legend_elements = [Patch(color='k',fill=False,hatch='//',label='#val<'+str(threshold_min))]
+        ax.legend(handles=legend_elements,fontsize=14,frameon=False)
+    elif len(var_comp)>1:
+        linestyles=['-','--','.','-.']
+        legend_elements=[]
+        for i in range(len(var_comp)):
+            ds = table_binned_error_metric(data=data,var_bin=var_bin,var_bin_size=var_bin_size,var_ref=var_ref,var_comp=var_comp[i],threshold_min=0,error_metric=[error_metric],output_file='')
+            if i==0:
+                bins = ds.index.to_numpy()
+            ax.plot(bins,ds[error_metric],linestyle=linestyles[i],color='k',label=var_comp[i])
+            marker_symb = ['o' if nn>=threshold_min else 'x' for nn in ds['nb_val']]
+            for j in range(len(bins)):
+                ax.scatter(bins[j],ds[error_metric].iloc[j],color='k',marker=marker_symb[j])
+            del ds,marker_symb
+            legend_elements.append(mlines.Line2D([0],[0],lw=1.5,color='k',linestyle=linestyles[i],label=var_comp[i]))
+        ax.hlines(y=0,xmin=0,xmax=100,colors='k',linestyles='-',linewidth=1)
+        legend_elements.append(mlines.Line2D([0],[0],marker='x',lw=0,color='k',label='#val<'+str(threshold_min)))
+        ax.legend(handles=legend_elements,fontsize=14)
+        ax.set_ylabel(error_metric+' ['+var_comp_unit+']',fontsize=16)  # Depends on the metric plotted
+        ax.set_xlabel(var_bin+' ['+var_bin_unit+']',fontsize=16)
+        ax.tick_params(axis='both', labelsize=16)
+        ax.set_title(str(var_comp)+' vs '+var_ref,fontsize=16)
+        ax.set_xlim(bins[0]-var_bin_size/2,bins[-1]+var_bin_size/2)
+        ax.grid()
+
+    plt.tight_layout()
+
+    if output_file!='':
+        plt.savefig(output_file,dpi=100,facecolor='white',bbox_inches='tight')
+
     plt.close()
     return fig

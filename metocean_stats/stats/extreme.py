@@ -725,7 +725,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
     start = 1
     x = mean_hs[start:]
     y = variance_lnTp[start:]
-    parameters, covariance = curve_fit(aux_funcs.Gauss4, x, y)#,maxfev=10000)
+    parameters, covariance = curve_fit(aux_funcs.Gauss4, x, y, maxfev=10000)
     b1 = 0.005
     b2 = parameters[0]
     b3 = parameters[1]
@@ -1328,38 +1328,6 @@ def get_empirical_return_levels_new(data, var, method="POT",
         df.attrs['var'] = var
 
     return df
-
-def get_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100]):
-    """Compute a joint contour for the given return periods. 
-    Input:
-        data: pd.DataFrame
-        var1: e.g., 'hs'
-        var2: e.g., 'tp'
-        return_periods: A list of return periods in years, default [50,100]
-    Output:
-         contours : list of joint contours, 
-         i.e.,  number of contours based on given return_periods 
-    """
-    from virocon import get_OMAE2020_Hs_Tz, GlobalHierarchicalModel,IFORMContour
-    # Define 2D joint distribution model
-    dist_descriptions, fit_descriptions, _ = get_OMAE2020_Hs_Tz()
-    model = GlobalHierarchicalModel(dist_descriptions)
-    dt = (data.index[1]-data.index[0]).total_seconds()/3600  # duration in hours
-    data_2D =  np.transpose(np.array([data[var1],data[var2]]))
-    model.fit(data_2D, fit_descriptions=fit_descriptions)
-    contours = []
-    for rp in periods:
-        alpha = 1 / (rp * 365.25 * 24 / dt)
-        contour = IFORMContour(model, alpha)
-        coords = contour.coordinates
-        x = coords[:, 1].tolist()
-        y = coords[:, 0].tolist()
-        contours.append({
-            'return_period': rp,
-            'x': x,
-            'y': y
-        })
-    return contours, data_2D
 
 def cca_profiles(data,var='current_speed_',month=None,percentile=None,return_period=None,distribution='GUM',method='default',threshold='default'):
     import sys

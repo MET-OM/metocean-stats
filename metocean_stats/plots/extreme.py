@@ -11,6 +11,7 @@ from pyextremes import get_extremes
 from .. import stats
 from .. import tables
 from ..stats import aux_funcs
+from ..CMA import JointProbabilityModel
 
 def plot_return_levels(data, var, rl, output_file):
     """
@@ -474,54 +475,6 @@ def plot_threshold_sensitivity(df, output_file):
 
     return fig
 
-def plot_joint_2D_contour(data=pd.DataFrame,var1='hs', var2='tp', periods=[50,100], output_file='2D_contours.png'):
-    contours, data_2D = stats.get_joint_2D_contour(data=data,var1=var1,var2=var2, periods=periods)
-    """Plot joint contours for the given return periods. 
-    Input:
-        data: pd.DataFrame
-        var1: e.g., 'hs'
-        var2: e.g., 'tp'
-        return_periods: A list of return periods in years, default [50,100]
-        output_file: Path to save the plot 
-    Output:
-         figure with 2Djoint contours
-    """
-    # Plot the contours and save the plot
-
-    fig, ax = plt.subplots()
-    if len(data_2D)>0:
-        import seaborn as sns
-        sns.set_theme(style="ticks")
-        sns.scatterplot(x=data_2D[:,1], y=data_2D[:,0], ax=ax, color='black')
-    else:
-        pass
-
-    color = plt.cm.rainbow(np.linspace(0, 1, len(periods)))
-    # Compute an IFORM contour with a return period of N years
-    # loop over contours, get index
-
-    for i,contour in enumerate(contours):
-        # Plot the contour
-        x = []
-        x.extend(contour['x'])
-        x.append(x[0])
-
-        y = []
-        y.extend(contour['y'])
-        y.append(y[0])
-
-        rp = contour['return_period']
-        ax.plot(x, y, color=color[i],label=str(rp)+'y')
-
-        ax.set_xlabel(var2,fontsize='16')
-        ax.set_ylabel(var1,fontsize='16')
-
-    plt.grid()
-    plt.title(output_file.split('.')[0],fontsize=18)
-    plt.legend()
-    plt.savefig(output_file,dpi=300)
-    return fig, ax
-
 def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distribution='Weibull3P',method='default',threshold='default'):
     
     # data : dataframe, should be daily or hourly
@@ -601,6 +554,165 @@ def plot_RVE_ALL(dataframe,var='hs',periods=np.array([1,10,100,1000]),distributi
        
     return 
 
+
+def plot_joint_2D_contour(
+        data,
+        var1='hs', 
+        var2='tp',
+        model='hs_tp',
+        return_periods=[10,100,1000], 
+        state_duration = 1,
+        output_file='contours.png'):
+    """
+    Plot joint contours for the given return periods. 
+    
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    model : str, default hs_tp
+        The model. One of 
+
+             - Hs_Tp: DNV-RP-C205 model of significant wave height and peak wave period
+             - Hs_U: DNV-RP-C205 model of wind speed and significant wave height
+    return_periods : list[float], default [50,100]
+        A list of return periods for which to create contours.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    output_file : str
+        Filename for saved figure.
+    
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2)
+    ax = model.plot_contours(periods=return_periods,state_duration=state_duration)
+    model.plot_data_density(ax)
+    model.plot_dependent_percentiles(ax)
+    model.plot_DNVGL_steepness_criterion(ax,label="Steepness\nlimit")
+    model.plot_legend(ax)
+    if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
+    return ax
+
+def plot_joint_3D_contour(
+        data,var1,var2,var3,
+        model="u_hs_tp",
+        return_period=100,
+        state_duration=1,
+        output_file="3D_contour.png"
+        ):
+    """
+    Plot 3-dimensional IFORM contour.
+
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    var3 : str
+        A column of the dataframe corresponding to the third variable of the model.
+    model : str, default hs_tp
+        The model. One of 
+
+            - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
+            - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+
+    return_period : float, default 100
+        The return period represented by the contour.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    
+    output_file : str
+        Filename for saved figure.
+
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2,var3)
+    ax = model.plot_3D_contour(
+        return_period = return_period,
+        state_duration = state_duration)
+    model.plot_legend(ax)
+    ax.set_box_aspect(None,zoom=0.85)
+    if output_file!="":ax.get_figure().savefig(output_file,bbox_inches="tight")
+    return ax
+
+def plot_joint_3D_contour_slices(
+        data,var1,var2,var3,
+        model="u_hs_tp",
+        slice_values=[5,10,15,20,25],
+        return_period=100,
+        state_duration=1,
+        output_file="3D_contour_slices.png"
+        ):
+    """
+    Plot 3-dimensional IFORM contour.
+
+    Parameters
+    -----------
+    data: pd.DataFrame
+        Dataframe containing data columns.
+    var1 : str
+        A column of the dataframe corresponding to the primary variable of the model.
+    var2 : str
+        A column of the dataframe corresponding to the second variable of the model.
+    var3 : str
+        A column of the dataframe corresponding to the third variable of the model.
+    model : str, default hs_tp
+        The model. One of 
+
+            - U_Hs_Tp: Model of wind speed, significant wave height, and peak wave period, based on Li et. al. (2015).
+            - cT_Hs_Tp: Model of current, significant wave height, and peak wave period.
+    slice_values : list[float]
+        The values of the primary variable (e.g., wind speed) to "cut" the 3D contour at.
+    return_period : float, default 100
+        The contour return period.
+    state_duration : int
+        Duration of each entry in the data, in hours. E.g., 1 or 3 hours per entry.
+    
+    output_file : str
+        Filename for saved figure.
+
+    Notes
+    ------
+    Written by efvik.
+
+    This is a simplified functional interface to the CMA module.
+    There are many more configuration options available by using 
+    the JointProbabilityModel class from that module directly.
+    """
+    model = JointProbabilityModel(model)
+    model.fit(data,var1,var2,var3)
+    ax = model.plot_3D_contour_slices(
+        subplots=False,
+        return_period=return_period,
+        state_duration=state_duration,
+        slice_values=slice_values
+        )
+    model.plot_legend(ax)
+    if output_file!="":ax.get_figure().savefig(output_file)
+    return ax
+
 def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='W10',var3_units='m/s',periods=[100],var3_bin=5,threshold_min=100,output_file='Hs.Tp.joint.distribution.multi.binned.var3.png'):  
     """
     Plot joint distribution of Hs-Tp for a given return period for eached binned var3 data
@@ -657,7 +769,33 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
 
 ##################
 
-def plot_joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,10000], title='Hs-Tp joint distribution',output_file='Hs.Tp.joint.distribution.png',density_plot=False):
+def plot_joint_distribution_Hs_Tp(
+        data,var_hs='hs',var_tp='tp',
+        periods=[1,10,100,10000], 
+        title='Hs-Tp joint distribution',
+        output_file='Hs.Tp.joint.distribution.png',
+        density_plot=False,
+        model = "lonowe",
+        state_duration = 1,
+        ):
+
+    if model != "lonowe":
+        model = JointProbabilityModel(model)
+        model.fit(data,var_hs,var_tp)
+        ax = model.plot_contours(
+            periods=periods,
+            state_duration=state_duration
+            )
+        if density_plot:
+            model.plot_data_density(ax,bins=50)
+        else:
+            model.plot_data_scatter(ax)
+        model.plot_dependent_percentiles(ax)
+        model.plot_DNVGL_steepness_criterion(ax)
+        model.plot_legend(ax)
+        if output_file != "": ax.get_figure().savefig(output_file)
+        return ax
+
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
     df = data
     # calculate pdf Hs, Tp 
@@ -1106,6 +1244,6 @@ def plot_cca_profiles(data,var='current_speed_',month=None,percentile=None,retur
     ax.set_xlim(lev[0],lev[-1])
     plt.grid(color='lightgray',linestyle=':')
     plt.tight_layout()
-    plt.savefig(output_file)
+    if output_file != "": plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
     return fig
 

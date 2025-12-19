@@ -3,11 +3,13 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10
+  - pip
+  - python-build     
+  - wheel            
   - xarray
   - matplotlib>=3.1
   - numpy>=2.0
   - pandas>=2.2.1
-  - pip
   - scipy
   - pytest
   - windrose
@@ -18,6 +20,5 @@ dependencies:
   - netcdf4
   - pydap
   - setuptools
-  - metpy               
+  - metpy
   - virocon
-
