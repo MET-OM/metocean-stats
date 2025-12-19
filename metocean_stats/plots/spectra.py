@@ -530,7 +530,7 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
         mean_wind_dir_rad = np.arctan2(data_aggregated['u'], data_aggregated['v'])
         data_aggregated['wind_direction'] = ((450 - np.rad2deg(mean_wind_dir_rad))%360)-180
 
-        plot_direction_arrow(ax_arrow,
+        plot_direction_arrow_on_ax(ax_arrow,
                             direction=(data_aggregated['wind_direction'].sel(height=10) if 'height' in data else data_aggregated['wind_direction']),
                             speed_data=data_aggregated['wind_speed'].sel(height=10) if 'height' in data else data_aggregated['wind_speed'],
                             x0=x0, y0=y0,
@@ -543,14 +543,14 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
             sp =  spec_funcs.Spectral_Partition_wind(data_aggregated, beta=1.3)
 
             # Plot swell
-            plot_direction_arrow(ax_arrow,
+            plot_direction_arrow_on_ax(ax_arrow,
                                 direction=sp['mean_pdir_swell_rad'] if arrow_dir == 'pdir' else sp['mean_dir_swell_rad'],
                                 x0=x0, y0=y0,
                                 color='green',
                                 style='arrow')
 
             # Plot windsea
-            plot_direction_arrow(ax_arrow,
+            plot_direction_arrow_on_ax(ax_arrow,
                                 direction=sp['mean_pdir_windsea_rad'] if arrow_dir == 'pdir' else sp['mean_dir_windsea_rad'],
                                 x0=x0, y0=y0,
                                 color='#E69F00',
@@ -580,7 +580,7 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
         ax_arrow.text(x, y, 'Mean peak wave/' if arrow_dir=='pdir' else "Mean wave/", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom')    
         ax_arrow.text(x + 0.08, y-0.1, "swell", color='green', transform=ax_arrow.transAxes, fontsize=12, va='bottom') if arrow_dir=='pdir' else ax_arrow.text(x + 0.67, y, "swell", color='green', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
         ax_arrow.text(x + 0.36, y-0.1, "/", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom')  if arrow_dir=='pdir' else ax_arrow.text(x + 0.95, y, "/", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom') 
-        ax_arrow.text(x + 0.4, y - 0.1, "windsea", color='#E69F00', transform=ax_arrow.transAxes, fontsize=12, va='bottom') if arrow_dir=='pdir' else ax_arrow.text(x + 0.1, y - 0.1, "windsea", color='#E69F00', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
+        ax_arrow.text(x + 0.4, y - 0.1, "wind sea", color='#E69F00', transform=ax_arrow.transAxes, fontsize=12, va='bottom') if arrow_dir=='pdir' else ax_arrow.text(x + 0.1, y - 0.1, "wind sea", color='#E69F00', transform=ax_arrow.transAxes, fontsize=12, va='bottom')
         if arrow_dir == 'pdir': 
             ax_arrow.text(x, y - 0.2, "direction + mean", color='black', transform=ax_arrow.transAxes, fontsize=12, va='bottom') if arrow_dir=='pdir' else ax_arrow.text(x + 0.6, y - 0.1, "wind", color=color, transform=ax_arrow.transAxes, fontsize=12, va='bottom')
             ax_arrow.text(x + 0.1, y - 0.3, "wind", color=color, transform=ax_arrow.transAxes, fontsize=12, va='bottom') if arrow_dir=='pdir' else ax_arrow.text(x + 0.6, y - 0.1, "wind", color=color, transform=ax_arrow.transAxes, fontsize=12, va='bottom')
