@@ -751,11 +751,11 @@ def plot_partition_peak_dir_freq_2d(data, period = None, month=None, hm0_thresho
 
     ################## plot windsea waves ##################
     ax_2D_spectra_windsea = fig_main.add_axes([0.01, 0.25, 0.45, 0.6], projection='polar')     
-    plot_partition_spec(ax=ax_2D_spectra_windsea, sp=sp_windsea, sp_aggregated=sp_windsea_aggregated, wave_partition='windsea', freq_mask_percentile=windsea_freq_mask_percentile, cmap=cmap)   
+    plot_partition_spec_on_ax(ax=ax_2D_spectra_windsea, sp=sp_windsea, sp_aggregated=sp_windsea_aggregated, wave_partition='windsea', freq_mask_percentile=windsea_freq_mask_percentile, cmap=cmap)   
 
     ################## Plot swell waves ##################
     ax_2D_spectra_swell = fig_main.add_axes([0.45, 0.25, 0.52, 0.6], projection='polar')  
-    plot_partition_spec(ax=ax_2D_spectra_swell, sp=sp_swell, sp_aggregated=sp_swell_aggregated, wave_partition='swell', freq_mask_percentile=swell_freq_mask_percentile, cmap=cmap)
+    plot_partition_spec_on_ax(ax=ax_2D_spectra_swell, sp=sp_swell, sp_aggregated=sp_swell_aggregated, wave_partition='swell', freq_mask_percentile=swell_freq_mask_percentile, cmap=cmap)
 
     ############ Create label with position, period, and Hm0 for the plot ############
     mean_hm0_windsea = sp_windsea_aggregated['Hm0_windsea'].mean(dim='time') 
