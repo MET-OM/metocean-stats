@@ -1673,7 +1673,8 @@ Once the datasets are combined, the following code can be used to generate the p
 .. image:: files/wave_spectrum_diana.png
    :width: 500
 
-**Wind Sea and Swell Wave Peak Direction-Frequency Occurrences**    
+**Wind Sea and Swell Wave Peak Direction-Frequency Occurrences**   
+ 
 This function requires the wave spectra data (NORA3_wave_spec) to be merged with the wind data (NORA3_wind_sub) beforehand. Refer to the Diana section for instructions.
 
 .. code-block:: python
