@@ -80,7 +80,7 @@ Scatter Diagram
 
 .. code-block:: python
    
-   plots.scatter_diagram(
+   tables.scatter_diagram(
        df, 
        var1='HS', 
        step_var1=1, 
