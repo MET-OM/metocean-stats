@@ -37,11 +37,11 @@ def table_monthly_freq_1dspectrum(data, var='SPEC', method='mean', month=None, a
     if not isinstance(spec, pd.DataFrame):                                                          # If not a preprocessed 1D spectrum (pandas.DataFrame)
         spec = spec_funcs.from_2dspec_to_1dspec(spec, var=var, dataframe=True, hm0=True)            # Calculate 1D frequency spectrum by integrating over directions from a 2D directional spectrum.
 
+
     freq_cols = [c for c in spec.columns if c not in ['time', 'Hm0']]                               # Define frequency columns (exclude 'time' and 'Hm0')
 
     if 'Hm0' not in spec.columns:
-        hm0 = spec_funcs.integrated_parameters(data=data, var=var, params=['hm0'])
-        spec['Hm0'] = hm0.values
+        spec['Hm0'] = spec_funcs.integrated_parameters_dict(data[var], data.freq, data.direction)['Hs']
 
     month_map = {                                                                                   # Define month names, with 'Average' as a label for the overall mean
         'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,

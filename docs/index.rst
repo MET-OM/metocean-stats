@@ -1628,8 +1628,10 @@ CCA profiles Table
 
 Wave Spectrum Plots
 -----------------------------------------
+In all the spectra functions, the data can be filtered using the selected start_time and end_time. 
+If start_time and end_time is set to None the full dataset will be used. 
 
-**Monthly Mean 1D Wave Spectrum:**
+**Monthly Mean 1D Wave Spectrum**
 
 .. code-block:: python
 
@@ -1645,7 +1647,7 @@ Wave Spectrum Plots
 .. image:: files/wave_spectrum_1d_months.png
    :width: 500
 
-**1D Spectrum Mean for a Specific Month Across Several Years:**
+**1D Spectrum Mean for a Specific Month Across Several Years**
 
 .. code-block:: python
 
@@ -1661,14 +1663,14 @@ Wave Spectrum Plots
 .. image:: files/wave_spectrum_1d_month.png
    :width: 500
 
-**2D Wave Spectrum at Time of Maximum Hm0 in Selected Period:**
+**2D Wave Spectrum at Time of Maximum Hm0 in Selected Period**
 
 .. code-block:: python
 
    plots.plot_spectrum_2d(
       data, 
       var = 'SPEC',
-      period = ('2021-01-01T00', '2024-12-31T23'),
+      period = ['2021-01-01T00','2024-12-31T23'],
       month = None,
       method = 'hm0_max',
       plot_type = 'pcolormesh',
@@ -1678,13 +1680,23 @@ Wave Spectrum Plots
 .. image:: files/wave_spectrum_2d.png
    :width: 500
 
-**Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile:**         
+**Diana Wave Spectrum with Swell and Windsea Partitions, Averaged Over Times with Hm0 ≥ 99th Percentile**         
 
-- note: Partitioning requires that the wave spetra data (NORA3_wave_spec) is merged with the wind data (NORA3_wind_sub) beforehand, using:
+The function takes an xarray Dataset as input. If the wind data are provided in a CSV file, they must first be converted to an xarray Dataset.
+This can be done as follows:
 
 .. code-block:: python
 
-   spec_funcs.combine_spec_wind(NORA3_wave_spec, NORA3_wind_sub)
+   df = pd.read_csv('NORA3_wind_wave.csv', comment="#", index_col=0, parse_dates=True)
+   df1=df[['wind_speed_10m','wind_direction_10m']]
+   df1.columns=['wind_speed','wind_direction']
+   NORA3_wind_sub=df1.to_xarray()
+
+Partitioning requires that the wave spectra data (NORA3_wave_spec) are merged with the wind data (NORA3_wind_sub) beforehand, using:
+
+.. code-block:: python
+
+   spec_funcs.merge_spec_wind(NORA3_wave_spec, NORA3_wind_sub)
 
 The plotting function can also be used without combining with wind data. However, in that case, partitioning will not be available.  
 Once the datasets are combined, the following code can be used to generate the plot:
@@ -1694,16 +1706,38 @@ Once the datasets are combined, the following code can be used to generate the p
    plots.plot_diana_spectrum(
       data, 
       var = 'SPEC',
-      period = ('2022-01-01T00', '2022-07-31T23'),
-      month = None,
+      period = ['2022-01-01T00', '2022-07-31T23'],
+      month = 1,
       method = 'top_1_percent_mean',
-      partition=True,
-      plot_type = 'pcolormesh'
-      freq_mask=True,
+      partition = True,
+      plot_type = 'pcolormesh',
+      freq_mask = True,
+      bar = 'hm0',
+      arrow_dir = 'pdir',
       output_file  = 'wave_spectrum_diana.png'
    )
 
 .. image:: files/wave_spectrum_diana.png
+   :width: 500
+
+**Wind Sea and Swell Wave Peak Direction-Frequency Occurrences**   
+
+This function requires the wave spectra data (NORA3_wave_spec) to be merged with the wind data (NORA3_wind_sub) beforehand. Refer to the Diana section for instructions.
+
+.. code-block:: python
+
+   plots.plot_partition_peak_dir_freq_2d(
+      data, 
+      var = 'SPEC',
+      period = time,
+      month=month,
+      hm0_threshold = 1,
+      windsea_freq_mask_percentile=None,
+      swell_freq_mask_percentile=99,
+      output_file = 'wave_partition_peak_dir_freq_2d.png'
+   )
+
+.. image:: files/wave_partition_peak_dir_freq_2d.png
    :width: 500
 
 **2D Monthly Mean Wave Spectra**

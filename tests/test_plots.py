@@ -421,6 +421,12 @@ def test_plot_diana_spectrum():
     if os.path.exists(output_file):
         os.remove(output_file)
 
+def test_plot_partition_peak_dir_freq_2d():
+    output_file = 'test_wave_partition_peak_dir_freq_2d.png'
+    fig = plots.plot_partition_peak_dir_freq_2d(data=ds_synthetic_spectra, period=None, month=None, hm0_threshold=1, windsea_freq_mask_percentile=None, swell_freq_mask_percentile=None, output_file=output_file)
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
 def test_plot_spectra_2d():
     output_file = 'test_plot_dir_mean_2dspectrum.png'
     fig = plots.plot_spectra_2d(data=ds_synthetic_spectra, var='SPEC', method='monthly_mean', output_file=output_file)
