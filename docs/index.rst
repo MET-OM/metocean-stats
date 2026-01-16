@@ -2221,7 +2221,7 @@ Linear regression Plot and Table
 
 .. code-block:: python
 
-   plots.plot_yearly_vertical_profiles(
+   plots.plot_linear_regression(
       df,
       var='HS',
       time='Year',
