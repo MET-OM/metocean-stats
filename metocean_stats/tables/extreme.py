@@ -565,11 +565,11 @@ def table_wave_induced_current(ds, var_hs,var_tp,max_hs= 20, depth=200,ref_depth
     return df
 
 
-def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],units = 'm/s' ,distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.csv'):
+def table_profile_return_values(data,var=['W10','W50','W80','W100','W150'], z=[10, 50, 80, 100, 150], periods=[1, 10, 100, 10000],units='m/s',distribution='Weibull3P',method='default',threshold='default', output_file='RVE_wind_profile.csv'):
     df = pd.DataFrame()
     df['z']= ['m'] + [str(num) for num in z] 
-    for p in periods: 
-        df[f'Return period {p} [years]'] = [units] + [stats.RVE_ALL(data,var=var1,periods=p,distribution=distribution,method=method,threshold=threshold)[3].round(2) for var1 in var]
+    for p in periods:
+        df[f'Return period {p} [years]'] = [units] + [stats.RVE_ALL(data,var=var1,periods=p,distribution=distribution,method=method,threshold=threshold)[3].round(2).item() for var1 in var]
     
     if output_file:
         df.to_csv(output_file, index=False)  
@@ -764,7 +764,7 @@ def table_current_for_given_hs(data: pd.DataFrame, var_curr: str,var_hs: str, bi
 def table_extreme_current_profile_rv(data: pd.DataFrame, var: str, z=[10, 20, 30], periods=[1,10,100], percentile=95, fitting_method='polynomial', fmt=".2f", output_file='table_extreme_current_profile_rv.csv'):
     for period in periods:
         df = table_profile_return_values(data=data, var=var, z=z, periods=periods, output_file=None)
-        df[[f'{i}' for i in z]] = np.nan
+        df[[f'{i}' for i in z]] = None #np.nan
         df.loc[0, [f'{i}' for i in z]] = df[f'Return period {period} [years]'][0] # add units
         
         # Create a list of columns to drop, excluding the current period
