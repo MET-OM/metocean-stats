@@ -769,3 +769,185 @@ def plot_nb_hours_below_threshold(df,var='hs',thr_arr=(np.arange(0.05,20.05,0.05
     del ax
     return fig
 
+
+def _weather_window_simulator(
+        data:pd.DataFrame,
+        limits:pd.DataFrame,
+        ):
+    """
+    Simulates an operation starting in each timestamp of the dataframe,
+    for any sequence of limitations.
+
+    Parameters
+    -----------
+    data : pd.DataFrame
+        The dataset with variable column(s).
+    limits : pd.DataFrame
+        Dataframe where the column header describes the limitation, 
+        and the values correspond to the numerical limit in each timestep.
+    """
+    
+    columns = []
+    for i,c in enumerate(limits.columns):
+        if type(c) == str:
+            assert c in data.columns
+            columns.append((c,"upper","inclusive"))
+        elif len(c) == 2:
+            assert c[0] in data.columns
+            assert c[1] in ["upper","lower"]
+            columns.append((c[0],c[1],"inclusive"))
+        elif len(c) == 3:
+            assert c[0] in data.columns
+            assert c[1] in ["upper","lower"]
+            assert c[2] in ["inclusive","exclusive"]
+            columns.append(c)
+    limits.columns = columns
+
+    within_limits = {}
+    for var,edge,inex in limits.columns:
+        lim = np.squeeze(limits[(var,edge,inex)].values)
+        shift = list(np.arange(0,-len(lim),-1,dtype=int))
+        table = data[var].shift(shift)
+
+        print(table.shape)
+        print(lim.shape)
+
+        if edge == "upper" and inex == "inclusive":
+            table = table <= lim
+        if edge == "upper" and inex == "exclusive":
+            table = table < lim
+        if edge == "lower" and inex == "inclusive":
+            table = table >= lim
+        if edge == "lower" and inex == "exclusive":
+            table = table > lim
+
+        within_limits[(var,edge,inex)] = table.all(axis=1)
+    
+    within_limits = pd.DataFrame(within_limits)
+
+    return within_limits
+
+def plot_characteristic_durations(
+        data:pd.DataFrame,
+        limits:pd.DataFrame,
+    ):
+    """
+    Plot the statistics of characteristic durations 
+    corresponding to a specified weather window.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The dataframe, which includes the physical variables of interest.
+    limits : pd.DataFrame
+        A dataframe which specifies the weather window limitations.
+        Each column represents a limitation on one variable.
+        The values are the limit, and the index represents the weather window duration (t0,t1,t2,...).
+        The column name specifies which variable the limitation applies to. Some options are given:
+         - If only a str name is given, it should be the variable on which there is an upper limit, e.g., "hs". This is most common.
+         - If a tuple of two strings is given, the first should be the variable name, and the 
+           second should be either "upper" or "lower" to specify upper or lower limit on that variable.
+           This can be useful, for example, if dealing with u and v components.
+         - If three strings are given, the third should specify "inclusive" or "exclusive" limit. (< vs <=),
+           which can be more explicit in the case of discrete variables.
+    """
+
+
+    table = _weather_window_simulator(data,limits)
+    data["within_limits"] = table.all(axis=1)
+
+    # Compute waiting time to next valid start
+
+    can_start_idx = data.index[data["within_limits"]]
+    next_idx_pos = np.searchsorted(can_start_idx, data.index)
+    next_valid_time = pd.Series(pd.NaT, index=data.index, dtype="datetime64[ns]")
+    mask = next_idx_pos < len(can_start_idx)
+    next_valid_time[mask] = can_start_idx[next_idx_pos[mask]]
+
+    data["waiting_time"] = (next_valid_time - data.index) / pd.Timedelta(hours=1)
+    data.loc[data["within_limits"], "waiting_time"] = 0
+
+    data["characteristic_duration"] = data["waiting_time"] + len(limits)
+
+    stats = data["characteristic_duration"].groupby(data.index.month).describe(percentiles=[0.5,0.6,0.7,0.8,0.9]).drop(["count","std","min","max"],axis=1).astype(int)
+    stats.index = [pd.to_datetime(i,format="%m").strftime("%B")[:3] for i in stats.index]
+    stats = stats/24
+
+    ax = stats.plot(cmap="viridis",grid=True, marker="o", linestyle="--")
+    _ = ax.set_xticks(np.arange(12),stats.index)
+    ax.legend(loc="upper center")
+    ax.set_xlim([-0.5,11.5])
+
+    def float_format(cell): return f"{cell:.1f}"
+    rowColours = plt.get_cmap("viridis")(np.linspace(0,1,len(stats.T.index)))
+    
+    ax.set_xticklabels([])
+    ax.table(stats.T.map(float_format),bbox = (0,-0.5,1,0.5),rowColours=rowColours)
+    ax.set_ylabel("Characteristic duration [days]")
+
+    return ax
+
+def plot_weather_window_probability(
+        data:pd.DataFrame,
+        limits:pd.DataFrame
+    ):
+    """
+    Plot the empirical probability of finding a weather 
+    window within various time periods, for different times of year.
+
+    In other words, it gives the ratio of years in the dataset in which there
+    was a weather window starting in the respective hour, day, week or month of the year.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The dataframe, which includes the physical variables of interest.
+    limits : pd.DataFrame
+        A dataframe which specifies the weather window limitations.
+        Each column represents a limitation on one variable.
+        The values are the limit, and the index represents the weather window duration (t0,t1,t2,...).
+        The column name specifies which variable the limitation applies to. Some options are given:
+         - If only a str name is given, it should be the variable on which there is an upper limit, e.g., "hs". This is most common.
+         - If a tuple of two strings is given, the first should be the variable name, and the 
+           second should be either "upper" or "lower" to specify upper or lower limit on that variable.
+           This can be useful, for example, if dealing with u and v components.
+         - If three strings are given, the third should specify "inclusive" or "exclusive" limit. (< vs <=),
+           which can be more explicit in the case of discrete variables.
+    """
+    table = _weather_window_simulator(data,limits)
+    data["within_limits"] = table.all(axis=1)
+
+    data["week_of_year"] = data.index.isocalendar().week
+    data["hour_of_year"] = (data.index.dayofyear - 1) * 24 + data.index.hour
+    data["within_limits"] = data["within_limits"].astype(int)
+
+    colors = plt.get_cmap("viridis")(np.linspace(0,1,4))
+    fig,ax = plt.subplots()
+
+    hourly_probability = data["within_limits"].astype(int).groupby(data["hour_of_year"]).mean()
+    ax.plot(np.linspace(0,366,24*366),hourly_probability,c=colors[0])
+
+    daily_probability = data["within_limits"].astype(int).resample("D").max()
+    ax.plot(np.arange(0,366),daily_probability.groupby(daily_probability.index.day_of_year).mean(),c=colors[1])
+
+    weekly_probability = data.resample("W").max()
+    ax.plot(np.arange(0,369,7),weekly_probability["within_limits"].groupby(weekly_probability["week_of_year"]).mean(),marker="o",c=colors[2])
+
+    avg_days_per_month = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    month_xticks = np.cumsum(avg_days_per_month) - 0.5*np.mean(avg_days_per_month)
+    monthly_probability = data["within_limits"].resample("MS").max()
+    ax.plot(month_xticks,monthly_probability.groupby(monthly_probability.index.month).mean(),marker="o",c=colors[3])
+
+    month_labels = [pd.to_datetime(i,format="%m").strftime("%B")[:3] for i in range(1,13)]
+    ax.set_xticks(month_xticks,month_labels,minor=True)
+    ax.legend(["hour","day","week","month"],title="Probability of a weather\nwindow starting in this")
+
+    month_edges = np.cumsum([0]+avg_days_per_month)
+    ax.set_xticks(month_edges,[],minor=False)
+
+    ax.set_yticks(np.arange(0,1.0001,0.1),[f"{100*p:.0f}%" for p in np.arange(0,1.001,0.1)])
+    ax.set_ylim([0,1])
+    ax.set_ylabel("Probability of at least one weather window starting")
+    ax.set_xlim([0,366])
+
+    return ax
