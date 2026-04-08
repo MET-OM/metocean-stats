@@ -922,16 +922,19 @@ def plot_weather_window_probability(
     data["within_limits"] = data["within_limits"].astype(int)
 
     colors = plt.get_cmap("viridis")(np.linspace(0,1,4))
-    fig,ax = plt.subplots()
+    _,ax = plt.subplots()
 
     hourly_probability = data["within_limits"].astype(int).groupby(data["hour_of_year"]).mean()
-    ax.plot(np.linspace(0,366,24*366),hourly_probability,c=colors[0])
+
+    ax.plot(np.linspace(0,366,len(hourly_probability)),hourly_probability,c=colors[0])
 
     daily_probability = data["within_limits"].astype(int).resample("D").max()
-    ax.plot(np.arange(0,366),daily_probability.groupby(daily_probability.index.day_of_year).mean(),c=colors[1])
+    daily_probability = daily_probability.groupby(daily_probability.index.day_of_year).mean()
+    ax.plot(np.linspace(0,366,len(daily_probability)),daily_probability,c=colors[1])
 
     weekly_probability = data.resample("W").max()
-    ax.plot(np.arange(0,369,7),weekly_probability["within_limits"].groupby(weekly_probability["week_of_year"]).mean(),marker="o",c=colors[2])
+    weekly_probability = weekly_probability["within_limits"].groupby(weekly_probability["week_of_year"]).mean()
+    ax.plot(np.linspace(0,366,len(weekly_probability)),weekly_probability,marker="o",c=colors[2])
 
     avg_days_per_month = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     month_xticks = np.cumsum(avg_days_per_month) - 0.5*np.mean(avg_days_per_month)
