@@ -4,7 +4,7 @@ import xarray as xr
 
 def synthetic_dataset_spectra():
     '''
-    Create a synthetic xarray.Dataset representing a 2D wave spectrum time series
+    Create a synthetic xarray.Dataset representing a 2D wave spectrum time series (includes wind)
     at a single geographical point.
 
     The dataset contains:
@@ -21,7 +21,8 @@ def synthetic_dataset_spectra():
     # Define dimensions
     n_time = 24 * 365 * 2  # Number of time steps: 2 years of hourly data
     n_freq = 30        
-    n_dir = 24           
+    n_dir = 24     
+    heights = np.array([10, 50, 100], dtype=np.int16)      
 
     # Create coordinate arrays
     time = pd.date_range('2021-01-01', periods=n_time, freq='h')                      # Hourly time steps from Jan 1, 2021
@@ -59,22 +60,45 @@ def synthetic_dataset_spectra():
         }
     )
 
-    # Construct the full Dataset with SPEC and metadata
+    # Base wind at 10 m
+    base_wind = (
+        8
+        + 2 * np.sin(2 * np.pi * time_hours / (24 * 365))
+        + np.random.randn(n_time)
+    )
+
+    # Simple vertical wind profile (log-like increase)
+    wind_speed = np.empty((n_time, len(heights)))
+    for i, h in enumerate(heights):
+        wind_speed[:, i] = base_wind * (1 + 0.05 * np.log(h / 10))
+
+    # Wind direction (height-independent, small noise)
+    wind_direction = (
+        180
+        + 40 * np.sin(2 * np.pi * time_hours / (24 * 180))
+        + 10 * np.random.randn(n_time)
+    ) % 360
+
+    wind_direction = np.repeat(wind_direction[:, None], len(heights), axis=1)
+
+    # Construct the full Dataset with SPEC, wind and metadata
     ds = xr.Dataset(
-        {
-            "SPEC": spec
+        data_vars={
+            "SPEC": spec,
+            "wind_speed": (("time", "height"), wind_speed),
+            "wind_direction": (("time", "height"), wind_direction),
+            "longitude": ("time", np.full(n_time, 4.0, dtype=np.float32)),
+            "latitude": ("time", np.full(n_time, 60.0, dtype=np.float32)),
         },
         coords={
             "time": time,
             "freq": freq,
             "direction": direction,
-            "x": 4,                                                                   # Dummy x-dimension for compatibility
-            "longitude": 4.0,                                                         # Constant longitude (as coordinate)
-            "latitude": 60.0                                                          # Constant latitude (as coordinate)
+            "height": heights,
         },
         attrs={
-            "title": "Simplified synthetic wave dataset, single point, 2 years",
-        }
+            "title": "Synthetic wave spectrum and wind dataset (single point)",
+        },
     )
 
     return ds

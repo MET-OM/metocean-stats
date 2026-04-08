@@ -277,6 +277,7 @@ def interpolate_dataarray_spec( spec: xr.DataArray,
     new_coordinates[dir_var] = new_directions
     return xr.DataArray(new_spec,new_coordinates)
 
+
 def integrated_parameters_dict(
     spec:       np.ndarray|xr.DataArray, 
     frequencies:np.ndarray|xr.DataArray, 
@@ -356,80 +357,7 @@ def integrated_parameters_dict(
     return spec_parameters
 
 
-def integrated_parameters(data, var='SPEC', params=None):
-    '''
-    Calculate significant wave height (Hm0), peak frequency, and peak direction 
-    from a directional wave spectrum. You can select which parameters to compute.
-
-    Parameters
-    - data : xarray.Dataset or xarray.DataArray
-        Wave spectrum with dimensions including 'freq' and 'direction'. If a Dataset,
-        the spectral variable is specified by `var`.
-    - var : str, optional, default = 'SPEC'
-        Name of the spectral variable in `data` if `data` is a Dataset.
-    - params : list of str or None, optional, default = None
-        List of parameters to compute. Possible values: 'hm0', 'peak_freq', 'peak_dir'.
-        If None, all parameters are computed.
-
-    Returns
-    - tuple or single xarray.DataArray
-        The requested parameters, in order ('hm0', 'peak_freq', 'peak_dir'). If only
-        one parameter is requested, returns it directly.
-    '''
-    if params is None:
-        params = ['hm0', 'peak_freq', 'peak_dir']
-    else:
-        # Validate params list
-        valid_params = {'hm0', 'peak_freq', 'peak_dir'}
-        if not set(params).issubset(valid_params):
-            raise ValueError(f"Invalid params {params}. Allowed values are {valid_params}")
-
-    try:
-        data = data[var]
-    except KeyError:
-        pass
-
-    directions = data['direction']
-    frequencies = data['freq']
-
-    # Convert directions to radians if in degrees
-    if directions.max().item() > 2 * np.pi:
-        directions = np.deg2rad(directions)
-
-    # Assign radian direction coordinates to spectrum (for correct integration)
-    data = data.assign_coords(direction=directions)
-
-    results = {}
-
-    # Compute peak_freq and/or peak_dir only if requested
-    if 'peak_freq' in params or 'peak_dir' in params:
-        spec_flat = data.stack(freq_dir=("freq", "direction"))                                      # Combine frequency and direction dimensions into a single dimension to find global peak
-        peak_flat_idx = spec_flat.argmax(dim="freq_dir")                                            # Find index of maximum spectral energy along the combined freq-direction dimension
-        freq_idx, dir_idx = np.unravel_index(peak_flat_idx, (len(frequencies), len(directions)))    # Convert the flat index back into separate frequency and direction indices
-        
-        if 'peak_freq' in params:                                                                   # Select frequencies and directions at the peak indices
-            results['peak_freq'] = frequencies.isel(freq=freq_idx)
-        if 'peak_dir' in params:
-            results['peak_dir'] = directions.isel(direction=dir_idx)
-
-    # Compute hm0 only if requested
-    if 'hm0' in params:
-        spec_1d = data.integrate(coord='direction')
-        m0 = spec_1d.integrate(coord='freq')
-        results['hm0'] = 4 * np.sqrt(m0)
-
-    # Return in fixed order, but only requested params
-    output_order = ['hm0', 'peak_freq', 'peak_dir']
-    output = tuple(results[param] for param in output_order if param in params)
-
-    # If only one param requested, return it directly (not tuple)
-    if len(output) == 1:
-        return output[0]
-    else:
-        return output
-
-
-def combine_spec_wind(dataspec, datawind):
+def merge_spec_wind(dataspec, datawind):
     '''
     Merge spectral and wind datasets after dropping conflicting spatial coordinates ('x' and 'y').
     Both input datasets must correspond to a single geographic location.
@@ -480,10 +408,16 @@ def from_2dspec_to_1dspec(data, var='SPEC', dataframe=True, hm0=False):
     if spec2d['direction'].max() > 2 * np.pi:                                                # Convert direction coordinates from degrees to radians if needed (assuming max direction value > 2π)
         spec2d = spec2d.assign_coords(direction=np.deg2rad(spec2d['direction']))
 
+    spec2d = spec2d.sortby('direction')
     spec_1d = spec2d.integrate(coord='direction')                                            # Integrate over the 'direction' coordinate to collapse 2D spectrum into 1D frequency spectrum
+
+    if np.any(spec_1d < 0):
+        print("Warning: negative 1D spectra values set to 0")
+        spec_1d = np.clip(spec_1d, a_min=0, a_max=None)
 
     if dataframe:
         df = spec_1d.to_pandas().reset_index()                                               # Convert xarray.DataArray to pandas DataFrame and reset index so 'time' becomes a column
+        # df = pd.DataFrame(spec_1d).reset_index()
         df.columns.name = None
 
         if hm0 and isinstance(data, xr.Dataset) and 'hm0' in data:                           # Optionally add 'Hm0' column if requested and present in the input dataset
@@ -513,8 +447,11 @@ def standardize_wave_dataset(data):
     # Detect NORAC product
     if 'product_name' in data.attrs and data.attrs['product_name'].startswith("ww3"):
         # Rename dims and vars
-        data = data.rename({
-            'frequency': 'freq',
+        if 'frequency' in data:
+            data = data.rename({
+                'frequency': 'freq'})
+        if 'efth' in data:
+            data = data.rename({
             'efth': 'SPEC'})
 
     return data
@@ -527,12 +464,14 @@ def filter_period(data, period):
     Parameters
     - data : xarray.Dataset or xarray.DataArray
         The input dataset containing a 'time' dimension.
-    period : tuple or None
-        A tuple specifying the desired time range.
-        - (start_time, end_time): Filters between start_time and end_time.
-        - (start_time,): Filters to a single timestamp.
+    period : list or None
+        A list specifying the desired time range.
+        - [start_time, end_time]: Filters between start_time and end_time.
+        - [start_time]: Filters to a single timestamp.
+        - [None, end_time] / [start_time, None]: Filter from the first available timestamp up to `end_time`, or from `start_time` to the last available timestamp.
+        - [Year]: Uses the specified year as the time range. Can be int or string.
         - None: Uses the full time range available in data.
-        Both start_time and end_time may be strings or datetime-like objects.
+        Both start_time and end_time must be strings
 
     Returns
     filtered_data : xarray.Dataset or xarray.DataArray
@@ -545,23 +484,21 @@ def filter_period(data, period):
     # Finds data time range
     data_start = pd.to_datetime(data.time.min().values)
     data_end = pd.to_datetime(data.time.max().values)
-
-    # Uses the full dataset if period is None
-    if period is None:
+ 
+    if period is None or str(period[0]).isdigit() and len(str(period[0])) == 4:
         start_time, end_time = data_start, data_end
-    
-    # Uses the choosen period range
-    elif isinstance(period,tuple):
-        start_time, end_time = pd.to_datetime(period[0]), pd.to_datetime(period[1])
 
-        if start_time < data_start or end_time > data_end:
-            raise ValueError(f"Period {start_time} to {end_time} is outside data range {data_start} to {data_end}.")
-
-    # Uses one timestamp if choosen
     else:
-        start_time = end_time = pd.to_datetime(period)
-        if start_time not in data.time.values:
-            raise ValueError(f"({start_time}) is outside data range {data_start} to {data_end}.")
+        if len(period) == 1:
+            start_time = end_time = pd.to_datetime(period[0])
+        else:
+            start_time = pd.to_datetime(period[0]) if period[0] is not None else data_start
+            end_time   = pd.to_datetime(period[1]) if period[1] is not None else data_end
+
+    if start_time < data_start or end_time > data_end:
+        raise ValueError(f"Period {start_time} to {end_time} is outside data range {data_start} to {data_end}.")
+    if period is not None and not isinstance(period, list):
+        raise ValueError ('Period must be a list. ["yyyy-mm-ddThh", "yyyy-mm-ddThh"]')
 
     filtered_data = data.sel(time=slice(start_time, end_time))
 
@@ -570,7 +507,11 @@ def filter_period(data, period):
     else:
         period_label = f"{start_time.strftime('%Y-%m-%dT%H')}Z to {end_time.strftime('%Y-%m-%dT%H')}Z"
 
+    if isinstance(filtered_data, xr.DataArray):
+        filtered_data = filtered_data.to_dataset()
+
     return filtered_data, period_label
+
 
 def wrap_directional_spectrum(data, var='SPEC'):
     '''
@@ -592,7 +533,7 @@ def wrap_directional_spectrum(data, var='SPEC'):
         datspec=data[var]
     except KeyError:
         datspec=data
-
+    
     directions = datspec.coords['direction']
 
     # Ensure directions are 0–360 and sorted
@@ -611,10 +552,11 @@ def wrap_directional_spectrum(data, var='SPEC'):
     else:
         dirc = directions
         spec = datspec
+
     return spec, dirc
 
 
-def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
+def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None, hm0_threshold=1):
     '''
     Aggregate a variable over time using the specified method, with optional filtering by month.
 
@@ -632,10 +574,11 @@ def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
         Variable name to aggregate (ignored if `data` is a DataArray).
     - method : str, optional, default='mean'  
         Aggregation method:  
-        - 'mean'            : Average over time.  
+        - 'mean'                 : Average over time.  
         - 'top_1_percent_mean'   : Average over times where Hm0 ≥ 99th percentile.  
-        - 'hm0_max'         : Use time step with maximum Hm0.  
-        - 'hm0_top3_mean'   : Average of Hm0 over the three time steps with the highest values.
+        - 'hm0_max'              : Use time step with maximum Hm0.  
+        - 'hm0_top3_mean'        : Average of Hm0 over the three time steps with the highest values.
+        - 'hm0_threshold'        : Filters the data to only include timestamps where hm0 is over the threshold.
     - month : int, optional, default=None  
         If set (1-12), filters data to that month. Otherwise, uses all available data.
 
@@ -645,18 +588,19 @@ def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
     '''
     
     try:
-        data=data[var]
+        data_spec=data[var]
     except KeyError:
-        data = data
+        data_spec = data
 
     # Apply monthly filtering if needed
     if month is not None:
-        time_mask = data['time'].dt.month == month
-        data = data.sel(time=time_mask)
+        time_mask = data_spec['time'].dt.month == month
+        data_spec = data_spec.sel(time=time_mask)
         hm0 = hm0.sel(time=time_mask)
 
+
     if method == 'mean':
-        data_aggregated = data.mean(dim='time')              
+        data_aggregated = data_spec.mean(dim='time')              
 
     elif method == 'top_1_percent_mean':
         # Get time steps where hm0 >= 99th percentile
@@ -664,7 +608,7 @@ def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
         high_hm0_times = hm0['time'][hm0 >= p99]
 
         # Select those time steps from data
-        spec_p99 = data.sel(time=high_hm0_times)
+        spec_p99 = data_spec.sel(time=high_hm0_times)
         data_aggregated = spec_p99.mean(dim='time')
     
     elif method == 'hm0_max':
@@ -672,7 +616,7 @@ def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
         hm0_max_time = hm0.idxmax(dim='time')
 
         # Select data at that max hm0 time step
-        spec_hm0_max = data.sel(time=hm0_max_time)
+        spec_hm0_max = data_spec.sel(time=hm0_max_time)
         data_aggregated = spec_hm0_max
 
     elif method == 'hm0_top3_mean':
@@ -680,16 +624,30 @@ def aggregate_spectrum(data, hm0, var='SPEC', method='mean', month=None):
         top3_times = hm0.sortby(hm0, ascending=False)['time'][:3]
 
         # Select those times from data
-        spec_top3 = data.sel(time=top3_times)
+        spec_top3 = data_spec.sel(time=top3_times)
         data_aggregated = spec_top3.mean(dim='time')
 
         # Store top 3 times as metadata
         data_aggregated.attrs['hm0_top3_timesteps'] = [str(t) for t in top3_times.values]
+    
+    elif method == 'hm0_threshold':
+        # Filter hm0 values above threshold
+        hm0_filtered = hm0.where(hm0 > hm0_threshold, drop=True)
+
+        if len(hm0_filtered.time) > 0:
+            # Select corresponding spectral data
+            data_aggregated = data_spec.sel(time=hm0_filtered.time)
+        elif np.isnan(hm0).all():
+            # print(f'All Hm0_{list(data.data_vars)[0].split('_')[-1]} values are NaN')
+            data_aggregated = data_spec.sel(time=hm0_filtered.time)
+            data_aggregated = data_aggregated.map(lambda x: 0 * x)
+        elif len(hm0_filtered.time) == 0:
+            raise ValueError(f'No data with Hm0 > {hm0_threshold}. Lower hm0_threshold.')
 
     return data_aggregated
 
 
-def compute_mean_wave_direction(data, var='SPEC', method='mean', month=None, hm0=None):
+def compute_mean_wave_direction(data, var='SPEC', mean_pdir=False):
     '''
     Compute the mean wave direction from a directional wave energy spectrum.
 
@@ -705,72 +663,63 @@ def compute_mean_wave_direction(data, var='SPEC', method='mean', month=None, hm0
         - The integrals are approximated by summations over the frequency and
           direction bins weighted by the bin widths.
 
+    If mean_pdir=True, the mean peak direction is calculated instead. 
+          
     Parameters:
     - data : xarray.Dataset or xarray.DataArray
         Wave spectrum with dimensions including 'freq' and 'direction'. If a Dataset,
         the spectral variable is specified by `var`.
     - var : str, optional, default = 'SPEC'
         Name of the spectral variable in `data` if `data` is a Dataset.
-    - method : str, optional, default = 'mean'
-        Aggregation method to apply over time ('mean', 'top_1_percent_mean', 'hm0_max', 'hm0_top3_mean') after computing a and b.
-    month : int or None, optional, default = None
-        If specified, selects data only for that month (1-12) before computing direction.
-    hm0 : xarray.DataArray or None, optional, default = None
-        Significant wave height time series. This is required for weighted aggregation.
-        It must either be passed explicitly or be present as `data[var]['hm0']`.
-
+    - mean_pdir : bool, optional, default = False,
+        False : calculates mean wave direction
+        True : calculated mean peak wave direction
 
     Returns:
     - mean_dir_rad : xarray.DataArray
-        Mean wave direction in radians using the mathematical convention:
+        Mean (peak) wave direction in radians using the mathematical convention:
         0 = East, positive counter-clockwise (CCW).
 
     Notes:
-    - Direction angles in the input are assumed to be oceanographic (0° = North, increasing clockwise).
-      They are converted to mathematical radians (0 = East, increasing CCW).
     - Frequency and direction bin widths are computed using gradients and used to weight the integration.
     - The final direction is based on vector summation (a, b) and converted using arctangent.
     - Based on the method in the WAVEWATCH III User Manual (v6.07, NOAA/NCEP, 2019).
     '''
 
     try:
-        spectrum=data[var]
+        spectrum = data[var].sortby('direction')
     except KeyError:
-        spectrum = data                                                                             # Extract the spectrum variable (dimensions expected: ['time', 'freq', 'direction'])
+        spectrum = data.sortby('direction')
 
-    directions_rad = np.deg2rad((450 - spectrum['direction']) % 360)                                # Convert oceanographic directions (degrees, coming from North clockwise) 
-                                                                                                    # to mathematical directions (radians, pointing to East counterclockwise)
+    direction = data['pdir'] if mean_pdir else spectrum['direction']
 
-    delta_freq = np.gradient(spectrum.freq.values)                                                  # Calculate frequency bin widths
+    directions_rad = np.deg2rad((450 - direction) % 360)                                                        # Convert to mathematical convention (radians, pointing to East counterclockwise)
+    
+    if not mean_pdir:
+        # Full 2D integration
+        delta_freq = np.gradient(spectrum.freq.values)                                                          # Calculate frequency and dir bin widths
+        delta_dir = np.gradient(spectrum['direction'])
+        delta_dir_rad = np.deg2rad(delta_dir)                   
+        dfreq_2d = xr.DataArray(delta_freq, dims=['freq'])                                                      # Create DataArrays for bin widths to broadcast over spectrum dims
+        ddir_2d = xr.DataArray(delta_dir_rad, dims=['direction'])
+        area_element = dfreq_2d.broadcast_like(spectrum) * ddir_2d.broadcast_like(spectrum)                     # Compute the area element dfreq ddir for each frequency-direction bin by outer product
 
-    delta_dir = np.gradient(spectrum['direction'])                                                  # Calculate direction bin widths in degrees and convert to radians
-    delta_dir_rad = np.deg2rad(delta_dir)
 
-    dfreq_2d = xr.DataArray(delta_freq, dims=['freq'])                                              # Create DataArrays for bin widths to broadcast over spectrum dims
-    ddir_2d = xr.DataArray(delta_dir_rad, dims=['direction'])
+    if mean_pdir:
+        peak_directions_rad = np.deg2rad(450 - (spectrum.integrate('freq').idxmax(dim='direction')) % 360)      # Computes mean peak direction
+        a = xr.ufuncs.cos(peak_directions_rad) 
+        b = xr.ufuncs.sin(peak_directions_rad)
 
-    area_element = dfreq_2d.broadcast_like(spectrum) * ddir_2d.broadcast_like(spectrum)             # Compute the area element dfreq ddir for each frequency-direction bin by outer product
+    else:
+        a = (xr.ufuncs.cos(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])            # Compute weighted sums a and b over freq and direction dimensions
+        b = (xr.ufuncs.sin(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])
 
-    a = (xr.ufuncs.cos(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])    # Compute weighted sums a and b over freq and direction dimensions
-    b = (xr.ufuncs.sin(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])
-
-    if hm0 is None:
-        try:
-            hm0 = data['hm0']
-        except KeyError:
-            hm0 = integrated_parameters(data=data, var=var, params=['hm0'])
-
-    a = aggregate_spectrum(data=a, hm0=hm0, method=method, month=month)                             # Aggregate based on method
-    b = aggregate_spectrum(data=b, hm0=hm0, method=method, month=month)                     
-
-    mean_dir_rad = np.arctan2(b, a)                                                                 # Compute mean wave direction as arctangent of vector sum components
+    mean_dir_rad = np.arctan2(b, a)
 
     return mean_dir_rad
 
 
-
-
-def Spectral_Partition_wind(data, beta =1.3, method='mean', month=None):
+def Spectral_Partition_wind(data, beta =1.3):
     '''
     Partition wave spectrum into wind sea and swell using the dimensionless parameter A.
 
@@ -782,32 +731,33 @@ def Spectral_Partition_wind(data, beta =1.3, method='mean', month=None):
         Must contain 'SPEC', 'freq', 'direction', 'wind_speed', 'wind_direction' (all with time).
     - beta : float, optional, default = 1.3
         Partition threshold (typically ≤ 1.3).
-    - method : str, default 'mean'
-        Aggregation method for computing mean direction.
-    - month : int or None
-        If set, compute mean direction only for that month.
 
     Returns
     - data : xarray.Dataset
         Dataset with added variables for each partition:
         - 'SPEC_swell', 'SPEC_windsea'
-        - 'Hm0_*', 'Tp_*', 'pdir_*', 'mean_dir_*'
+        - 'Hm0_*', 'Tp_*', 'pdir_*', 'mean_dir_*', 'mean_pdir_*'
     '''
 
     # Calculate the phase speed (cp) using the dispersion relation for deep water waves
     data['cp'] = 9.81/(2*np.pi*data['freq']) 
+    data = data.sortby('direction')
     
     # Initialize an array to store the directional difference between wave direction and wind direction
-    data['diff_dir'] = xr.DataArray(np.zeros((data.time.size, data.direction.size)), 
-                            dims=['time', 'direction'],
-                            coords={'time': data.time, 'direction': data.direction})
+    if 'time' in data.dims:
+        data['diff_dir'] = xr.DataArray(np.zeros((data.sizes['time'], data.sizes['direction'])),dims=('time', 'direction'),coords={'time': data.time, 'direction': data.direction})
 
-    # Loop over each time step to compute the angular difference between wave direction and wind direction
-    for i in range (len(data['diff_dir'].time)):
-        data['diff_dir'][i,:] = angular_difference((data.direction), ((data['wind_direction'].sel(height=10)[i].item() - 180)))
+        # Loop over each time step to compute the angular difference between wave direction and wind direction
+        for i in range(len(data['diff_dir'].time)):
+            data['diff_dir'][i,:] = angular_difference((data.direction), (data['wind_direction'].sel(height=10)[i].item() if 'height' in data else data['wind_direction'][i].item() - 180))
+
+    else:
+        data['diff_dir'] = xr.DataArray(np.zeros(data.sizes['direction']),dims=('direction'),coords={'direction': data.direction})
+        data['diff_dir'][:] = angular_difference((data.direction), (data['wind_direction'].sel(height=10).values if 'height' in data else data['wind_direction'].values))
+
 
     # Calculate the dimensionless parameter A, which is used to distinguish between swell and windsea
-    data['A']  = beta*(data['wind_speed'].sel(height=10)/data['cp'])*np.cos(np.deg2rad(data['diff_dir']))
+    data['A']  = beta*((data['wind_speed'].sel(height=10) if 'height' in data else data['wind_speed'])/data['cp'])*np.cos(np.deg2rad(data['diff_dir']))
 
     # Partition the wave spectrum into swell and windsea components based on the value of A
     data['SPEC_swell'] = data['SPEC'].where(data['A']<=1,0)
@@ -815,18 +765,19 @@ def Spectral_Partition_wind(data, beta =1.3, method='mean', month=None):
 
     # Estimate integrated parameters
     part = ['swell','windsea']
-    for k in range(len(part)):
-        data['Hm0_'+part[k]] = (4*(data['SPEC_'+part[k]].integrate("freq").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
-        data['Tp_'+part[k]] = (1/data['SPEC_'+part[k]].integrate('direction').idxmax(dim='freq')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
-        data['pdir_'+part[k]] = (data['SPEC_'+part[k]].integrate('freq').idxmax(dim='direction'))
-        data['mean_dir_'+part[k]+'_rad'] = compute_mean_wave_direction(data = data['SPEC_' + part[k]], hm0 = data['hm0'], method = method, month=month)
-        data['mean_dir_'+part[k]+'_deg'] = (450 - np.rad2deg(data['mean_dir_'+part[k]+'_rad'].values)) % 360                                            # Meteorological convention (0° = North, clockwise)
 
-    # Uncomment the following lines to print the mean direction
-    # print('Mean wave direction swell:', data['mean_dir_swell_deg'].values)
-    # print('Mean wave direction sea', data['mean_dir_windsea_deg'].values)
+    for k in range(len(part)):
+        spec = data['SPEC_'+part[k]].sortby('direction')
+        data['Hm0_'+part[k]] = (4*(spec.integrate("freq").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
+        data['Tp_'+part[k]] = (1/spec.integrate('direction').idxmax(dim='freq')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
+        data['fp_'+part[k]] = (spec.integrate('direction').idxmax(dim='freq')).assign_attrs(units='s', standard_name = 'peak_wave_freq_'+part[k])
+        data['pdir_'+part[k]] = (spec.integrate('freq').idxmax(dim='direction'))
+
+        data['mean_dir_'+part[k]+'_rad'] = compute_mean_wave_direction(data = data['SPEC_' + part[k]], mean_pdir=False)
+        data['mean_pdir_'+part[k]+'_rad'] = np.arctan2(np.sin(np.deg2rad((450-data['pdir_'+part[k]])%360)), np.cos(np.deg2rad((450 - data['pdir_'+part[k]]%360)))) 
 
     return data
+
 
 def angular_difference(deg1, deg2):
     """

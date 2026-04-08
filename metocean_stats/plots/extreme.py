@@ -1002,11 +1002,19 @@ def plot_prob_non_exceedance_fitted_3p_weibull(data, var='hs', output_file='plot
     ax.set_yticklabels([str(i) for i in a.tolist()])
     ax.set_ylim(-0.5, 2.2)
     
-    # Set grid lines for each integer
-    x_grid_ticks = np.arange(1, int(data[var].max()) + 2)
+    # Set grid lines for minor ticks
+    itv=int(data[var].max())-int(data[var].min())
+    if itv<=10:
+        x_grid_ticks = np.arange(0.5, int(data[var].max()) + 0.5, 0.5)
+    else:
+        x_grid_ticks = np.arange(1, int(data[var].max()) + 1, 1)
     ax.set_xticks(np.log(x_grid_ticks), minor=True)
     
-    # Set major ticks and labels at intervals of 5
+    # Set major ticks and labels
+    if itv<=10:
+        x_major_ticks = np.arange(1, int(data[var].max()) + 1, 1)
+    else:
+        x_major_ticks = np.arange(2, int(data[var].max()) + 2, 2)
     x_major_ticks = np.arange(5, int(data[var].max()) + 5, 5)
     ax.set_xticks(np.log(x_major_ticks))
     ax.set_xticklabels([f'{x}' for x in x_major_ticks])

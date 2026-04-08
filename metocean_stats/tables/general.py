@@ -450,7 +450,8 @@ def table_directional_non_exceedance(data: pd.DataFrame, var: str, step_var: flo
     # Calculate percentage of time each var bin occurs in each month
     percentage_by_dir = 100*data.groupby([data.index, var+'-level'], observed=False)[var].count().unstack()/len(data[var])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
-    cumulative_percentage = cumulative_percentage.fillna(method='ffill')
+    #cumulative_percentage = cumulative_percentage.fillna(method='ffill')
+    cumulative_percentage = cumulative_percentage.ffill()
 
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
@@ -803,8 +804,8 @@ def table_max_min_water_level(data: pd.DataFrame, var_total_water_level: str,var
     min_values = data[var_list].min()
 
     df = pd.DataFrame({'variable': var_list, 'max': max_values, 'min': min_values})
-    new_row = {'variable': 'pressure_surge', 'max': max_pressure_surge, 'min': min_pressure_surge}  
-    df = df._append(new_row, ignore_index=True)
+    new_row = {'variable': ['pressure_surge'], 'max': [max_pressure_surge], 'min': [min_pressure_surge]}  
+    df = pd.concat([df, pd.DataFrame(new_row)], ignore_index=True)
     df = df.T
     df.columns = df.iloc[0]
     df = df.iloc[1:]   

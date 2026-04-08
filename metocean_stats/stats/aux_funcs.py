@@ -284,8 +284,8 @@ def calculate_Us_Tu(H_s, T_p, depth, ref_depth,spectrum='JONSWAP'):
 
         S_u[i,:] = spec_funcs.velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
     
-    M0 = np.trapz(S_u*df,axis=1)
-    M2 = np.trapz((f**2)*S_u*df,axis=1)
+    M0 = np.trapezoid(S_u*df,axis=1)
+    M2 = np.trapezoid((f**2)*S_u*df,axis=1)
     Us = 2*np.sqrt(M0)
     Tu = np.sqrt(M0/M2)
     return Us, Tu

@@ -97,7 +97,7 @@ def table_directional_non_exceedance(data: pd.DataFrame, var1: str, step_var1: f
     # Calculate percentage of time each var1 bin occurs in each month
     percentage_by_dir = 100*data.groupby([data.index, var1+'-level'], observed=True)[var1].count().unstack()/len(data[var1])
     cumulative_percentage = np.cumsum(percentage_by_dir,axis=1).T
-    cumulative_percentage = cumulative_percentage.fillna(method='ffill')
+    cumulative_percentage = cumulative_percentage.ffill()
 
     # Calculate cumulative percentage for each bin across all months
     # Insert 'Omni', 'Mean', 'P99', 'Maximum' rows
