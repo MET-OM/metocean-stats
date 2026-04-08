@@ -433,3 +433,18 @@ def test_plot_spectra_2d():
     if os.path.exists(output_file):
         os.remove(output_file)
 
+def test_plot_characteristic_durations_custom_limits():
+    limits = pd.DataFrame({
+        "HS":[2.5]*24+[3.0]*48,
+        "TP":[12]*24+[15]*48
+    })
+    plots.plot_characteristic_durations(ds,limits)
+
+
+def test_plot_weather_window_probability():
+    limits = pd.DataFrame({
+        "HS":[2.5]*24+[3.0]*48,
+        "TP":[12]*24+[15]*48
+    })
+    plots.plot_weather_window_probability(ds,limits)
+

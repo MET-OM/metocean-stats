@@ -457,6 +457,36 @@ All-Year Round Weather Window For Hs Under A Threshold Table
    :header-rows: 1
    :file: files/weather_window_thresholds.csv
 
+Characteristic durations for custom sequence of operation limits
+---------------------------
+
+.. code-block:: python
+
+    import pandas as pd
+    limits = pd.DataFrame({
+        "HS":[2.5]*24+[3.0]*48,
+        "TP":[20]*24+[25]*48
+    })
+    plots.plot_characteristic_durations(data,limits)
+
+.. image:: files/figure_characteristic_durations_custom_limits.png
+   :width: 500
+
+Empirical weather window probability in different time periods in the year
+---------------------------
+
+.. code-block:: python
+
+    import pandas as pd
+    limits = pd.DataFrame({
+        "HS":[2.5]*24+[3.0]*48,
+        "TP":[20]*24+[25]*48
+    })
+    plots.plot_weather_window_probability(data,limits)
+
+.. image:: files/figure_weather_window_probability.png
+   :width: 500
+
 Monthly Return Periods Table
 ----------------------------
 
