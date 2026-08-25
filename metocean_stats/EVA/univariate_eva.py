@@ -64,7 +64,7 @@ def _get_n_axes(n_intervals, max_cols=4):
         nrows = np.ceil(n_intervals / max_cols).astype(int)
         ncols = max_cols
 
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False)
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False, layout="constrained")
     return fig, axes.ravel()
 
 class UnivariateEVA:
@@ -91,7 +91,10 @@ class UnivariateEVA:
         """
 
         # Sort into sectors
-        data = data[[var,var_dir]].copy()
+        if var_dir is not None:
+            data = data[[var,var_dir]].copy()
+        else:
+            data = data[[var]].copy()
         # data.index = pd.to_datetime(data.index)
         # bins = np.linspace(0, 360, sectors+1,dtype=int)
         # dir_offset = (bins[1]-bins[0])/2
@@ -101,15 +104,18 @@ class UnivariateEVA:
         # Group the data
         self.data_omni = data[var]
         self.data_monthly = groupby_month(data,var=var)
-        self.data_sectors = groupby_sector(
-            data,
-            var_dir=var_dir,
-            sectors=sectors,
-            var=var
-            )
+        if var_dir is not None:
+            self.data_sectors = groupby_sector(
+                data,
+                var_dir=var_dir,
+                sectors=sectors,
+                var=var
+                )
+        else:
+            self.data_sectors = None
 
         # Set keys
-        self.keys_sectors = list(self.data_sectors.keys())
+        self.keys_sectors = list(self.data_sectors.keys()) if self.data_sectors is not None else None
         self.keys_monthly = list(self.data_monthly.keys())
 
         # State flags
@@ -128,6 +134,12 @@ class UnivariateEVA:
         T = np.array(T)
         if method not in ["AM","BM"]: return T
         return 1/(1-np.exp(-(1/T)))
+
+    def _check_sectors_available(self):
+        if self.var_dir is None:
+            raise ValueError(
+                "Sector results are unavailable because var_dir was not provided on init."
+            )
 
     def plot_threshold_diagnostics(
             self,
@@ -160,20 +172,20 @@ class UnivariateEVA:
         if th_monthly is None:
             th_monthly = {k:v.quantile(th_percentile)
                           for k,v in self.data_monthly.items()}
-        if th_sectors is None:
+        if self.data_sectors is not None and th_sectors is None:
             th_sectors = {k:v.quantile(th_percentile)
                           for k,v in self.data_sectors.items()}
 
-
-        if not len(th_monthly) == 12:
-            raise ValueError(f"Expected 12 monthly thresholds, got {len(th_monthly)}.")
+        # if not len(th_monthly) < len(self.data_monthly):
+        #     raise ValueError(f"Expected {len(self.data_monthly)} monthly thresholds, got {len(th_monthly)}.")
         if not isinstance(th_monthly,dict):
             th_monthly = {k:t for k,t in zip(self.keys_monthly,th_monthly)}
 
-        if not len(th_sectors) == len(self.data_sectors):
-            raise ValueError(f"Expected {len(self.data_sectors)} sector thresholds, got {len(th_sectors)}.")
-        if not isinstance(th_sectors,dict):
-            th_sectors = {k:t for k,t in zip(self.keys_sectors,th_sectors)}
+        if self.data_sectors is not None:
+            if not len(th_sectors) == len(self.data_sectors):
+                raise ValueError(f"Expected {len(self.data_sectors)} sector thresholds, got {len(th_sectors)}.")
+            if not isinstance(th_sectors,dict):
+                th_sectors = {k:t for k,t in zip(self.keys_sectors,th_sectors)}
 
         # Omni
         self.am_omni = pyex.get_extremes(
@@ -187,17 +199,21 @@ class UnivariateEVA:
             threshold=th_omni,r=r)
 
         # Sectors
-        self.am_sectors = {k:pyex.get_extremes(
-            self.data_sectors[k],"BM",extremes_type,
-            errors=errors,
-            block_size=block_size,
-            min_last_block=min_last_block*
-            (len(self.data_sectors[k])/len(self.data_omni)))
-            for k in self.keys_sectors}
-        self.pot_sectors = {k:pyex.get_extremes(
-            self.data_sectors[k],"POT",extremes_type,
-            threshold=th_sectors[k],r=r)
-            for k in self.keys_sectors}
+        if self.data_sectors is not None:
+            self.am_sectors = {k:pyex.get_extremes(
+                self.data_sectors[k],"BM",extremes_type,
+                errors=errors,
+                block_size=block_size,
+                min_last_block=min_last_block*
+                (len(self.data_sectors[k])/len(self.data_omni)))
+                for k in self.keys_sectors}
+            self.pot_sectors = {k:pyex.get_extremes(
+                self.data_sectors[k],"POT",extremes_type,
+                threshold=th_sectors[k],r=r)
+                for k in self.keys_sectors}
+        else:
+            self.am_sectors = None
+            self.pot_sectors = None
 
         # Monthly
         self.am_monthly = {k:pyex.get_extremes(
@@ -255,7 +271,7 @@ class UnivariateEVA:
         if not len(all_dist): raise ValueError("No distributions to fit.")
 
         self.models_omni = {}
-        self.models_sectors = {k:{} for k in self.keys_sectors}
+        self.models_sectors = {k:{} for k in self.keys_sectors} if self.data_sectors is not None else None
         self.models_monthly = {k:{} for k in self.keys_monthly}
 
         pbar = tqdm(all_dist)
@@ -280,33 +296,34 @@ class UnivariateEVA:
             self.models_omni[(method,dist)] = model
 
             # Sectors
-            for sector,data in self.data_sectors.items():
-                try:
-                    model = pyex.EVA(data)
-                    if method == "AM":
-                        model.set_extremes(self.am_sectors[sector],
-                                        "BM",self.extremes_type,
-                                            block_size=self.block_size,
-                                            min_last_block=self.min_last_block)
-                        model.fit_model(dist_fit_method(dist,method),dist)
-                    if method == "POT":
-                        model.set_extremes(self.pot_sectors[sector],
-                                        "POT",self.extremes_type,
-                                            threshold=self.th_sectors[sector])
-                        model.fit_model(dist_fit_method(dist,method),dist)
-                    if method == "IDM":
-                        model.set_extremes(self.data_sectors[sector],
-                                        "POT",self.extremes_type,
-                                            # block_size=hours_per_entry
-                                            )
-                        model.fit_model(dist_fit_method(dist,method),dist)
-                    self.models_sectors[sector][(method,dist)] = model
+            if self.data_sectors is not None:
+                for sector,data in self.data_sectors.items():
+                    try:
+                        model = pyex.EVA(data)
+                        if method == "AM":
+                            model.set_extremes(self.am_sectors[sector],
+                                            "BM",self.extremes_type,
+                                                block_size=self.block_size,
+                                                min_last_block=self.min_last_block)
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        if method == "POT":
+                            model.set_extremes(self.pot_sectors[sector],
+                                            "POT",self.extremes_type,
+                                                threshold=self.th_sectors[sector])
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        if method == "IDM":
+                            model.set_extremes(self.data_sectors[sector],
+                                            "POT",self.extremes_type,
+                                                # block_size=hours_per_entry
+                                                )
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        self.models_sectors[sector][(method,dist)] = model
 
-                except Exception as e:
-                    if errors == "raise":
-                        raise
-                    elif errors == "warn":
-                        warnings.warn(f"Failed to fit {dist} ({method}) for sector '{sector}': {e}")
+                    except Exception as e:
+                        if errors == "raise":
+                            raise
+                        elif errors == "warn":
+                            warnings.warn(f"Failed to fit {dist} ({method}) for sector '{sector}': {e}")
 
             # Monthly
             for month,data in self.data_monthly.items():
@@ -528,6 +545,8 @@ class UnivariateEVA:
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
+        if grouping == "sectors":
+            self._check_sectors_available()
 
         # Check if table is included, and its size, to correcly place title
         titlepos = 1 + 0.07*len(return_periods)
@@ -671,6 +690,8 @@ class UnivariateEVA:
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
+        if grouping == "sectors":
+            self._check_sectors_available()
 
         dist = _dist_name_map(dist,False)
         if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
@@ -746,6 +767,8 @@ class UnivariateEVA:
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
+        if grouping == "sectors":
+            self._check_sectors_available()
 
         if grouping == "monthly": 
             models = self.models_monthly | {"Yearly":self.models_omni}
@@ -783,6 +806,9 @@ class UnivariateEVA:
         
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
+
+        if grouping == "sectors":
+            self._check_sectors_available()
 
         if grouping == "omni":
             models = {"Omni":self.models_omni}
@@ -823,6 +849,9 @@ class UnivariateEVA:
         """
         Plot of return values for a given distribution.
         """
+        if grouping == "sectors":
+            self._check_sectors_available()
+
         table = self.table_return_values_final(grouping,method,dist,return_periods)
         if grouping == "monthly": N = 12
         else: N = len(self.models_sectors)

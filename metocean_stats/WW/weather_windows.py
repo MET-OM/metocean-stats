@@ -869,7 +869,7 @@ class WeatherWindow:
 
         freqs = freqs or ["M", "W", "D", "h"]
         if ax is None:
-            fig, ax = plt.subplots(figsize=(15, 6))
+            fig, ax = plt.subplots()
 
         if xlim is not None:
             x0 = pd.Timestamp(f"2000-{xlim[0]}")

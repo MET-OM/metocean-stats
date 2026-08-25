@@ -333,8 +333,10 @@ class SpectralTimeSeries:
             )
 
         for slot, var_name in var_map.items():
-            if var_name is not None:
+            if var_name is not None and dim_map[_ROLE_TIME] is not None \
+                    and dim_map[_ROLE_TIME] in ds[var_name].dims:
                 self._check_time_is_datetime(ds[var_name], var_name, dim_map)
+
 
         dir_unit = (
             self._detect_dir_unit(ds, var_map, dim_map)
@@ -560,25 +562,6 @@ class SpectralTimeSeries:
         dim_map: dict[str, str | None],
         dir_unit: str | None,
     ) -> xr.Dataset:
-        """
-        Check every recognised spectral variable for problems and fix
-        everything that is safely fixable, printing each action as it is
-        taken. Unfixable problems raise immediately, before any fix is
-        applied to anything, so a ValueError never leaves ds half-patched.
-
-        Fix order (later fixes may depend on earlier ones being applied):
-          1. Unfixable checks first, across all variables -- freq must be
-             strictly positive; direction, once in degrees, must fall in
-             [0, 360); each recognised spectral variable must have
-             *exactly* the dims implied by its signature (e.g. an "S"
-             variable must be exactly (time, freq, dir), nothing more).
-             Raising here happens before any mutation below.
-          2. Direction unit: radians -> degrees, coordinate and density
-             both rescaled to conserve total variance.
-          3. Ascending sort of time / freq / dir coordinates.
-          4. Per-variable dimension order (transpose to canonical order).
-          5. Per-variable non-negativity (clip).
-        """
         freq_dim = dim_map[_ROLE_FREQ]
         dir_dim  = dim_map[_ROLE_DIR]
         time_dim = dim_map[_ROLE_TIME]
@@ -600,10 +583,6 @@ class SpectralTimeSeries:
 
         if dir_dim is not None:
             dirs = ds.coords[dir_dim].values.astype(float)
-            # Range is only meaningful once we know we're looking at degrees;
-            # if currently radians, it will become degrees in step 2 below,
-            # so we re-check range *after* conversion, not here. Here we only
-            # catch degree-labelled inputs that are already out of range.
             if dir_unit == "deg" and (np.any(dirs < -180.0) or np.any(dirs > 360.0)):
                 unfixable.append(
                     f"recognised '{dir_dim}' as the dir dimension (degrees), but "
@@ -611,32 +590,6 @@ class SpectralTimeSeries:
                     f"(range=[{dirs.min():.4g}, {dirs.max():.4g}]°). This is not "
                     "a simple wrap-around or sign convention issue -- check the "
                     "source data."
-                )
-
-        # Exact-dimensionality check: a recognised spectral variable must
-        # carry *only* the dims implied by its signature. This matters
-        # because step 4 below transposes to `expected_dims`, which would
-        # otherwise fail with a cryptic xarray error (or silently succeed
-        # while ignoring an extra dim) if the variable carried more dims
-        # than its slot allows.
-        for slot, var_name in var_map.items():
-            if var_name is None:
-                continue
-            actual_dims = ds[var_name].dims
-            expected_roles = _SLOT_ROLES[slot]
-            if len(actual_dims) != len(expected_roles):
-                label = _SPECTRAL_SIGNATURES_BY_SLOT[slot]
-                unfixable.append(
-                    f"'{var_name}' was recognised as the {label} ({slot}) "
-                    f"signature {_signature_roles_str(slot)}, but has "
-                    f"{len(actual_dims)} dimension(s) {actual_dims} instead of "
-                    f"the expected {len(expected_roles)}. Every spectral "
-                    "variable must have exactly the dims (time, freq), "
-                    "(time, dir), or (time, freq, dir) -- no additional "
-                    "dimensions (e.g. 'station') are allowed. Select or "
-                    "squeeze out the extra dimension before constructing "
-                    "SpectralTimeSeries, e.g.:\n"
-                    f"    ds = ds.isel({{'<extra_dim>': 0}})"
                 )
 
         if unfixable:
@@ -667,9 +620,6 @@ class SpectralTimeSeries:
                         "to conserve variance under the unit change"
                     )
 
-            # Re-check range now that we're in degrees -- a radian axis with
-            # a genuinely bad range (e.g. corrupted values) should still be
-            # caught rather than silently sorted/wrapped below.
             dirs_deg = ds.coords[dir_dim].values.astype(float)
             if np.any(dirs_deg < -180.0) or np.any(dirs_deg > 360.0):
                 raise ValueError(
@@ -680,7 +630,8 @@ class SpectralTimeSeries:
                 )
 
         # -------------------------------------------------------------- #
-        # 3. Ascending sort of freq / dir coordinates.                    #
+        # 3. Ascending sort of time / freq / dir coordinates.              #
+        #    Time is now optional -- only sorted if a time role was found. #
         # -------------------------------------------------------------- #
         if time_dim is not None:
             diffs = np.diff(ds.coords[time_dim].values)
@@ -704,7 +655,9 @@ class SpectralTimeSeries:
             if var_name is None:
                 continue
             da = ds[var_name]
-            expected_dims = tuple(dim_map[role] for role in _SLOT_ROLES[slot])
+            trailing_roles = _SLOT_ROLES[slot]
+            trailing_dims = tuple(dim_map[role] for role in trailing_roles)
+            expected_dims = tuple(d for d in da.dims if d not in trailing_dims) + trailing_dims
 
             if da.dims != expected_dims:
                 da = da.transpose(*expected_dims)
@@ -819,6 +772,13 @@ class SpectralTimeSeries:
     # Guards                                                                  #
     # ---------------------------------------------------------------------- #
 
+    def _require_time_dim(self, method_name: str) -> None:
+        if self.dim_map[_ROLE_TIME] is None:
+            raise AttributeError(
+                f"{method_name}() requires a time dimension, but this instance "
+                f"has none (input dims recognised: {self._input_summary()}). "
+            )
+
     def _requires_2d_spectrum(self, method_name: str) -> None:
         if not self.has_2d:
             raise AttributeError(
@@ -873,6 +833,7 @@ class SpectralTimeSeries:
 
     @property
     def time(self) -> pd.DatetimeIndex:
+        self._require_time_dim("time")
         return pd.DatetimeIndex(self.ds.coords[self.dim_map[_ROLE_TIME]].values)
 
     @property
@@ -891,15 +852,18 @@ class SpectralTimeSeries:
 
     @property
     def duration(self) -> pd.Timedelta:
+        self._require_time_dim("duration")
         t = self.time
         return t[-1] - t[0]
 
     @property
     def timestep(self) -> pd.Timedelta:
+        self._require_time_dim("timestep")
         return pd.Series(self.time).diff().median()
 
     @property
     def n_years(self) -> float:
+        self._require_time_dim("n_years")
         return self.duration.total_seconds() / (365.2425 * 24 * 3600)
 
     # ---------------------------------------------------------------------- #
@@ -907,15 +871,21 @@ class SpectralTimeSeries:
     # ---------------------------------------------------------------------- #
 
     def __repr__(self) -> str:
-        t = self.time
+        has_time = self.dim_map[_ROLE_TIME] is not None
         aux_names = self._aux_names(self.ds, self.var_map)
         lines = [
             "SpectralTimeSeries(",
             f"  name          = {self.name}",
             f"  input         = {self._input_summary()}",
-            f"  period        = {t[0].date()} → {t[-1].date()} ({self.n_years:.1f} years)",
-            f"  timestep      = {self.timestep}",
         ]
+        if has_time:
+            t = self.time
+            lines.append(
+                f"  period        = {t[0].date()} → {t[-1].date()} ({self.n_years:.1f} years)"
+            )
+            lines.append(f"  timestep      = {self.timestep}")
+        else:
+            lines.append("  time          = none (not a time series)")
         if self.freqs is not None:
             lines.append(
                 f"  freq          = {len(self.freqs)} bins "
@@ -926,6 +896,13 @@ class SpectralTimeSeries:
                 f"  dir           = {len(self.dirs)} bins "
                 f"[{self.dirs[0]:.4g}–{self.dirs[-1]:.4g}°]"
             )
+        non_time_batch_dims = [
+            d for d in self.ds.dims
+            if d not in (self.dim_map[_ROLE_TIME], self.dim_map[_ROLE_FREQ], self.dim_map[_ROLE_DIR])
+            and d is not None
+        ]
+        if non_time_batch_dims:
+            lines.append(f"  other dims    = {non_time_batch_dims}")
         if aux_names:
             lines.append(f"  aux           = {aux_names}")
         lines += [
@@ -934,8 +911,9 @@ class SpectralTimeSeries:
             ")",
         ]
         return "\n".join(lines)
-
+    
     def __len__(self) -> int:
+        self._require_time_dim("__len__")
         return len(self.time)
 
     # ---------------------------------------------------------------------- #
@@ -1684,6 +1662,7 @@ class SpectralTimeSeries:
             f"{[v for v in self.ds.data_vars if self.ds[v].dims == (time_dim,)]}."
         )
 
+
     def aggregate(
         self,
         by: str,
@@ -1770,6 +1749,7 @@ class SpectralTimeSeries:
             ``_group_counts`` variable along the same group dimension,
             giving the number of time steps aggregated into each group.
         """
+        self._require_time_dim("aggregate")
         return self.groupby(
             by, sectors=sectors, seasons=seasons, step=step, circular_by=circular_by,
         ).aggregate(stat=stat, select_by=select_by)
@@ -1935,6 +1915,7 @@ class SpectralTimeSeries:
         one-level `aggregate(by, ...)`, which is now just a thin wrapper
         around this.
         """
+        self._require_time_dim("groupby")
         groups = self._get_time_groups(
             by, sectors=sectors, seasons=seasons, step=step, circular_by=circular_by,
         )
@@ -2196,6 +2177,7 @@ class SpectralTimeSeries:
         """
         from wavespectra.partition.partition import np_ptm1
 
+        self._require_time_dim("partition_ptm1")
         self._requires_2d_spectrum("partition_ptm1")
         wspd, wdir, dpt = self._wind_inputs(wspd_var, wdir_var, dpt_var, wdir_from)
         freqs = self.ds.coords[self.dim_map[_ROLE_FREQ]].values.astype(float)
@@ -2248,6 +2230,7 @@ class SpectralTimeSeries:
         """
         from wavespectra.partition.partition import np_ptm2
 
+        self._require_time_dim("partition_ptm1")
         self._requires_2d_spectrum("partition_ptm2")
         wspd, wdir, dpt = self._wind_inputs(wspd_var, wdir_var, dpt_var, wdir_from)
         freqs = self.ds.coords[self.dim_map[_ROLE_FREQ]].values.astype(float)
@@ -2333,6 +2316,7 @@ class SpectralTimeSeries:
         """
         from wavespectra.core.utils import celerity as ws_celerity
 
+        self._require_time_dim("partition_ptm4")
         self._requires_2d_spectrum("partition_ptm4")
         wspd, wdir, dpt = self._wind_inputs(wspd_var, wdir_var, dpt_var, wdir_from)
 
@@ -2677,7 +2661,7 @@ class SpectralTimeSeries:
         col: str | None = None,
         col_wrap: int | None = None,
         radius: str = "frequency",
-        plot_type: str = "pcolormesh",
+        plot_type: str = "contourf",
         cmap: str = "viridis",
         vmax: float | None = None,
         dir_letters: bool = False,
@@ -3140,7 +3124,10 @@ class _GroupedSpectralTimeSeries:
             out_arrays = {**out_arrays, **integrated_arrays}
 
         combo_counts = np.array([int(combo_masks[c].sum()) for c in combo_labels])
+
+        level_value_order = [list(d.keys()) for d in level_masks]
         multi_index = pd.MultiIndex.from_tuples(combo_labels, names=level_names)
+        multi_index = multi_index.set_levels(level_value_order, level=level_names)
         mindex_coords = xr.Coordinates.from_pandas_multiindex(multi_index, combo_dim)
 
         out_ds = xr.Dataset(out_arrays)

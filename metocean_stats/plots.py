@@ -11,6 +11,8 @@ from .spectral import _ROLE_TIME, _ROLE_FREQ, _ROLE_DIR, _ALIASES_FREQ, _ALIASES
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.ticker as mticker
+import cmocean
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -19,7 +21,6 @@ from .utils import infer_step
 
 _AUTO_FACET_WARN_THRESHOLD = 25
 _AUTO_FACET_RAISE_THRESHOLD = 100
-
 
 def _grid_shape(n_panels: int, max_cols: int = 4) -> tuple[int, int]:
     """
@@ -76,42 +77,6 @@ def _check_panel_count(n_panels: int, dims: list, errors: str) -> None:
  
 
 
-"""
-plotting
---------
-Faceted spectrum plotting for SpectralTimeSeries, its aggregate()/
-groupby().aggregate() output, and SpectralTimeSeriesCollection.
-
-Three layers, kept deliberately separate:
-
-  Layer 1 (resolver)      _resolve_spectral_target()
-      Given ANY xr.Dataset, find the spectral variable and which of its
-      dims play the freq/dir roles -- via the same alias detection
-      SpectralTimeSeries.__init__ uses, but without requiring a time role,
-      since aggregate() output has no "time" dimension at all.
-
-  Layer 2 (renderer)      _draw_polar_spectrum(), _draw_1d_spectrum(),
-                           _draw_one_panel()
-      Given ONE already-selected 2D or 1D slice and an Axes, draw it.
-      No knowledge of time, grouping, or faceting -- these are pure
-      "array in, pixels out" functions, reused identically by
-      plot_spectra() and by SpectralTimeSeriesCollection.plot().
-
-  Layer 3 (facet engine)  plot_spectra()
-      Given a SpectralTimeSeries or xr.Dataset plus row=/col=/time=,
-      resolves down to 2D/1D slices via Layer 1, loops, calls Layer 2
-      per panel, assembles the grid. Never guesses which leftover
-      dimension to facet over or reduce -- every non-spectral dimension
-      with more than one value must be explicitly handled by time=/row=/
-      col=, or this raises.
-
-This module never imports SpectralTimeSeries itself (only the small
-alias/role constants below) to avoid a circular import, since
-SpectralTimeSeries.plot() imports this module. SpectralTimeSeries-like
-objects are detected via duck-typing (var_map/dim_map/ds attributes),
-consistent with this package's alias-detection philosophy elsewhere.
-"""
-
 def _leftover_dims(da: xr.DataArray, *spectral_dims: str) -> tuple[str, ...]:
     """Every dimension of `da` except the named spectral dimension(s)."""
     return tuple(d for d in da.dims if d not in spectral_dims)
@@ -135,15 +100,74 @@ def _colorbar_label(da) -> str:
     missing rather than raising -- a plot should still render for data
     that hasn't been through SpectralTimeSeries's attrs machinery.
     """
-    name = da.attrs.get("name") or da.name or "Spectral density"
+    # name = da.attrs.get("name") or da.name or "Spectral density"
+    name = "Spectral density"
     units = da.attrs.get("units")
     return f"{name} [{units}]" if units else name
- 
 
 
-# ---------------------------------------------------------------------- #
-# Layer 1: resolve a spectral variable + freq/dir dims, no time required  #
-# ---------------------------------------------------------------------- #
+def _global_radial_zoom(
+    da: xr.DataArray,
+    freq_dim: str | None,
+    dir_dim: str | None,
+    vmin: float,
+    radius: str = "frequency",
+) -> tuple[float | None, float | None]:
+    """
+    Compute a single, GLOBAL radial limit for 2D polar spectrum panels,
+    so every panel in a facet grid can share the same "zoomed in" view
+    and stay comparable -- exactly like vmin/vmax already do for color.
+
+    Finds the LOWEST and HIGHEST frequency at which ANY value anywhere
+    in `da` (across every batch/facet dimension and the direction
+    dimension) still exceeds `vmin`. Outside that frequency range, no
+    panel has anything to show, so it's safe to clip there. Both edges
+    are computed (not just the high-frequency one) because the "empty"
+    side of the spectrum could be either end -- e.g. swell-only data
+    wastes the high-frequency tail, wind-sea-only data wastes the
+    low-frequency end.
+
+    Frequency and period are RECIPROCAL axes, so a cutoff on one is a
+    cutoff on the other end of the other:
+      - radius="frequency": rmin <- lowest valid freq, rmax <- highest
+        valid freq (direct, un-flipped mapping).
+      - radius="period": rmin <- 1/(highest valid freq) [small period,
+        near centre], rmax <- 1/(lowest valid freq) [large period,
+        outer edge] -- flipped, because period grows as frequency
+        shrinks.
+
+    Values are returned in the DATA's native units (Hz or seconds) --
+    any logradius transform is applied later by the caller, exactly
+    like the un-logged vmin/vmax are.
+
+    Returns (rmin, rmax), either or both None if there's no freq
+    dimension to zoom along (i.e. this is a 1D spectrum), or if nothing
+    in the data exceeds vmin (falls back to the full range, no clip).
+    """
+    if freq_dim is None or dir_dim is None:
+        # Zoom only applies to the 2D polar case.
+        return None, None
+
+    other_dims = tuple(d for d in da.dims if d != freq_dim)
+    # Max over every dimension except freq (dir + any leftover batch
+    # dims) -- "is there ANYWHERE, in ANY panel, data above vmin at
+    # this frequency?"
+    max_per_freq = da.max(dim=other_dims, skipna=True)
+    valid = max_per_freq.values > vmin
+    if not np.any(valid):
+        # Nothing exceeds vmin anywhere -- don't zoom into an empty plot.
+        return None, None
+
+    freqs = da.coords[freq_dim].values.astype(float)
+    lowest_valid_freq = float(freqs[valid].min())
+    highest_valid_freq = float(freqs[valid].max())
+
+    if radius == "period":
+        rmin = 1.0 / highest_valid_freq if highest_valid_freq > 0 else None
+        rmax = 1.0 / lowest_valid_freq if lowest_valid_freq > 0 else None
+        return rmin, rmax
+
+    return lowest_valid_freq, highest_valid_freq
 
 def _resolve_spectral_target(
     ds: xr.Dataset,
@@ -211,77 +235,162 @@ def _resolve_spectral_target(
     f, d = _dims_on(candidates[0])
     return candidates[0], f, d
 
+def _to_log_radius(r: np.ndarray) -> np.ndarray:
+    """
+    Map native radial values (Hz or seconds, always > 0 for a spectrum)
+    onto a log10 coordinate for plotting. Kept as a tiny named helper
+    (rather than inlining np.log10 everywhere) so every place that needs
+    to move a radial value onto/off the log axis -- the mesh/contour
+    coordinates themselves, r_zoom, and user rmin/rmax -- goes through
+    exactly one definition and can't drift out of sync with each other.
+    """
+    r = np.asarray(r, dtype=float)
+    return np.log10(r)
 
-# ---------------------------------------------------------------------- #
-# Layer 2: draw ONE already-selected slice onto ONE Axes                  #
-# ---------------------------------------------------------------------- #
 
-def _direction_to_math_radians(deg) -> np.ndarray:
-    """Compass degrees (0=N, clockwise) -> math radians (0=E, CCW)."""
-    deg = np.asarray(deg, dtype=float)
-    return np.deg2rad((450.0 - deg) % 360.0)
+def _radial_ticks(rmin: float, rmax: float, logradius: bool, n: int = 6) -> np.ndarray:
+    """
+    Pick tick locations spanning [rmin, rmax] (already in PLOT
+    coordinates -- i.e. already log10'd if logradius=True), returned in
+    that same PLOT coordinate system so callers can hand them straight
+    to ax.set_rticks().
 
+    For the log case this delegates to matplotlib's own LogLocator
+    (1-2-5-per-decade "nice" ticks) rather than a hand-rolled stepping
+    loop -- a hand-rolled version risks landing on ugly values or, worse,
+    an infinite loop for degenerate/near-equal rmin==rmax ranges, and
+    LogLocator already solves both correctly. When the visible range
+    spans less than one decade (e.g. a tightly-zoomed panel), log
+    spacing has nothing to offer, so this falls back to plain "nice"
+    linear ticks instead -- still returned in log-plot coordinates.
+    """
+    if not logradius:
+        return np.linspace(rmin, rmax, n)
 
+    native_min, native_max = 10 ** rmin, 10 ** rmax
+    if not np.isfinite(native_min) or native_min <= 0:
+        native_min = native_max / 100
+    if native_min >= native_max:
+        return _to_log_radius(np.array([native_min]))
+
+    decades = np.log10(native_max / native_min)
+    if decades < 1.0:
+        ticks = mticker.MaxNLocator(nbins=n, steps=[1, 2, 2.5, 5, 10]).tick_values(native_min, native_max)
+    else:
+        loc = mticker.LogLocator(base=10, subs=(1.0, 2.0, 5.0))
+        ticks = loc.tick_values(native_min, native_max)
+        if len(ticks[(ticks >= native_min) & (ticks <= native_max)]) > n:
+            loc = mticker.LogLocator(base=10, subs=(1.0,))
+            ticks = loc.tick_values(native_min, native_max)
+
+    ticks = ticks[(ticks >= native_min) & (ticks <= native_max)]
+    if len(ticks) < 2:
+        ticks = np.array([native_min, native_max])
+    return _to_log_radius(ticks)
 
 def _draw_polar_spectrum(
     ax, da, freq_dim: str, dir_dim: str,
     radius: str = "frequency", plot_type: str = "pcolormesh",
-    cmap="viridis", vmin: float | None = None, vmax: float | None = None,
+    cmap=cmocean.cm.thermal, vmin: float | None = None, vmax: float | None = None,
     dir_letters: bool = False, log_scale: bool = True,
+    r_zoom: tuple[float | None, float | None] = (None, None),
+    logradius: bool = True,
+    r_limits: tuple[float | None, float | None] = (None, None),
+    mask_below_vmin: bool = False,
 ):
     """
     Draw one 2D (freq, dir) spectrum slice onto a polar Axes. `da` must
     already be reduced to exactly (freq_dim, dir_dim).
  
-    log_scale=True (default) colors on a log scale via LogNorm, since
-    spectral energy density typically spans several orders of magnitude
-    between the peak and the tail. LogNorm requires strictly positive
-    values, so `vmin` -- if not supplied by the caller -- floors at a
-    small positive fraction of `vmax` rather than the data's true
-    (possibly zero) minimum; values at/below that floor are clipped, not
-    masked, so empty bins still render (as the darkest color) instead of
-    showing as blank/missing.
+    The directional axis is periodically closed in ANGLE space (after
+    sorting theta), not in the original degree coordinate -- closing in
+    degree space (e.g. appending dir=365) doesn't survive
+    _direction_to_math_radians' internal `% 360`, which collapses such a
+    point back onto an existing angle instead of extending past it. The
+    fix here appends theta_sorted[0] + 2*pi (and the matching data
+    column) as the literal final point AFTER theta has been computed and
+    sorted, which is the only place the "one full lap later" value can
+    be expressed without being wrapped away.
  
-    `vmin`/`vmax` should normally be supplied by the caller (plot_spectra)
-    as GLOBAL values computed once across every panel in a grid, so every
-    panel shares the same color scale -- the fallbacks here only apply
-    when this is called standalone, on a single panel with nothing to be
-    consistent with.
+    log_scale=True (default) colors on a log scale via LogNorm. `vmin`/
+    `vmax` should normally be supplied by the caller (plot_spectra) as
+    GLOBAL values computed once across every panel in a grid.
  
-    Returns the drawn mappable (for colorbar attachment).
+    plot_type : {"pcolormesh", "contour", "contourf"}
+        "contour" draws unfilled contour lines only; "contourf" is the
+        filled equivalent. Colorbar ticks for log_scale=True are
+        decade-aligned via LogLocator for every plot_type, stashed on
+        the returned mesh as `mesh._log_cbar_ticks` -- see plot_spectra,
+        which passes this to fig.colorbar(..., ticks=...).
+ 
+    logradius : bool, default True
+        Plot the radial (frequency/period) axis on a log10 scale rather
+        than linear, by transforming the radial coordinate itself.
+ 
+    r_zoom : (float | None, float | None), default (None, None)
+        GLOBAL radial limits (native units), computed once across every
+        panel by the caller. Overridden per-side by r_limits.
+ 
+    r_limits : (float | None, float | None), default (None, None)
+        Explicit, user-supplied radial limits (native units), taking
+        precedence over r_zoom on whichever side(s) are not None.
+ 
+    Returns the drawn mappable, carrying `_log_cbar_ticks` (array or
+    None) for colorbar tick placement.
     """
     freqs = da.coords[freq_dim].values.astype(float)
     dirs  = da.coords[dir_dim].values.astype(float)
-    rad   = 1.0 / freqs if radius == "period" else freqs
-    theta = _direction_to_math_radians(dirs)
- 
+    rad_native = 1.0 / freqs if radius == "period" else freqs
+    rad   = _to_log_radius(rad_native) if logradius else rad_native
+    theta = np.deg2rad(dirs % 360)
+
     order = np.argsort(theta)
     theta = theta[order]
     vals  = da.transpose(freq_dim, dir_dim).values[:, order]
- 
+
+    theta = np.concatenate([theta, [theta[0] + 2.0 * np.pi]])
+    vals = np.concatenate([vals, vals[:, :1]], axis=1)
+
     vmax = vmax if vmax is not None else float(np.nanmax(vals))
- 
+
+    # Resolve the colormap object (so we can set its "under" color
+    # without mutating any shared/global colormap instance) and, if
+    # requested, mark values below vmin to render white -- display-only,
+    # the underlying `vals` are never modified.
+    cmap_obj = plt.get_cmap(cmap).copy()
+    if mask_below_vmin:
+        cmap_obj.set_under("white")
+
     if log_scale:
-        vmin = vmin if vmin is not None else max(vmax * 1e-4, 1e-12)
-        vals_plot = np.clip(vals, vmin, None)
+        vmin = vmin if vmin is not None else max(vmax * 1e-2, 1e-12)
         norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
         color_kwargs = dict(norm=norm)
+        cbar_ticks = mticker.LogLocator(base=10).tick_values(vmin, vmax)
+        cbar_ticks = cbar_ticks[(cbar_ticks >= vmin) & (cbar_ticks <= vmax)]
     else:
-        vals_plot = vals
+        if vmin is None:
+            vmin = float(np.nanmin(vals))
         color_kwargs = dict(vmin=vmin, vmax=vmax)
- 
+        cbar_ticks = None
+
     if plot_type == "pcolormesh":
-        mesh = ax.pcolormesh(theta, rad, vals_plot, cmap=cmap, shading="auto", **color_kwargs)
-    elif plot_type == "contour":
+        mesh = ax.pcolormesh(theta, rad, vals, cmap=cmap_obj, shading="auto", **color_kwargs)
+    elif plot_type in ("contour", "contourf"):
+        contour_fn = ax.contourf if plot_type == "contourf" else ax.contour
+        extend = "min" if plot_type == "contourf" else "neither"
         if log_scale:
             levels = np.logspace(np.log10(vmin), np.log10(vmax), 11)
-            mesh = ax.contourf(theta, rad, vals_plot, levels=levels, cmap=cmap, norm=norm)
+            mesh = contour_fn(theta, rad, vals, levels=levels, cmap=cmap_obj, norm=norm, extend=extend)
         else:
             step = max(np.round(vmax / 10, 2), 1e-3)
             levels = np.round(np.arange(0, vmax + step, step), 3)
-            mesh = ax.contourf(theta, rad, vals_plot, levels=levels, cmap=cmap)
+            mesh = contour_fn(theta, rad, vals, levels=levels, cmap=cmap_obj, extend=extend)
     else:
-        raise ValueError(f"plot_type must be 'pcolormesh' or 'contour', got {plot_type!r}.")
+        raise ValueError(
+            f"plot_type must be 'pcolormesh', 'contour', or 'contourf', got {plot_type!r}."
+        )
+
+    mesh._log_cbar_ticks = cbar_ticks
  
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
@@ -290,8 +399,31 @@ def _draw_polar_spectrum(
     if dir_letters:
         ax.set_xticks(np.deg2rad([0, 45, 90, 135, 180, 225, 270, 315]))
         ax.set_xticklabels(["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
+ 
+    zoom_min, zoom_max = r_zoom
+    user_min, user_max = r_limits
+    final_min = user_min if user_min is not None else zoom_min
+    final_max = user_max if user_max is not None else zoom_max
+ 
+    if logradius and final_min is not None and final_min <= 0:
+        final_min = float(np.min(rad_native[rad_native > 0])) if np.any(rad_native > 0) else None
+ 
+    if final_min is not None:
+        ax.set_rmin(_to_log_radius(final_min) if logradius else final_min)
+    if final_max is not None:
+        ax.set_rmax(_to_log_radius(final_max) if logradius else final_max)
+ 
+    if logradius:
+        plot_rmin = final_min if final_min is not None else float(rad_native.min())
+        plot_rmax = final_max if final_max is not None else float(rad_native.max())
+        lo_plot, hi_plot = sorted((_to_log_radius(plot_rmin), _to_log_radius(plot_rmax)))
+        tick_locs = _radial_ticks(lo_plot, hi_plot, logradius=True)
+        ax.set_rticks(tick_locs)
+        ax.set_yticklabels([f"{10**t:g}" for t in tick_locs])
+ 
     return mesh
  
+
  
 def _draw_1d_spectrum(
     ax, da, dim: str, kind: str, radius: str = "frequency",
@@ -310,20 +442,27 @@ def _draw_1d_spectrum(
     ax.set_ylabel(_colorbar_label(da))
     return None  # no mappable to attach a colorbar to
  
- 
+def _is_all_nan(da: xr.DataArray) -> bool:
+    """True if every value in this panel's data is NaN (nothing to draw)."""
+    return da.dtype.kind == "f" and bool(np.all(np.isnan(da.values)))
+
+
 def _draw_one_panel(
     ax, da, freq_dim: str | None, dir_dim: str | None,
     radius: str = "frequency", plot_type: str = "pcolormesh",
-    cmap="viridis", vmin: float | None = None, vmax: float | None = None,
+    cmap=cmocean.cm.thermal, vmin: float | None = None, vmax: float | None = None,
     dir_letters: bool = False, log_scale: bool = True,
+    r_zoom: tuple[float | None, float | None] = (None, None),
+    logradius: bool = True,
+    r_limits: tuple[float | None, float | None] = (None, None),
+    mask_below_vmin: bool = False,
 ):
-    """
-    Dispatch to the 2D polar renderer if both freq_dim and dir_dim are
-    present, otherwise the 1D renderer for whichever one is. Returns the
-    mappable (or None for 1D) for optional colorbar attachment.
-    """
+    if _is_all_nan(da):
+        ax.set_axis_off()
+        return None
+
     if freq_dim and dir_dim:
-        return _draw_polar_spectrum(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale)
+        return _draw_polar_spectrum(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
     elif freq_dim:
         return _draw_1d_spectrum(ax, da, freq_dim, "freq", radius)
     elif dir_dim:
@@ -332,13 +471,28 @@ def _draw_one_panel(
         ax.text(0.5, 0.5, "No spectral dimension in this slice", ha="center", va="center")
         ax.set_axis_off()
         return None
- 
 
+def _group_count_suffix(ds: xr.Dataset, sel: dict) -> str:
+    """
+    If `ds` has a `_group_counts` variable (as produced by
+    SpectralTimeSeries.aggregate()/groupby().aggregate()), look up the
+    count for this panel's selection and format it as a second title
+    line -- "group entries: N". Returns "" if the variable isn't
+    present, or if `sel` doesn't fully resolve to a single count (e.g.
+    a leftover dim not covered by sel).
+    """
+    if "_group_counts" not in ds.data_vars:
+        return ""
+    try:
+        count_da = ds["_group_counts"].sel(sel)
+        if count_da.size != 1:
+            return ""
+        count_val = float(count_da.values)
+        count = 0 if np.isnan(count_val) else int(count_val)
+        return f"\ngroup entries: {count}"
+    except (KeyError, ValueError):
+        return ""
 
-# ---------------------------------------------------------------------- #
-# Layer 3: facet engine                                                   #
-# ---------------------------------------------------------------------- #
- 
 def plot_spectra(
     obj,
     var: str | None = None,
@@ -350,11 +504,18 @@ def plot_spectra(
     errors: Literal["ignore", "raise"] = "raise",
     radius: str = "frequency",
     plot_type: str = "pcolormesh",
-    cmap: str = "Blues",
+    cmap: str = cmocean.cm.thermal,
+    vmin: float | None = None,
     vmax: float | None = None,
     log_scale: bool = True,
     dir_letters: bool = False,
     panel_size: float = 3.0,
+    zoom: bool = True,
+    logradius: bool = True,
+    rmin: float | None = None,
+    rmax: float | None = None,
+    mask_below_vmin: bool = False,
+    normalize: bool = False,
 ):
     """
     Flexible faceted spectrum plot. Works identically on:
@@ -369,14 +530,30 @@ def plot_spectra(
     and col= still requires every dimension to be accounted for
     explicitly.
  
-    Color scale is logarithmic by default (log_scale=True) -- spectral
-    density typically spans orders of magnitude between the peak and the
-    tail, and a linear scale washes out everything but the peak. `vmax`
-    (and, for log scale, the implied floor `vmin`) are always computed
-    GLOBALLY across every panel that will be drawn -- not per panel --
-    so panels stay honestly comparable on one shared color scale;
-    passing an explicit `vmax` overrides the computed one but is still
-    applied uniformly to every panel.
+    Color scale is logarithmic by default (log_scale=True). `vmax` (and,
+    for log scale, the implied floor `vmin`) are always computed GLOBALLY
+    across every panel that will be drawn -- not per panel -- so panels
+    stay honestly comparable on one shared color scale; passing an
+    explicit `vmin`/`vmax` overrides the computed one but is still
+    applied uniformly to every panel. Colorbar ticks are placed at clean
+    decade values for every plot_type (see _draw_polar_spectrum), not
+    just pcolormesh.
+ 
+    When zoom=True (default) and the panel is a 2D polar spectrum, the
+    radial extent is also clipped GLOBALLY across every panel: the
+    radial limits are set to the lowest/highest frequency (equivalently
+    highest/lowest period, for radius="period") at which ANY panel still
+    has data above `vmin`. `rmin`/`rmax` (native units -- Hz or seconds)
+    override the auto-computed zoom on whichever side(s) are given,
+    exactly like wavespectra's rmin=/rmax=.
+ 
+    logradius=True (default) plots the radial axis on a log10 scale.
+    `rmin`/`rmax` are always given in native units either way; the log
+    transform is applied internally.
+ 
+    The directional axis is periodically closed for every 2D panel (see
+    _draw_polar_spectrum / _close_direction) so there's no undrawn wedge
+    between the last and first direction bins.
  
     Parameters
     ----------
@@ -397,25 +574,62 @@ def plot_spectra(
         _AUTO_FACET_WARN_THRESHOLD (25), raise above
         _AUTO_FACET_RAISE_THRESHOLD (100). "ignore": never warn/raise.
     radius : {"frequency", "period"}, default "frequency"
-    plot_type : {"pcolormesh", "contour"}, default "pcolormesh"
-    cmap : str, default "viridis"
+    plot_type : {"pcolormesh", "contour", "contourf"}, default "pcolormesh"
+        "contour" draws unfilled level lines; "contourf" is the filled
+        version (wavespectra's default kind).
+    cmap : str, default "Blues"
+    vmin : float, optional
+        Shared colour scale floor across all panels, and (when
+        zoom=True) the threshold used to decide the radial zoom extent.
+        Computed as 1e-2 * vmax if omitted.
     vmax : float, optional
         Shared colour scale ceiling across all panels. Computed as the
         global max across every panel to be drawn if omitted.
     log_scale : bool, default True
-        Color on a log scale (LogNorm). Recommended default for spectral
-        density; set False for a linear scale instead.
+        Color on a log scale (LogNorm). Set False for a linear scale.
     dir_letters : bool, default False
     panel_size : float, default 3.0
+    zoom : bool, default True
+        Zoom the radial (frequency/period) axis of 2D polar panels in on
+        the region where data exceeds `vmin`, computed globally across
+        all panels. Has no effect on 1D panels. Set False to always show
+        the full frequency/period range. Ignored on whichever side(s)
+        rmin/rmax explicitly set.
+    logradius : bool, default True
+        Plot the radial (frequency/period) axis on a log10 scale rather
+        than linear. Has no effect on 1D panels.
+    rmin, rmax : float, optional
+        Explicit radial-axis limits in NATIVE units (Hz for
+        radius="frequency", seconds for radius="period"). Each,
+        independently, overrides the auto-computed zoom on that side.
+        Has no effect on 1D panels.
  
     Returns
     -------
     matplotlib.axes.Axes  (single panel)
     (matplotlib.figure.Figure, np.ndarray of Axes)  (grid)
     """
+
     is_sts_like = hasattr(obj, "ds") and hasattr(obj, "var_map") and hasattr(obj, "dim_map")
- 
-    if isinstance(obj, xr.Dataset):
+
+    if isinstance(obj, xr.DataArray):
+        if var is not None and var != (obj.name or var):
+            raise ValueError(
+                f"var={var!r} was given but obj is already a DataArray named "
+                f"{obj.name!r}. Pass the Dataset instead if you want to select "
+                f"a different variable."
+            )
+        da_name = obj.name or "__spectrum__"
+        ds = obj.rename(da_name).to_dataset()
+        spec_var, freq_dim, dir_dim = _resolve_spectral_target(ds, da_name)
+        time_dim = None
+        if time is not None:
+            raise ValueError(
+                "time= only applies to a SpectralTimeSeries. For a plain "
+                "xr.DataArray/Dataset (e.g. aggregate() output), select "
+                "directly with row=/col=, or call .sel(...)/.isel(...) first."
+            )
+    elif isinstance(obj, xr.Dataset):
         ds = obj
         spec_var, freq_dim, dir_dim = _resolve_spectral_target(ds, var)
         time_dim = None
@@ -435,10 +649,13 @@ def plot_spectra(
         time_dim = obj.dim_map[_ROLE_TIME]
     else:
         raise TypeError(
-            f"obj must be a SpectralTimeSeries or xr.Dataset, got {type(obj).__name__}."
+            f"obj must be a SpectralTimeSeries, xr.Dataset, or xr.DataArray, "
+            f"got {type(obj).__name__}."
         )
- 
+
     da = ds[spec_var]
+
+
     if time is not None and time_dim is not None:
         da = da.sel({time_dim: time})
         # A bare/partial date string is a label-slice, not a point-select
@@ -460,17 +677,30 @@ def plot_spectra(
  
     requested = {d for d in (row, col) if d is not None}
     unaccounted = [d for d in batch_dims if d not in requested]
- 
+
+    if normalize:
+            da = da / da.max(dim=spectral_dims, skipna=True)
+
     # --- GLOBAL vmax/vmin, computed once across every panel that could
     # possibly be drawn (i.e. over the whole of `da` as it stands right
     # now, before any per-panel .sel() narrows it further) -- this is
     # what guarantees every panel shares one honestly-comparable scale.
     vmax = vmax if vmax is not None else float(np.nanmax(da.values))
-    vmin = max(vmax * 1e-10, 1e-12) if log_scale else None
-
-    fig_kw = dict(subplot_kw=dict(projection="polar")) if dir_dim else {}
-    cbar_label = _colorbar_label(da) if dir_dim and freq_dim else None
+    if vmin is None:
+        vmin = max(vmax * 1e-2, 1e-12) if log_scale else vmax * 1e-2
  
+    # --- GLOBAL radial zoom limit, computed once across every panel,
+    # same rationale as vmin/vmax above. Explicit rmin=/rmax= (native
+    # units, like wavespectra) are passed through separately as
+    # r_limits and override the computed zoom per-side inside
+    # _draw_polar_spectrum.
+    r_zoom = _global_radial_zoom(da, freq_dim, dir_dim, vmin, radius) if zoom else (None, None)
+    r_limits = (rmin, rmax)
+ 
+    fig_kw = dict(subplot_kw=dict(projection="polar")) if dir_dim else {}
+    fig_kw["constrained_layout"] = True
+    cbar_label = _colorbar_label(da) if dir_dim and freq_dim else None 
+
     def _draw_grid(nrows, ncols, cell_fn, n_real_panels):
         """cell_fn(panel_index) -> (panel_da, title)."""
         fig, axes = plt.subplots(
@@ -483,19 +713,25 @@ def plot_spectra(
                 ax.set_visible(False)
                 continue
             panel_da, title = cell_fn(i)
-            mesh = _draw_one_panel(ax, panel_da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale)
+            mesh = _draw_one_panel(ax, panel_da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
             last_mesh = mesh if mesh is not None else last_mesh
             ax.set_title(title, fontsize=9)
         if last_mesh is not None:
-            fig.colorbar(last_mesh, ax=axes_flat.tolist(), pad=0.02, shrink=0.6, label=cbar_label)
+            fig.colorbar(
+                last_mesh, ax=axes_flat.tolist(), pad=0.02, shrink=0.6, label=cbar_label,
+                ticks=getattr(last_mesh, "_log_cbar_ticks", None),
+            )
         return fig, axes
  
     # --- Case A: single panel, nothing to facet at all --------------------- #
     if not requested and not unaccounted:
         fig, ax = plt.subplots(figsize=(panel_size + 2, panel_size + 2), **fig_kw)
-        mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale)
+        mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
         if mesh is not None:
-            fig.colorbar(mesh, ax=ax, pad=0.1, shrink=0.8, label=cbar_label)
+            fig.colorbar(
+                mesh, ax=ax, pad=0.1, shrink=0.8, label=cbar_label,
+                ticks=getattr(mesh, "_log_cbar_ticks", None),
+            )
         return ax
  
     # --- Case B: exactly one of row=/col= given, dims still left over ----- #
@@ -525,6 +761,7 @@ def plot_spectra(
             sel = {primary: primary_labels[primary_idx], **dict(zip(unaccounted, combo))}
             panel_da = da.sel(sel)
             title = ", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items())
+            title += _group_count_suffix(ds, sel)
             return panel_da, title
  
         return _draw_grid(nrows, ncols, cell_fn, n_panels)
@@ -539,7 +776,9 @@ def plot_spectra(
  
         def cell_fn(i):
             sel = dict(zip(unaccounted, combos[i]))
-            return da.sel(sel), ", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items())
+            title = ", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items())
+            title += _group_count_suffix(ds, sel)
+            return da.sel(sel), title
  
         return _draw_grid(nrows, ncols, cell_fn, n_panels)
  
@@ -576,19 +815,23 @@ def plot_spectra(
         if col_key and len(combo) > 1:
             sel[col_key] = combo[1]
         panel_da = da.sel(sel)
-        mesh = _draw_one_panel(ax, panel_da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale)
+        mesh = _draw_one_panel(ax, panel_da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
         last_mesh = mesh if mesh is not None else last_mesh
-        ax.set_title(", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items()), fontsize=9)
+        title = ", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items())
+        title += _group_count_suffix(ds, sel)
+        ax.set_title(title, fontsize=9)
  
     for ax in axes_flat[len(combos):]:
         ax.set_visible(False)
  
     if last_mesh is not None:
-        fig.colorbar(last_mesh, ax=axes_flat.tolist(), pad=0.02, shrink=0.6, label=cbar_label)
+        fig.colorbar(
+            last_mesh, ax=axes_flat.tolist(), pad=0.02, shrink=0.6, label=cbar_label,
+            ticks=getattr(last_mesh, "_log_cbar_ticks", None),
+        )
  
     return fig, axes
  
-
 
 def plot_rose(
     magnitude: "np.ndarray",

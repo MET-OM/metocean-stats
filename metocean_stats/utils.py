@@ -184,3 +184,28 @@ def table_to_latex(
                 f"Expected {len(columns)+1} and got {len(float_format)}.")
         f.write("\\bottomrule \n")
         f.write("\\end{tabular}")
+
+
+def dirmag_to_uv(wind_direction, wind_speed, going_to=True):
+    '''
+    Get wind x (east) and y (north) component 
+    from speed and direction (degrees, default: going to).
+
+    Parameters
+    ---------
+    wind_direction : np.ndarray
+        Wind direction (degrees)
+    wind_speed : np.ndarray
+        Wind Speed (degrees)
+    going_to : bool, default True (oceanographic)
+        Controls direction convention, False gives "from" direction.
+    '''
+    
+    wind_direction = np.radians(wind_direction)
+    
+    if not going_to: 
+        wind_direction = (wind_direction+np.pi)%(2*np.pi)
+    
+    u = wind_speed*np.sin(wind_direction)
+    v = wind_speed*np.cos(wind_direction)
+    return u,v
