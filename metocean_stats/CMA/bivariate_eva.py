@@ -42,15 +42,40 @@ class BivariateEVA:
         data:pd.DataFrame,
         var1:str,
         var2:str,
-        var_dir:str,
+        var_dir:str=None,
         sectors=12,
         model=predefined.get_DNVGL_Hs_Tz
         ):
         """
         Initialize multivariate extreme value analysis module.
+
+        Can be constructed directly (independent of TimeSeries) - only
+        `data`, `var1` and `var2` are strictly required.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input data, indexed by a datetime-compatible index. Must
+            contain var1, var2, and var_dir if given.
+        var1, var2 : str
+            Column names of the two variables entering the joint model.
+        var_dir : str, optional
+            Column name of a directional variable (0-360 deg). If None,
+            sector-based analysis is unavailable, but omni and monthly
+            analysis work as usual.
+        sectors : int, default 12
+            Number of directional sectors. Ignored if var_dir is None.
+        model : callable
+            A predefined model factory, or any callable accepted by
+            JointProbabilityModel.
         """
-        
-        data = data[[var1,var2,var_dir]].copy()
+
+        # Direction is optional - sector-based analysis is only
+        # available when a direction column is supplied.
+        self._has_direction = var_dir is not None
+
+        cols = [var1,var2] + ([var_dir] if self._has_direction else [])
+        data = data[cols].copy()
         # data.index = pd.to_datetime(data.index)
         # data = data.sort_index()
         # bins = np.linspace(0, 360, sectors+1,dtype=int)
@@ -61,11 +86,14 @@ class BivariateEVA:
         # Group the data
         self.data_omni = data
         self.data_monthly = groupby_month(data)
-        self.data_sectors = groupby_sector(
-            data,
-            var_dir=var_dir,
-            sectors=sectors,
-            )
+        if self._has_direction:
+            self.data_sectors = groupby_sector(
+                data,
+                var_dir=var_dir,
+                sectors=sectors,
+                )
+        else:
+            self.data_sectors = {}
 
         # Vars and predefined
         self.var1 = var1
@@ -73,12 +101,29 @@ class BivariateEVA:
         self.var_dir = var_dir
         self.model_description = model
 
+    def _require_direction(self,method_name:str) -> None:
+        """Raise a clear error if direction was not provided at initialisation."""
+        if not self._has_direction:
+            raise AttributeError(
+                f"{method_name} requires a direction variable (var_dir), "
+                "but none was provided when this BivariateEVA was created. "
+                "Sector-based analysis is unavailable; 'omni' and 'monthly' "
+                "groupings remain fully available."
+            )
+
     def fit(
             self,
             sector_errors:typing.Literal["ignore","raise"] = "ignore",
             month_errors:typing.Literal["ignore","raise"] = "ignore"):
+        """
+        Fit the joint model to the omni, monthly, and (if a direction
+        variable was provided) sector-split data. Sector models are
+        skipped entirely - self.models_sectors is left as an empty dict -
+        when no direction variable is available.
+        """
 
-        pbar = tqdm(total=25)
+        n_sectors = len(self.data_sectors)
+        pbar = tqdm(total=1+len(self.data_monthly)+n_sectors)
 
         pbar.set_description("Fitting Omni")
         model = JointProbabilityModel(self.model_description)
@@ -107,19 +152,20 @@ class BivariateEVA:
             pbar.update()
 
         self.models_sectors = {}
-        for k,g in self.data_sectors.items():
-            pbar.set_description(f"Fitting {k}")
-            model = JointProbabilityModel(self.model_description)
-            try: 
-                model.fit(g,self.var1,self.var2)
-            except Exception as e:
-                if sector_errors == "ignore":
-                    warnings.warn(f"Could not fit sector {k} - future results will skip this sector.")
-                else:
-                    raise e
+        if self._has_direction:
+            for k,g in self.data_sectors.items():
+                pbar.set_description(f"Fitting {k}")
+                model = JointProbabilityModel(self.model_description)
+                try: 
+                    model.fit(g,self.var1,self.var2)
+                except Exception as e:
+                    if sector_errors == "ignore":
+                        warnings.warn(f"Could not fit sector {k} - future results will skip this sector.")
+                    else:
+                        raise e
 
-            self.models_sectors[k] = model
-            pbar.update()
+                self.models_sectors[k] = model
+                pbar.update()
 
     def _subplot_isodensity_contours(
             self,
@@ -149,6 +195,13 @@ class BivariateEVA:
             subplot_columns:int=None,
             title_N_points=True
             ):
+        """
+        grouping : str
+            One of [omni, sectors, monthly]. "sectors" requires that a
+            direction variable was provided at construction.
+        """
+        if grouping == "sectors":
+            self._require_direction("plot_isodensity_contours(grouping='sectors')")
 
         contour_kwargs = {"cmap":"viridis"} | contour_kwargs
 
@@ -221,6 +274,8 @@ class BivariateEVA:
         -----------
         grouping : str
             Select "monthly" or "sectors" for which set of tables to produce.
+            "sectors" requires that a direction variable was provided at
+            construction.
         RVE : pd.DataFrame
             Dataframe of return values, with the index being sectors or months,
             and columns corresponding to different return periods.
@@ -231,13 +286,15 @@ class BivariateEVA:
         **kwargs : keyword arguments 
             These are passed to JointProbabilityModel.table_isodensity.contour()
         """
+        if grouping == "sectors":
+            self._require_direction("table_isodensity_contours(grouping='sectors')")
 
         if grouping == "monthly":
             models = self.models_monthly | {"Yearly":self.model_omni}
         elif grouping == "sectors":
             models = self.models_sectors | {"Omni":self.model_omni}
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
         
         tables = {}
         for subset,model in models.items():
@@ -265,13 +322,20 @@ class BivariateEVA:
         """
         Given a DataFrame of return values for the primary variable,
         return a DataFrame with corresponding conditional return values.
+
+        grouping : str
+            One of [monthly, sectors]. "sectors" requires that a direction
+            variable was provided at construction.
         """
+        if grouping == "sectors":
+            self._require_direction("table_conditional_return_values(grouping='sectors')")
+
         if grouping == "monthly":
             models = self.models_monthly | {"Yearly":self.model_omni}
         elif grouping == "sectors":
             models = self.models_sectors | {"Omni":self.model_omni}
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
 
         table = {}
         return_periods = RVE.columns
@@ -293,12 +357,20 @@ class BivariateEVA:
             state_duration:float = None,
             contour_method:str = "IFORM",
     ):
+        """
+        grouping : str
+            One of [monthly, sectors]. "sectors" requires that a direction
+            variable was provided at construction.
+        """
+        if grouping == "sectors":
+            self._require_direction("table_return_values(grouping='sectors')")
+
         if grouping == "monthly":
             models = self.models_monthly | {"Yearly":self.model_omni}
         elif grouping == "sectors":
             models = self.models_sectors | {"Omni":self.model_omni}
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
 
         data_interval = self.data_omni.sort_index().index.diff().mean().total_seconds()/3600
 
@@ -324,12 +396,20 @@ class BivariateEVA:
             self,
             grouping:typing.Literal["monthly","sectors"],
     ):
+        """
+        grouping : str
+            One of [monthly, sectors]. "sectors" requires that a direction
+            variable was provided at construction.
+        """
+        if grouping == "sectors":
+            self._require_direction("table_model_parameters(grouping='sectors')")
+
         if grouping == "monthly":
             models = self.models_monthly | {"Yearly":self.model_omni}
         elif grouping == "sectors":
             models = self.models_sectors | {"Omni":self.model_omni}
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
         
         table = {k:m.parameters(False) for k,m in models.items()}
         return pd.DataFrame.from_dict(table,orient="index")
@@ -341,6 +421,14 @@ class BivariateEVA:
             max_cols:int = 4,
             title_N_points=False,
     ):
+        """
+        grouping : str
+            One of [omni, monthly, sectors]. "sectors" requires that a
+            direction variable was provided at construction.
+        """
+        if grouping == "sectors":
+            self._require_direction("plot_marginal_quantiles(grouping='sectors')")
+
         if grouping == "omni":
             if axes is None:
                 fig,axes = plt.subplots(1,2)
@@ -352,7 +440,7 @@ class BivariateEVA:
         elif grouping == "sectors":
             models = self.models_sectors
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
         
         if axes is None:
             fig,axes = _get_n_axes(2*len(models),max_cols=max_cols)
@@ -379,6 +467,14 @@ class BivariateEVA:
             max_cols:int = 4,
             title_N_points=False,
     ):
+        """
+        grouping : str
+            One of [omni, monthly, sectors]. "sectors" requires that a
+            direction variable was provided at construction.
+        """
+        if grouping == "sectors":
+            self._require_direction("plot_dependence_functions(grouping='sectors')")
+
         if grouping == "omni":
             if axes is None:
                 fig,axes = plt.subplots(1,2)
@@ -390,7 +486,7 @@ class BivariateEVA:
         elif grouping == "sectors":
             models = self.models_sectors
         else:
-            raise ValueError(f"models should be monthly or sectors, got {models}")
+            raise ValueError(f"models should be monthly or sectors, got {grouping}")
         
         if axes is None:
             fig,axes = _get_n_axes(2*len(models),max_cols=max_cols)
@@ -408,4 +504,3 @@ class BivariateEVA:
 
         fig.subplots_adjust(hspace=0.25)
         return axes
-    

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
@@ -260,6 +261,50 @@ def _batch_shape_of(da_or_shape, freq_dim: str, dir_dim: str, dims=None):
     batch_shape = tuple(sizes[d] for d in batch_dims)
     return batch_dims, batch_shape
 
+
+def _broadcast_point_params(n, **params):
+    """Broadcast per-point-of-interest parameters against n points.
+
+    Each keyword value may be:
+      - a single "scalar" value (including a plain string, which is treated
+        as one atomic value, NOT as a sequence of characters, even though
+        strings have __len__) -> repeated for all n points.
+      - a sequence of length n -> used as-is, one entry per point.
+      - a sequence of length 1 -> that single value repeated for all n points.
+
+    Any sequence-like value whose length is neither 1 nor n raises ValueError.
+    Returns a dict of the same keys, each now a list of length n.
+
+    "Sequence-like" here means: has __len__ and __getitem__, but is not a
+    str/bytes (those are always atomic) and is not None.
+    """
+    def is_scalar_like(v):
+        if v is None:
+            return True
+        if isinstance(v, (str, bytes)):
+            return True
+        if not hasattr(v, "__len__"):
+            return True
+        return False
+
+    out = {}
+    for name, value in params.items():
+        if is_scalar_like(value):
+            out[name] = [value] * n
+            continue
+
+        seq = list(value)
+        if len(seq) == n:
+            out[name] = seq
+        elif len(seq) == 1:
+            out[name] = seq * n
+        else:
+            raise ValueError(
+                f"'{name}' has length {len(seq)}, but must have length 1 or "
+                f"{n} (the number of points) to match lons/lats."
+            )
+    return out
+
 # ---------------------------------------------------------------------------
 # Drawing implementations - plain functions taking an already-created ax and
 # transform. Always called from within plot(), in call order.
@@ -480,10 +525,30 @@ def _draw_streamlines(ax, transform, *, lon2d, lat2d, u2d, v2d, color, cmap,
         ax.plot([], [], color=proxy_color, label=label)
     return lc
 
+def _levels_norm(levels, cmap):
+    """Build a BoundaryNorm so that each interval BETWEEN consecutive levels
+    maps to an equal-sized slice of the colormap, regardless of how unevenly
+    the level *values* are spaced.
+
+    Without this, contour/contourf's default Normalize scales colors linearly
+    by level value, so e.g. levels [50,100,200,500,1000,2000,5000] puts almost
+    the whole colormap in the 2000-5000 band and makes 50/100/200/500 look
+    nearly identical. BoundaryNorm instead assigns colormap slice k to the
+    k-th interval regardless of its width, so every band is visually distinct.
+    """
+    levels = np.asarray(levels)
+    cmap_obj = plt.get_cmap(cmap) if isinstance(cmap, str) or cmap is None else cmap
+    n_bins = max(len(levels) - 1, 1)
+    return mcolors.BoundaryNorm(levels, ncolors=cmap_obj.N, extend="both") if n_bins > 0 else None
+
+
 def _draw_contour(ax, transform, *, lon2d, lat2d, z, levels, cmap, colors, linewidths,
-                   clabel, clabel_fmt, label, **kwargs):
+                   clabel, clabel_fmt, label, even_color_spacing=True, **kwargs):
+    norm = None
+    if even_color_spacing and colors is None and levels is not None and cmap is not None:
+        norm = _levels_norm(levels, cmap)
     kw = dict(levels=levels, cmap=cmap, colors=colors, linewidths=linewidths,
-              transform=transform, transform_first=True)
+              norm=norm, transform=transform, transform_first=True)
     kw.update(kwargs)
     cs = ax.contour(lon2d, lat2d, z, **{k: v for k, v in kw.items() if v is not None})
     if clabel:
@@ -495,8 +560,12 @@ def _draw_contour(ax, transform, *, lon2d, lat2d, z, levels, cmap, colors, linew
 
 
 def _draw_contourf(ax, transform, *, lon2d, lat2d, z, levels, cmap, extend, label,
-                    colorbar, colorbar_label, **kwargs):
-    kw = dict(levels=levels, cmap=cmap, extend=extend, transform=transform, transform_first=True)
+                    colorbar, colorbar_label, even_color_spacing=True, **kwargs):
+    norm = None
+    if even_color_spacing and levels is not None:
+        norm = _levels_norm(levels, cmap)
+    kw = dict(levels=levels, cmap=cmap, extend=extend, norm=norm,
+              transform=transform, transform_first=True)
     kw.update(kwargs)
     cf = ax.contourf(lon2d, lat2d, z, **{k: v for k, v in kw.items() if v is not None})
     if colorbar:
@@ -516,22 +585,39 @@ def _draw_pcolormesh(ax, transform, *, lon2d, lat2d, z, cmap, vmin, vmax, label,
     return pc
 
 
-def _draw_point(ax, transform, *, lon, lat, text, marker, color, markersize,
-                 text_offset, text_kwargs, label, **kwargs):
-    kw = dict(marker=marker, color=color, markersize=markersize, linestyle="none", transform=transform)
-    kw.update(kwargs)
-    if label is not None:
-        kw["label"] = label
-    (point,) = ax.plot([lon], [lat], **{k: v for k, v in kw.items() if v is not None})
+def _draw_points(ax, transform, *, lons, lats, texts, markers, colors, markersizes,
+                  text_offsets, text_kwargs_list, labels, **kwargs):
+    """Draw one or more points of interest. All the per-point arguments here
+    are already-broadcast lists of equal length (see _broadcast_point_params);
+    this function just loops over them and draws each one, using **kwargs
+    (shared, non-broadcast extras) for every point."""
+    artists = []
+    n = len(lons)
+    for idx in range(n):
+        lon, lat = lons[idx], lats[idx]
+        text = texts[idx]
+        marker = markers[idx]
+        color = colors[idx]
+        markersize = markersizes[idx]
+        text_offset = text_offsets[idx]
+        text_kwargs = text_kwargs_list[idx]
+        label = labels[idx]
 
-    txt = None
-    if text:
-        dx, dy = text_offset
-        txt = ax.text(
-            lon + dx, lat + dy, text, transform=transform,
-            **{"fontsize": 9, "ha": "left", "va": "bottom", **(text_kwargs or {})},
-        )
-    return point, txt
+        kw = dict(marker=marker, color=color, markersize=markersize, linestyle="none", transform=transform)
+        kw.update(kwargs)
+        if label is not None:
+            kw["label"] = label
+        (point,) = ax.plot([lon], [lat], **{k: v for k, v in kw.items() if v is not None})
+
+        txt = None
+        if text:
+            dx, dy = text_offset
+            txt = ax.text(
+                lon + dx, lat + dy, text, transform=transform,
+                **{"fontsize": 9, "ha": "left", "va": "bottom", **(text_kwargs or {})},
+            )
+        artists.append((point, txt))
+    return artists if n > 1 else artists[0]
 
 
 def _draw_coastline(ax, transform, *, resolution, color, linewidth, **kwargs):
@@ -663,7 +749,15 @@ class Spatial:
             self.extent = lonlat_extent
 
             proj = _resolve_projection(self.projection_spec, lonlat_extent)
-            self.fig, self.ax = plt.subplots(figsize=self.figsize, subplot_kw={"projection": proj})
+            # constrained layout keeps colorbars, gridline tick labels, and
+            # axes from overlapping (e.g. a right-hand colorbar colliding
+            # with gridline labels drawn on that same side) by re-solving
+            # the layout whenever new artists (colorbars, tick labels, etc.)
+            # are added, instead of using fixed subplot margins.
+            self.fig, self.ax = plt.subplots(
+                figsize=self.figsize, subplot_kw={"projection": proj},
+                layout="constrained",
+            )
 
             projected_extent = _tight_projected_extent(proj, sample_lons, sample_lats)
             if projected_extent is not None:
@@ -741,11 +835,18 @@ class Spatial:
         )
 
     def add_contour(self, data, lon, lat, *, levels=None, n_levels=10, cmap=None, colors=None,
-                      linewidths=None, clabel=False, clabel_fmt="%.1f", label=None, **kwargs):
+                      linewidths=None, clabel=False, clabel_fmt="%.1f", label=None,
+                      even_color_spacing=True, **kwargs):
         """Line contour plot of a scalar field.
 
         levels: explicit contour levels; if None, ~n_levels evenly spaced levels
         are derived automatically from the data range.
+        even_color_spacing: when True (default) and `cmap` is used (not `colors`),
+        colors are assigned evenly across the levels by *index* rather than by
+        level *value* - so unevenly spaced levels (e.g. [50,100,200,500,1000,
+        2000,5000]) still get visually distinct colors per band instead of the
+        color scale being dominated by the largest level. Set to False to
+        restore plain value-based color scaling.
         """
         lon2d, lat2d, fields = _check_shapes(lon, lat, data=data)
         self._update_bounds(lon2d, lat2d)
@@ -755,12 +856,21 @@ class Spatial:
         return self._add_layer(
             _draw_contour, lon2d=lon2d, lat2d=lat2d, z=z, levels=levels, cmap=cmap,
             colors=colors, linewidths=linewidths, clabel=clabel, clabel_fmt=clabel_fmt,
-            label=label, **kwargs,
+            label=label, even_color_spacing=even_color_spacing, **kwargs,
         )
 
     def add_contourf(self, data, lon, lat, *, levels=None, n_levels=10, cmap="viridis",
-                       extend="both", label=None, colorbar=False, colorbar_label=None, **kwargs):
-        """Filled contour plot of a scalar field. Set colorbar=True to attach a colorbar."""
+                       extend="both", label=None, colorbar=False, colorbar_label=None,
+                       even_color_spacing=True, **kwargs):
+        """Filled contour plot of a scalar field. Set colorbar=True to attach a colorbar.
+
+        even_color_spacing: when True (default), colors are assigned evenly
+        across the levels by *index* rather than by level *value* - so
+        unevenly spaced levels (e.g. [50,100,200,500,1000,2000,5000]) still
+        get visually distinct bands instead of the color scale being
+        dominated by the largest level. Set to False to restore plain
+        value-based color scaling (matplotlib's default behavior).
+        """
         lon2d, lat2d, fields = _check_shapes(lon, lat, data=data)
         self._update_bounds(lon2d, lat2d)
         z = fields["data"]
@@ -768,7 +878,8 @@ class Spatial:
             levels = _auto_levels(z, n_levels)
         return self._add_layer(
             _draw_contourf, lon2d=lon2d, lat2d=lat2d, z=z, levels=levels, cmap=cmap,
-            extend=extend, label=label, colorbar=colorbar, colorbar_label=colorbar_label, **kwargs,
+            extend=extend, label=label, colorbar=colorbar, colorbar_label=colorbar_label,
+            even_color_spacing=even_color_spacing, **kwargs,
         )
 
     def add_pcolormesh(self, data, lon, lat, *, cmap="viridis", vmin=None, vmax=None, label=None,
@@ -783,43 +894,81 @@ class Spatial:
         )
 
     def add_bathymetry(self, depth, lon, lat, *, cmap="Blues", levels=None, n_levels=10,
-                         colorbar=True, colorbar_label="Depth (m)", **kwargs):
-        """Convenience wrapper around add_contourf tailored for bathymetry/topography defaults."""
+                         colorbar=True, colorbar_label="Depth (m)", even_color_spacing=True,
+                         **kwargs):
+        """Convenience wrapper around add_contourf tailored for bathymetry/topography defaults.
+
+        even_color_spacing: see add_contourf - default True, so uneven depth
+        levels (e.g. [50,100,200,500,1000,2000,5000]) still produce visually
+        distinct color bands.
+        """
         return self.add_contourf(
             depth, lon, lat, cmap=cmap, levels=levels, n_levels=n_levels,
-            colorbar=colorbar, colorbar_label=colorbar_label, **kwargs,
+            colorbar=colorbar, colorbar_label=colorbar_label,
+            even_color_spacing=even_color_spacing, **kwargs,
         )
 
-    def add_point_of_interest(self, lon, lat, text=None, *, marker="o", color="k", markersize=6,
-                                text_offset=(0.02, 0.02), text_kwargs=None, label=None, **kwargs):
-        """Plot a single point (e.g. weather station, platform) with an optional text label.
+    def add_points_of_interest(self, lons, lats, texts=None, *, markers="o", colors="k",
+                                 markersizes=6, text_offsets=(0.02, 0.02), text_kwargs=None,
+                                 labels=None, **kwargs):
+        """Plot one or more points of interest (e.g. weather stations, platforms).
 
-        lon/lat are scalars here (a single location). text_offset is in degrees
-        (lon, lat) applied to the label position.
+        Accepts either a single point or many points through the same
+        signature: lons/lats may be a single scalar or a sequence. Every
+        other parameter (texts, markers, colors, markersizes, text_offsets,
+        text_kwargs, labels) may likewise be given either as a single value
+        - applied to every point - or as a sequence matching the number of
+        points (a sequence of length 1 is also broadcast to all points).
+
+        A plain string (e.g. colors="black") is always treated as one atomic
+        value, never as a sequence to split across points, even though
+        strings technically support len()/indexing.
+
+        Examples
+        --------
+            m.add_points_of_interest(4.5, 60.4, "Station A")
+            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], ["A", "B"])
+            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], colors="red")  # both red
+            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], colors=["red", "blue"])
+
+        text_offsets is in degrees (lon, lat); when given per-point it must be
+        a sequence of (dx, dy) pairs, e.g. [(0.02, 0.02), (-0.05, 0.02)].
         """
-        lon_arr = np.atleast_1d(np.asarray(lon, dtype=float))
-        lat_arr = np.atleast_1d(np.asarray(lat, dtype=float))
-        self._update_bounds(lon_arr, lat_arr)
+        lons_arr = np.atleast_1d(np.asarray(lons, dtype=float))
+        lats_arr = np.atleast_1d(np.asarray(lats, dtype=float))
+        if lons_arr.shape != lats_arr.shape:
+            raise ValueError(f"lons and lats must have the same length, got {lons_arr.shape} and {lats_arr.shape}")
+        n = lons_arr.size
+        self._update_bounds(lons_arr, lats_arr)
+
+        # text_offsets is special: a single offset is itself a 2-tuple, which
+        # looks like "a length-2 sequence" - we must not mistake that for "one
+        # offset per point" when n==2. Detect "a single (dx, dy) pair" up
+        # front and wrap it before generic broadcasting sees it.
+        def is_single_offset(v):
+            return (
+                len(v) == 2
+                and not hasattr(v[0], "__len__")
+                and not hasattr(v[1], "__len__")
+            )
+
+        if is_single_offset(text_offsets):
+            text_offsets_in = [text_offsets] * n if n != 1 else [text_offsets]
+        else:
+            text_offsets_in = text_offsets
+
+        broadcast = _broadcast_point_params(
+            n,
+            texts=texts, markers=markers, colors=colors, markersizes=markersizes,
+            text_offsets=text_offsets_in, text_kwargs=text_kwargs, labels=labels,
+        )
+
         return self._add_layer(
-            _draw_point, lon=lon, lat=lat, text=text, marker=marker, color=color,
-            markersize=markersize, text_offset=text_offset, text_kwargs=text_kwargs,
-            label=label, **kwargs,
+            _draw_points, lons=list(lons_arr), lats=list(lats_arr),
+            texts=broadcast["texts"], markers=broadcast["markers"], colors=broadcast["colors"],
+            markersizes=broadcast["markersizes"], text_offsets=broadcast["text_offsets"],
+            text_kwargs_list=broadcast["text_kwargs"], labels=broadcast["labels"], **kwargs,
         )
-
-    def add_points_of_interest(self, lons, lats, texts=None, **kwargs):
-        """Convenience wrapper to plot several points of interest in one call.
-
-        lons/lats: 1D sequences. texts: optional sequence of labels (same length).
-        """
-        lons = np.atleast_1d(np.asarray(lons))
-        lats = np.atleast_1d(np.asarray(lats))
-        if texts is None:
-            texts = [None] * len(lons)
-        if len(texts) != len(lons):
-            raise ValueError("texts must be the same length as lons/lats")
-        for lon, lat, text in zip(lons, lats, texts):
-            self.add_point_of_interest(lon, lat, text, **kwargs)
-        return self
 
     def add_coastline(self, *, resolution=None, color="black", linewidth=1.0, **kwargs):
         """Add a coastline overlay. Requires a cartopy GeoAxes.

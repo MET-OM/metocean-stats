@@ -64,7 +64,7 @@ def _get_n_axes(n_intervals, max_cols=4):
         nrows = np.ceil(n_intervals / max_cols).astype(int)
         ncols = max_cols
 
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False, layout="constrained")
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False)
     return fig, axes.ravel()
 
 class UnivariateEVA:
@@ -78,23 +78,55 @@ class UnivariateEVA:
     def __init__(self,
                  data:pd.DataFrame,
                  var:str,
-                 var_dir:str,
-                 var_name:str,
-                 var_symbol:str,
-                 var_unit:str,
+                 var_dir:str=None,
+                 var_name:str=None,
+                 var_symbol:str=None,
+                 var_unit:str=None,
                  sectors:int=12,
                  dist_name_map:callable=_dist_name_map,
                  ):
         """
         Initialize extreme value analysis module.
-        This module applies pyextremes.EVA to monthly and sectors.
+        This module applies pyextremes.EVA to monthly and sectors (and,
+        if a direction variable is supplied, directional sectors).
+
+        Can be constructed directly (independent of TimeSeries) - only
+        `data` and `var` are strictly required.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input data, indexed by a datetime-compatible index. Must
+            contain `var`, and `var_dir` if given.
+        var : str
+            Column name of the variable to analyse.
+        var_dir : str, optional
+            Column name of a directional variable (0-360 deg). If None,
+            sector-based analysis is unavailable, but omni and monthly
+            analysis work as usual.
+        var_name, var_symbol, var_unit : str, optional
+            Semantics used for axis labels etc. Fall back to `var`,
+            `var`, and "" respectively if not given.
+        sectors : int, default 12
+            Number of directional sectors. Ignored if var_dir is None.
         """
 
+        # Semantics (fall back to sensible defaults so direct construction
+        # doesn't require boilerplate).
+        self.var = var
+        self.var_dir = var_dir
+        self.var_name = var_name if var_name is not None else var
+        self.var_symbol = var_symbol if var_symbol is not None else var
+        self.var_unit = var_unit if var_unit is not None else ""
+        self.dist_name_map = dist_name_map
+
+        # Direction is optional - sector-based analysis is only
+        # available when a direction column is supplied.
+        self._has_direction = var_dir is not None
+
         # Sort into sectors
-        if var_dir is not None:
-            data = data[[var,var_dir]].copy()
-        else:
-            data = data[[var]].copy()
+        cols = [var] + ([var_dir] if self._has_direction else [])
+        data = data[cols].copy()
         # data.index = pd.to_datetime(data.index)
         # bins = np.linspace(0, 360, sectors+1,dtype=int)
         # dir_offset = (bins[1]-bins[0])/2
@@ -104,7 +136,7 @@ class UnivariateEVA:
         # Group the data
         self.data_omni = data[var]
         self.data_monthly = groupby_month(data,var=var)
-        if var_dir is not None:
+        if self._has_direction:
             self.data_sectors = groupby_sector(
                 data,
                 var_dir=var_dir,
@@ -112,34 +144,73 @@ class UnivariateEVA:
                 var=var
                 )
         else:
-            self.data_sectors = None
+            self.data_sectors = {}
 
         # Set keys
-        self.keys_sectors = list(self.data_sectors.keys()) if self.data_sectors is not None else None
+        self.keys_sectors = list(self.data_sectors.keys())
         self.keys_monthly = list(self.data_monthly.keys())
 
         # State flags
         self._got_extremes = False
         self._fitted_models = False
 
-        # Semantics
-        self.var = var
-        self.var_dir = var_dir
-        self.var_name = var_name
-        self.var_symbol = var_symbol
-        self.var_unit = var_unit
-        self.dist_name_map = dist_name_map
+    def _require_direction(self,method_name:str) -> None:
+        """Raise a clear error if direction was not provided at initialisation."""
+        if not self._has_direction:
+            raise AttributeError(
+                f"{method_name} requires a direction variable (var_dir), "
+                "but none was provided when this UnivariateEVA was created. "
+                "Sector-based analysis is unavailable; 'omni' and 'monthly' "
+                "groupings remain fully available."
+            )
 
     def _poisson_correction(self,T,method = None):
         T = np.array(T)
         if method not in ["AM","BM"]: return T
         return 1/(1-np.exp(-(1/T)))
 
-    def _check_sectors_available(self):
-        if self.var_dir is None:
+    def _extremes_rate_from_duration(self,duration,return_period_size="365.2425D"):
+
+        duration = pd.to_timedelta(duration)
+        return_period_size = pd.to_timedelta(return_period_size)
+        return return_period_size / duration
+
+    def _get_return_value(self,model,return_period,return_period_size="365.2425D",
+                           duration=None,exposure_fraction=1.0,alpha=None,**kwargs):
+
+        if duration is None:
+            return model.get_return_value(return_period,return_period_size,alpha=alpha,**kwargs)
+
+        if model.extremes_method != "POT":
             raise ValueError(
-                "Sector results are unavailable because var_dir was not provided on init."
+                "duration override is only valid for POT-based models (this "
+                "includes IDM, which is fit via the POT backend); got "
+                f"extremes_method='{model.extremes_method}'. AM return periods "
+                "are governed by block_size, not event duration, so `duration` "
+                "must be left as None for AM models."
             )
+
+        return_period_size = pd.to_timedelta(return_period_size)
+        full_year_extremes_rate = self._extremes_rate_from_duration(duration,return_period_size)
+        extremes_rate = full_year_extremes_rate*exposure_fraction
+
+        return_period = np.asarray(return_period,dtype=np.float64).copy()
+        if return_period.ndim == 0:
+            return_period = return_period[np.newaxis]
+        if return_period.ndim != 1:
+            raise ValueError(
+                f"invalid shape in {return_period.shape} for the 'return_period' "
+                f"argument, must be a scalar or 1D array"
+            )
+
+        exceedance_probability = 1/return_period/extremes_rate
+
+        return tuple(
+            model.extremes_transformer.transform(value)
+            for value in model.model.get_return_value(
+                exceedance_probability=exceedance_probability,alpha=alpha,**kwargs
+            )
+        )
 
     def plot_threshold_diagnostics(
             self,
@@ -165,6 +236,10 @@ class UnivariateEVA:
         ):
         """
         Get POT and AM extremes of all models.
+
+        Sector-based extremes (th_sectors, self.am_sectors, self.pot_sectors)
+        are only computed if a direction variable was provided at
+        construction; otherwise they are skipped entirely.
         """
 
         if th_omni is None:
@@ -172,20 +247,27 @@ class UnivariateEVA:
         if th_monthly is None:
             th_monthly = {k:v.quantile(th_percentile)
                           for k,v in self.data_monthly.items()}
-        if self.data_sectors is not None and th_sectors is None:
-            th_sectors = {k:v.quantile(th_percentile)
-                          for k,v in self.data_sectors.items()}
 
-        # if not len(th_monthly) < len(self.data_monthly):
-        #     raise ValueError(f"Expected {len(self.data_monthly)} monthly thresholds, got {len(th_monthly)}.")
+        if not len(th_monthly) == 12:
+            raise ValueError(f"Expected 12 monthly thresholds, got {len(th_monthly)}.")
         if not isinstance(th_monthly,dict):
             th_monthly = {k:t for k,t in zip(self.keys_monthly,th_monthly)}
 
-        if self.data_sectors is not None:
+        if self._has_direction:
+            if th_sectors is None:
+                th_sectors = {k:v.quantile(th_percentile)
+                              for k,v in self.data_sectors.items()}
             if not len(th_sectors) == len(self.data_sectors):
                 raise ValueError(f"Expected {len(self.data_sectors)} sector thresholds, got {len(th_sectors)}.")
             if not isinstance(th_sectors,dict):
                 th_sectors = {k:t for k,t in zip(self.keys_sectors,th_sectors)}
+        elif th_sectors is not None:
+            raise AttributeError(
+                "th_sectors was given, but this UnivariateEVA has no direction "
+                "variable (var_dir), so sector-based extremes are unavailable."
+            )
+        else:
+            th_sectors = {}
 
         # Omni
         self.am_omni = pyex.get_extremes(
@@ -199,7 +281,7 @@ class UnivariateEVA:
             threshold=th_omni,r=r)
 
         # Sectors
-        if self.data_sectors is not None:
+        if self._has_direction:
             self.am_sectors = {k:pyex.get_extremes(
                 self.data_sectors[k],"BM",extremes_type,
                 errors=errors,
@@ -212,8 +294,8 @@ class UnivariateEVA:
                 threshold=th_sectors[k],r=r)
                 for k in self.keys_sectors}
         else:
-            self.am_sectors = None
-            self.pot_sectors = None
+            self.am_sectors = {}
+            self.pot_sectors = {}
 
         # Monthly
         self.am_monthly = {k:pyex.get_extremes(
@@ -247,6 +329,9 @@ class UnivariateEVA:
         """
         Fit all combinations of distributions, methods and data subsets.
         Distributions may be given as shorthand (2-3 letters) or scipy names.
+
+        Sector models are only fitted if a direction variable was provided
+        at construction; self.models_sectors will be an empty dict otherwise.
         """
 
         if not self._got_extremes:
@@ -271,7 +356,7 @@ class UnivariateEVA:
         if not len(all_dist): raise ValueError("No distributions to fit.")
 
         self.models_omni = {}
-        self.models_sectors = {k:{} for k in self.keys_sectors} if self.data_sectors is not None else None
+        self.models_sectors = {k:{} for k in self.keys_sectors}
         self.models_monthly = {k:{} for k in self.keys_monthly}
 
         pbar = tqdm(all_dist)
@@ -296,7 +381,7 @@ class UnivariateEVA:
             self.models_omni[(method,dist)] = model
 
             # Sectors
-            if self.data_sectors is not None:
+            if self._has_direction:
                 for sector,data in self.data_sectors.items():
                     try:
                         model = pyex.EVA(data)
@@ -351,7 +436,7 @@ class UnivariateEVA:
                     if errors == "raise":
                         raise
                     elif errors == "warn":
-                        warnings.warn(f"Failed to fit {dist} ({method}) for sector '{sector}': {e}")
+                        warnings.warn(f"Failed to fit {dist} ({method}) for month '{month}': {e}")
 
         self._fitted_models = True
 
@@ -360,6 +445,8 @@ class UnivariateEVA:
             models:dict[tuple[str,str],pyex.EVA],
             return_periods:list[float],
             return_period_size:str="365.2425D",
+            duration_POT=None,
+            duration_IDM=None,
             ax = None,
             scatter_kwargs_AM  = {},
             scatter_kwargs_POT = {},
@@ -372,6 +459,13 @@ class UnivariateEVA:
             ):
         """
         This plots a set of EVA distributions on a axes object.
+
+        duration_POT, duration_IDM : str or pandas.Timedelta, optional
+            Explicit "duration of event" used to override the empirical
+            POT / IDM extremes rate (default=None, meaning use the
+            empirical historical spacing between peaks, unchanged from
+            before). Has no effect on AM curves/values, which are always
+            governed by block_size.
         """
 
         # Input checks
@@ -448,10 +542,12 @@ class UnivariateEVA:
                 legend.append(f"POT, N={N_extremes_POT}")
                 smallest_extreme = np.minimum(smallest_extreme,model.extremes.min())
                 
-            plot_rv = model.get_return_value(plot_rp,return_period_size)[0]
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni))[0]
             ax.plot(plot_rp,plot_rv,c=colors_pot[i],
                     linestyle=plot_kwargs_POT["linestyle"])
-            RVE[(method,dist)] = model.get_return_value(return_periods,return_period_size)[0]
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni))[0]
             legend.append(f"{self.dist_name_map(dist)}")
 
         for i in range(legend_fill[1]):
@@ -472,10 +568,12 @@ class UnivariateEVA:
                 if smallest_extreme == np.inf: # only use idm if no pot or am available
                     smallest_extreme = model.extremes.min()
                 
-            plot_rv = model.get_return_value(plot_rp,return_period_size)[0]
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni))[0]
             ax.plot(plot_rp,plot_rv,c=colors_idm[i],
                     linestyle=plot_kwargs_IDM["linestyle"])
-            RVE[(method,dist)] = model.get_return_value(return_periods,return_period_size)[0]
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni))[0]
             legend.append(f"{self.dist_name_map(dist)}")
 
         for i in range(legend_fill[2]):
@@ -522,7 +620,8 @@ class UnivariateEVA:
         Parameters
         ----------
         grouping : str or dict of EVA models
-            Str ("omni", "monthly", or "sectors").
+            Str ("omni", "monthly", or "sectors"). "sectors" requires that
+            a direction variable was provided at construction.
         return_periods : list[float]
             List of return periods, in years.
         ax : matplotlib axes or list of axes
@@ -532,6 +631,11 @@ class UnivariateEVA:
         subplot_figures : int
             Only used if axes are not provided. Option to divide plots over several figures.
         kwargs : keyword arguments passed to the return value plots:
+         - duration_POT (str or pandas.Timedelta): Explicit duration of event
+           used to override the empirical POT extremes rate (default=None,
+           meaning use the empirical historical spacing between peaks).
+         - duration_IDM (str or pandas.Timedelta): Same as duration_POT, but
+           for IDM models.
          - include_table (bool): Include a table of return values above the plot.
          - scatter_kwargs_AM (dict): Keyword arguments passed to AM scatter.
          - scatter_kwargs_POT (dict): Keyword arguments passed to POT scatter.
@@ -546,7 +650,7 @@ class UnivariateEVA:
             raise ValueError("Models not fitted. Run .fit() first.")
 
         if grouping == "sectors":
-            self._check_sectors_available()
+            self._require_direction("plot_return_value_comparison(grouping='sectors')")
 
         # Check if table is included, and its size, to correcly place title
         titlepos = 1 + 0.07*len(return_periods)
@@ -604,6 +708,7 @@ class UnivariateEVA:
             model:pyex.EVA,
             return_periods:list[float],
             return_period_size:str="365.2425D",
+            duration=None,
             alphas:float|list[float]=[0.99,0.9],
             samples=300,
             cmap="viridis",
@@ -612,6 +717,12 @@ class UnivariateEVA:
             ax=None):
         """
         Plot return value confidence intervals based on bootstrapping.
+
+        duration : str or pandas.Timedelta, optional
+            Explicit "duration of event" used to override the empirical
+            extremes rate (default=None, i.e. unchanged empirical
+            behavior). Only valid when method is "POT" or "IDM"; must be
+            left as None for "AM".
         """
         if not hasattr(alphas,"__len__"): alphas = [alphas]
         alphas = np.sort(alphas)
@@ -626,11 +737,13 @@ class UnivariateEVA:
         # Plotting
         table = {}
         legend = [f"{method}","Fitted"]
+        exposure_fraction = len(model.data)/len(self.data_omni)
         for i,alpha in enumerate(alphas):
-            rv,cl,cu = model.get_return_value(plot_rp,alpha=alpha,n_samples=samples,
-                                              return_period_size=return_period_size)
+            rv,cl,cu = self._get_return_value(model,plot_rp,return_period_size,duration=duration,
+                                               exposure_fraction=exposure_fraction,
+                                               alpha=alpha,n_samples=samples)
             if i == 0:
-                extremes_method = "BM" if method=="AM" else method
+                extremes_method = "BM" if method=="AM" else "POT"
                 extremes = pyex.get_return_periods(
                     model.data,model.extremes,extremes_method,self.extremes_type)
                 ax.scatter(extremes["return period"], extremes[self.var],s=10,c="black")
@@ -639,8 +752,9 @@ class UnivariateEVA:
             ax.plot(plot_rp,cu,c=colors[i+1])
             ax.plot(plot_rp,cl,c=colors[i+1],label="_nolegend_")
             
-            rv,cl,cu = model.get_return_value(corrected_rp,alpha=alpha,n_samples=samples,
-                                              return_period_size=return_period_size)
+            rv,cl,cu = self._get_return_value(model,corrected_rp,return_period_size,duration=duration,
+                                               exposure_fraction=exposure_fraction,
+                                               alpha=alpha,n_samples=samples)
             exceedance = 1-alpha
             table[(100*(exceedance)/2)] = cl
             table[(100*(alpha+exceedance/2))] = cu
@@ -680,18 +794,26 @@ class UnivariateEVA:
             ax:plt.Axes | list[plt.Axes] = None,
             subplot_columns = None,
             subplot_figures = 1,
+            duration=None,
             alphas = [0.99,0.9],
             cmap = "viridis",
             table_scale = 0.07,
             table_flip = False,
             samples = 200,
             ):
+        """
+        duration : str or pandas.Timedelta, optional
+            Explicit "duration of event" used to override the empirical
+            extremes rate (default=None, i.e. unchanged empirical
+            behavior). Only valid when method is "POT" or "IDM"; must be
+            left as None for "AM".
+        """
 
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
         if grouping == "sectors":
-            self._check_sectors_available()
+            self._require_direction("plot_return_value_confidence(grouping='sectors')")
 
         dist = _dist_name_map(dist,False)
         if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
@@ -704,7 +826,8 @@ class UnivariateEVA:
                 raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
             model = self.models_omni[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,alphas,samples,cmap,table_scale,table_flip,ax=ax)
+                method,model,return_periods,duration=duration,alphas=alphas,samples=samples,
+                cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax)
             ax.set_title("Omni",y=titlepos)
             return ax
 
@@ -737,7 +860,8 @@ class UnivariateEVA:
         for i,(subset,subset_models) in enumerate(models.items()):
             model = subset_models[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,alphas,samples,cmap,table_scale,table_flip,ax=ax[i])
+                method,model,return_periods,duration=duration,alphas=alphas,samples=samples,
+                cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax[i])
             ax[i].set_title(f"{subset}",y=titlepos)
 
         for fig in figures:
@@ -757,8 +881,9 @@ class UnivariateEVA:
 
         Parameters
         ------------
-        subset : str
-            One of [omni, monthly, sectors].
+        grouping : str
+            One of [monthly, sectors]. "sectors" requires that a direction
+            variable was provided at construction.
 
         Notes
         -------
@@ -768,7 +893,7 @@ class UnivariateEVA:
             raise ValueError("Models not fitted. Run .fit() first.")
 
         if grouping == "sectors":
-            self._check_sectors_available()
+            self._require_direction("table_model_parameters(grouping='sectors')")
 
         if grouping == "monthly": 
             models = self.models_monthly | {"Yearly":self.models_omni}
@@ -794,21 +919,31 @@ class UnivariateEVA:
 
     def table_return_values_final(
             self,
-            grouping:typing.Literal["monthly","sectors"],
+            grouping:typing.Literal["omni","monthly","sectors"],
             method:str,
             dist:str,
             return_periods:list[float],
-            return_period_size:str="365.2425D"
+            return_period_size:str="365.2425D",
+            duration=None,
             ):
         """
         Table of return values for a given distribution.
+
+        grouping : str
+            One of [omni, monthly, sectors]. "sectors" requires that a
+            direction variable was provided at construction.
+        duration : str or pandas.Timedelta, optional
+            Explicit "duration of event" used to override the empirical
+            POT/IDM extremes rate (default=None, i.e. unchanged empirical
+            behavior). Only valid when method is "POT" or "IDM"; must be
+            left as None for "AM".
         """
         
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
         if grouping == "sectors":
-            self._check_sectors_available()
+            self._require_direction("table_return_values_final(grouping='sectors')")
 
         if grouping == "omni":
             models = {"Omni":self.models_omni}
@@ -821,9 +956,12 @@ class UnivariateEVA:
         RVE = {}
         for subset,subset_models in models.items():
             model = subset_models[(method,self.dist_name_map(dist,False))]
-            RVE[subset] = {f"{rp}-year":model.get_return_value(
+            RVE[subset] = {f"{rp}-year":self._get_return_value(
+                model,
                 self._poisson_correction(rp,method),
-                return_period_size=return_period_size)[0]
+                return_period_size=return_period_size,
+                duration=duration,
+                exposure_fraction=len(model.data)/len(self.data_omni))[0]
                 for rp in return_periods}
         
         RVE = pd.DataFrame.from_dict(RVE,orient="index")
@@ -843,16 +981,26 @@ class UnivariateEVA:
             method:str,
             dist:str,
             return_periods:list[float],
+            duration=None,
             plot_kwargs = {},
             table_kwargs = {},
             ):
         """
         Plot of return values for a given distribution.
+
+        grouping : str
+            One of [monthly, sectors]. "sectors" requires that a direction
+            variable was provided at construction.
+        duration : str or pandas.Timedelta, optional
+            Explicit "duration of event" used to override the empirical
+            POT/IDM extremes rate (default=None, i.e. unchanged empirical
+            behavior). Only valid when method is "POT" or "IDM"; must be
+            left as None for "AM".
         """
         if grouping == "sectors":
-            self._check_sectors_available()
+            self._require_direction("plot_return_values_final(grouping='sectors')")
 
-        table = self.table_return_values_final(grouping,method,dist,return_periods)
+        table = self.table_return_values_final(grouping,method,dist,return_periods,duration=duration)
         if grouping == "monthly": N = 12
         else: N = len(self.models_sectors)
         table = table[:N]

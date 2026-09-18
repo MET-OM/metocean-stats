@@ -913,13 +913,13 @@ class TimeSeriesValidation:
         # Colorbar                                                             #
         # ------------------------------------------------------------------ #
         if x_var.unit: 
-            unit_str = x_var.unit
+            unit_str = x_var.unit + " "
         elif y_var.unit: 
-            unit_str = y_var.unit
+            unit_str = y_var.unit + " "
         else: 
-            unit_str = "-"
+            unit_str = ""
         cbar_label = (
-            f"entries per {bin_size:g} × {bin_size:g} {unit_str} bin"
+            f"entries per {bin_size:g} × {bin_size:g} {unit_str}bin"
         )
 
         cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046)

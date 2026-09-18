@@ -478,6 +478,7 @@ class TimeSeries:
         step: float = None,
     ) -> dict:
         if by == "direction":
+            self._require_direction("grouping by direction")
             data = self.data[[col, self.direction.col]].dropna()
             return groupby_sector(data, var_dir=self.direction.col,
                                 sectors=sectors or self.sectors, var=col)
@@ -1928,6 +1929,10 @@ class TimeSeries:
         >>> ts.statistics_2d(row="year",  col="month", stat="p90")
         >>> ts.statistics_2d(row="hs",    col="tp",    stat="count", margins=False)
         """
+
+        if row == "direction" or col == "direction": 
+            self._require_direction("statistics_2d")
+
         # ------------------------------------------------------------------ #
         # Resolve variable                                                     #
         # ------------------------------------------------------------------ #
@@ -2314,6 +2319,10 @@ class TimeSeries:
             has more than 12 groups only every N-th label is shown so that
             text does not overlap; the spacing N is chosen automatically.
             """
+
+            if row == "direction" or col == "direction": 
+                self._require_direction("statistics_2d")
+
             # ------------------------------------------------------------------ #
             # Compute table                                                        #
             # ------------------------------------------------------------------ #
