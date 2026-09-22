@@ -361,8 +361,7 @@ def air_temperature_correction_nora10(df,var='T2m'):
 
 
 def wind_gust(df,var='W10',var0='W10',z=10):
-    # this assume the 3-hour interval = 1-h mean wind speed 
-    # the calculation folow Norce Report for LUNA page 122/130 
+    # this assume the 3-hour interval = 1-h mean wind speed  
     Uo=df[var0]
     Uref=10 # m/s
     zr = 10
