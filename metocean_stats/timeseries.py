@@ -65,6 +65,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
+
 
 from .EVA import UnivariateEVA
 from .CMA import BivariateEVA
@@ -88,20 +90,19 @@ class Variable:
         Human-readable name used in table headers and axis titles.
         E.g. "Significant wave height".
     symbol : str
-        LaTeX-compatible symbol (without $ delimiters).
-        E.g. "H_s", "T_p", "U_{10}".
+        Display symbol used in axis labels, titles, and short labels.
     unit : str
-        Physical unit string. E.g. "m", "m/s", "s", "°".
+        Physical unit string. E.g. "m", "m/s", "s", "°". Used verbatim.
     label : str, optional
         Short display label for legend entries or compact tables.
         Defaults to symbol if not provided.
 
     Examples
     --------
-    >>> hs  = Variable("hs",  "Significant wave height", "H_s",     "m")
-    >>> tp  = Variable("tp",  "Peak wave period",        "T_p",     "s")
-    >>> mwd = Variable("mwd", "Mean wave direction",     "\\theta", "°")
-    >>> ws  = Variable("ws",  "Wind speed",              "U_{10}", "m/s")
+    >>> hs  = Variable("hs",  "Significant wave height", "$H_s$",     "m")
+    >>> tp  = Variable("tp",  "Peak wave period",        "$T_p$",     "s")
+    >>> mwd = Variable("mwd", "Mean wave direction",     r"$\\theta$", "°")
+    >>> ws  = Variable("ws",  "Wind speed",              "$U_{10}$", "m/s")
     """
     col: str
     name: str
@@ -119,18 +120,13 @@ class Variable:
 
     @property
     def axis_label(self) -> str:
-        """Formatted axis label: 'Name, $symbol$ (unit)'."""
-        return f"{self.name}, ${self.symbol}$ ({self.unit})"
+        """Formatted axis label: 'Name, symbol (unit)'."""
+        return f"{self.name}, {self.symbol} ({self.unit})"
 
     @property
     def short_label(self) -> str:
-        """Shorter variable label: '$symbol$ (unit)'."""
-        return f"${self.symbol}$ ({self.unit})"
-
-    @property
-    def math_label(self) -> str:
-        """Symbol wrapped in LaTeX math delimiters: '$symbol$'."""
-        return f"${self.symbol}$"
+        """Shorter variable label: 'symbol (unit)'."""
+        return f"{self.symbol} ({self.unit})"
 
     def __repr__(self) -> str:
         return (
@@ -142,7 +138,6 @@ class Variable:
 # ---------------------------------------------------------------------------
 # CMAConfig — pairs a variable order with its joint model description
 # ---------------------------------------------------------------------------
-
 @dataclass
 class CMAConfig:
     """
@@ -446,14 +441,15 @@ class TimeSeries:
             model=cma.model,
         )
 
-    def _require_direction(self, method_name: str) -> None:
-        """Raise a clear error if direction was not provided at initialisation."""
-        if self.direction is None:
+    def _require_direction(self, method_name: str, direction: str = None) -> None:
+        """Raise a clear error if direction was not provided at initialisation,
+        unless an explicit direction column override is given."""
+        if direction is None and self.direction is None:
             raise AttributeError(
                 f"{method_name}() requires a direction variable, "
                 "but none was provided at initialisation."
             )
-
+    
     def _resolve_column(self, col: str | None, default: Variable) -> Variable:
         """
         Resolve a user-supplied column name string to a Variable.
@@ -476,11 +472,14 @@ class TimeSeries:
         sectors: int = None,
         seasons: dict = None,
         step: float = None,
+        direction: str = None,
     ) -> dict:
+        
         if by == "direction":
-            self._require_direction("grouping by direction")
-            data = self.data[[col, self.direction.col]].dropna()
-            return groupby_sector(data, var_dir=self.direction.col,
+            self._require_direction("grouping by direction", direction=direction)
+            dir_col = direction or self.direction.col
+            data = self.data[[col, dir_col]].dropna()
+            return groupby_sector(data, var_dir=dir_col,
                                 sectors=sectors or self.sectors, var=col)
 
         data = self.data[[col]].dropna()
@@ -521,6 +520,8 @@ class TimeSeries:
                 f"'by' must be one of 'month', 'season', 'direction', 'year', "
                 f"'week', 'day', 'hour', or a column name. Got '{by}'."
             )
+
+        
     # ---------------------------------------------------------------------- #
     # Properties                                                               #
     # ---------------------------------------------------------------------- #
@@ -619,6 +620,142 @@ class TimeSeries:
         raise NotImplementedError
 
     # ---------------------------------------------------------------------- #
+    # Discrete-value correction                                                #
+    # ---------------------------------------------------------------------- #
+    @staticmethod
+    def _fit_geometric_centres(
+        x: np.ndarray,
+        ratio_range: tuple[float, float] = (1.06, 1.30),
+        n_trial: int = 2000,
+        max_dev: float = 0.35,
+        max_bins: int = 100,
+    ) -> np.ndarray:
+        """
+        Infer geometric bin centres from discrete positive values.
+        Fits log(x) = a + b*n for integer n. Interior gaps are filled;
+        no extrapolation beyond the observed range.
+
+        Parameters
+        ----------
+        max_bins : int, optional
+            Upper bound on the number of distinct observed levels
+            (unique values, after collapsing float noise) that will be
+            treated as candidates for a geometric grid. Real geometric
+            model grids (e.g. spectral frequency bins) rarely exceed a
+            few dozen levels, so this is a cheap sanity check: if the
+            data has more distinct levels than this, it's very unlikely
+            to be a discretised geometric variable, and fitting it would
+            be both meaningless and, for a moderately large N, slow.
+            Raises `ValueError` immediately rather than running the fit.
+        """
+        x = np.asarray(x, dtype=np.float64)
+        x = x[np.isfinite(x) & (x > 0)]
+
+        # Collapse float32 noise before taking unique values
+        logx, counts = np.unique(np.round(np.log(x), 5), return_counts=True)
+
+        if len(logx) > max_bins:
+            raise ValueError(
+                f"Found {len(logx)} distinct values, which exceeds max_bins="
+                f"{max_bins}. This data does not look like it sits on a small "
+                f"discrete geometric grid, so fitting was skipped. If this is "
+                f"expected (e.g. a genuinely fine grid), raise `max_bins`, or "
+                f"pass `centres` explicitly to `smooth_discrete_geometric`."
+            )
+
+        w = counts / counts.sum()
+
+        # Coarse scan over step size, then weighted LSQ refinement
+        steps = np.log(np.linspace(*ratio_range, n_trial))
+        u = (logx - logx[0])[:, None] / steps[None, :]
+        step = steps[np.argmin((w[:, None] * (u - np.round(u)) ** 2).sum(axis=0))]
+
+        n = np.round((logx - logx[0]) / step).astype(int)
+        if len(np.unique(n)) != len(n):
+            raise ValueError("Several observed values map to the same grid index; "
+                            "data does not look geometric. Pass `centres` explicitly.")
+        b, a = np.polyfit(n, logx, 1, w=np.sqrt(w))
+
+        dev = np.abs(logx - (a + b * n)).max() / b
+        if dev > max_dev:
+            warnings.warn(f"Max deviation from fitted grid is {dev:.2f} bins "
+                        f"(> {max_dev}); data may not be strictly geometric.")
+
+        return np.exp(a + b * np.arange(n.min(), n.max() + 1))
+
+    def smooth_discrete_geometric(
+        self,
+        column: str,
+        centres: np.ndarray | list[float] = None,
+        out: str = None,
+        seed: int = None,
+        **fit_kwargs,
+    ) -> np.ndarray:
+        """
+        Remove discretisation stripes from a variable defined on a geometric
+        grid (e.g. Tp from a spectral wave model with constant frequency ratio).
+
+        Each value is snapped to its nearest bin centre (in log-space) and
+        replaced by a uniform draw within that bin: centre * ratio**U(-0.5, 0.5).
+        Bin centres are either supplied or inferred from the data; values are
+        assumed to be ON the grid, so only observed levels are corrected.
+
+        Parameters
+        ----------
+        column : str
+            Column to correct.
+        centres : array-like, optional
+            Known bin centres (physical units, ascending, ratio constant).
+            If None, they are inferred with `_fit_geometric_centres`.
+        out : str, optional
+            Output column name. Defaults to `column` (overwrite in place).
+            A new name is added to `data` and registered as a secondary Variable
+            inheriting the metadata of `column`.
+        seed : int, optional
+            Seed for reproducible noise.
+        **fit_kwargs
+            Passed to `_fit_geometric_centres` (ratio_range, n_trial, max_dev,
+            max_bins).
+
+        Returns
+        -------
+        np.ndarray
+            The bin centres used.
+        """
+        var = self._resolve_column(column, self.primary)
+        out = out or var.col
+
+        s = self.data[var.col]
+        valid = s.notna() & (s > 0)
+        x = s[valid].to_numpy(dtype=np.float64)
+
+        if centres is None:
+            centres = self._fit_geometric_centres(x, **fit_kwargs)
+        centres = np.sort(np.asarray(centres, dtype=np.float64))
+        if len(centres) < 2:
+            raise ValueError("Need at least two bin centres.")
+
+        logc = np.log(centres)
+        step = np.median(np.diff(logc))      # log of the ratio
+
+        # Nearest centre in log-space via midpoints (O(N log K))
+        idx = np.searchsorted(0.5 * (logc[1:] + logc[:-1]), np.log(x))
+        rng = np.random.default_rng(seed)
+        new = np.exp(logc[idx] + rng.uniform(-0.5, 0.5, size=x.size) * step)
+
+        result = s.astype(np.float64).copy()
+        result[valid] = new
+        self.data[out] = result
+
+        if out not in self._variables:
+            v = Variable(col=out, name=var.name, symbol=var.symbol,
+                        unit=var.unit, label=var.label)
+            self.secondary.append(v)
+            self._variables[out] = v
+
+        return centres
+
+    # ---------------------------------------------------------------------- #
     # Descriptive statistics                                                   #
     # ---------------------------------------------------------------------- #
 
@@ -677,6 +814,7 @@ class TimeSeries:
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
+        direction: str = None,
     ) -> pd.DataFrame:
         """
         Aggregated statistics grouped by month, season, direction, or year.
@@ -696,6 +834,9 @@ class TimeSeries:
             Directional sectors. Only used when by="direction".
         seasons : dict[str, list[int]], optional
             Custom season map. Only used when by="season".
+        direction : str, optional
+            Direction column to use instead of the default direction variable
+            set at initialisation. Only used when by="direction".
 
         Returns
         -------
@@ -703,16 +844,16 @@ class TimeSeries:
             Groups as columns (+ "All"), statistics and percentiles as rows.
         """
         if by == "direction":
-            self._require_direction("statistics")
+            self._require_direction("statistics", direction=direction)
 
         func        = func        or ["min", "mean", "max", "std", "count", "%"]
         percentiles = percentiles if percentiles is not None else [1, 10, 50, 90, 99]
 
-        cols = self._resolve_columns(column, default=[self.primary])
-        var  = cols[0].col
+        var = self._resolve_column(column, default=self.primary).col
 
         # --- build groups ---------------------------------------------------- #
-        groups        = self._get_groups(by, var, sectors=sectors, seasons=seasons, step=step)
+        groups        = self._get_groups(by, var, sectors=sectors, seasons=seasons,
+                                        step=step, direction=direction)
         groups["All"] = self.data[var].dropna()
 
         # --- aggregation ----------------------------------------------------- #
@@ -737,16 +878,17 @@ class TimeSeries:
         df.columns.name = self._variables[by].short_label if by in self._variables else None
         return df
 
-
     def nonexceedance(
         self,
-        by: typing.Literal["month", "season", "direction", "year"] | str = "month",        
+        by: typing.Literal["month", "season", "direction", "year"] | str = "month",
         thresholds: list[float] = None,
         step: float = None,
         column: str = None,
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         by_step: float = None,
+        rounding: int = None,
+        direction: str = None,
     ) -> pd.DataFrame:
         """
         Non-exceedance table P(X ≤ x) in percent, grouped by month, season,
@@ -776,14 +918,23 @@ class TimeSeries:
             Number of directional sectors. Only used when by="direction".
         seasons : dict[str, list[int]], optional
             Custom season map. Only used when by="season".
+        rounding : int, optional
+            If given, number of decimal places to floor each value to. Values
+            are always rounded down, never to the nearest, since non-exceedance
+            probabilities must be conservative. Table is returned as strings in
+            that case, with "100" (no decimals) for values that floor to 100.
+        direction : str, optional
+            Direction column to use instead of the default direction variable
+            set at initialisation. Only used when by="direction".
 
         Returns
         -------
         pd.DataFrame
-            Thresholds as index, groups + "All" as columns. Values in percent.
-                """
+            Thresholds as index, groups + "All" as columns. Values in percent
+            (float), or as rounded-down strings if `rounding` is given.
+        """
         if by == "direction":
-                self._require_direction("nonexceedance")
+            self._require_direction("nonexceedance", direction=direction)
 
         var   = self._resolve_column(column, self.primary)
         s_all = self.data[var.col].dropna()
@@ -798,7 +949,8 @@ class TimeSeries:
         if by == var.col:
             raise ValueError("'by' column and 'column' cannot be the same variable.")
 
-        groups = self._get_groups(by, var.col, sectors=sectors, seasons=seasons, step=by_step)
+        groups = self._get_groups(by, var.col, sectors=sectors, seasons=seasons,
+                                step=by_step, direction=direction)
 
         # --- compute --------------------------------------------------------- #
         result = {}
@@ -816,8 +968,19 @@ class TimeSeries:
 
         df = pd.DataFrame(result, index=pd.Index(thresholds, name=var.short_label))
         df.columns.name = self._variables[by].short_label if by in self._variables else None
-        return df
 
+        if rounding is not None:
+            def floor_to_str(x, decimals):
+                if (100 - x) < 0.0001:
+                    return "100"
+                factor = 10 ** decimals
+                floored = np.floor(x * factor) / factor
+                return f"{floored:.{decimals}f}"
+
+            df = df.map(lambda x: floor_to_str(x, rounding))
+
+        return df
+        
     def frequency_table(
         self,
         row: typing.Literal["month", "season", "direction", "year"] | str = None,
@@ -940,6 +1103,7 @@ class TimeSeries:
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
+        direction: str = None,
     ) -> pd.DataFrame:
         """
         Statistics of block maxima grouped by year, month, season, direction,
@@ -973,6 +1137,9 @@ class TimeSeries:
             Custom season map. Used when by="season".
         step : float, optional
             Bin width when by is a column name. Inferred if not provided.
+        direction : str, optional
+            Direction column to use instead of the default direction variable
+            set at initialisation. Only used when by="direction".
 
         Returns
         -------
@@ -1040,10 +1207,11 @@ class TimeSeries:
             for year_label, year_df in year_groups.items():
                 # Get secondary groups within this year
                 if by == "direction":
-                    self._require_direction("block_maxima")
+                    self._require_direction("block_maxima", direction=direction)
+                    dir_col = direction or self.direction.col
                     secondary_groups = groupby_sector(
-                        year_df[[var.col, self.direction.col]].dropna(),
-                        var_dir=self.direction.col,
+                        year_df[[var.col, dir_col]].dropna(),
+                        var_dir=dir_col,
                         sectors=sectors or self.sectors,
                         var=var.col
                     )
@@ -1113,7 +1281,6 @@ class TimeSeries:
         df.columns.name = None
 
         return df
-
     def persistence(
         self,
         threshold: float,
@@ -1456,7 +1623,7 @@ class TimeSeries:
                 f"'confidence' must be between 0.5 and 1.0, got {confidence}."
             )
 
-        var = self._resolve_columns(column, default=[self.primary])[0]
+        var = self._resolve_column(column, default=self.primary)
         col = var.col
         u   = var.unit
 
@@ -1596,12 +1763,13 @@ class TimeSeries:
         self,
         magnitude: str = None,
         direction: str = None,
-        by: typing.Literal["month", "season", "year", "all"] | str = "month",
+        by: typing.Literal["month", "season", "year", "all", "omni"] | str = "month",
         seasons: dict[str, list[int]] = None,
         step: float = None,
         n_dir_bins: int = 16,
         mag_step: float = None,
-        cmap: str = "YlOrRd",
+        mag_max: float = None,
+        cmap: str = "viridis",
         calm_threshold: float = 0.0,
         min_entries: int = 100,
         ncols: int = 4,
@@ -1624,13 +1792,15 @@ class TimeSeries:
         direction : str, optional
             Column name of the direction variable. Defaults to
             ``self.direction``. Must be provided here or at construction.
-        by : {"month", "season", "year", "all"} or str, default "month"
+        by : {"month", "season", "year", "all", "omni"} or str, default "month"
             Grouping strategy:
 
             - ``"month"``  — one panel per calendar month.
             - ``"season"`` — one panel per season (custom via ``seasons``).
             - ``"year"``   — one panel per year in the record.
-            - ``"all"``    — a single panel for the full record.
+            - ``"all"`` / ``"omni"`` — a single panel for the full record
+            (both accepted; "omni" matches the naming used elsewhere,
+            e.g. BivariateEVA).
             - any column name — panels for bins of that variable (step
             auto-inferred or set via ``step``).
 
@@ -1642,6 +1812,15 @@ class TimeSeries:
             Number of compass sectors inside each rose panel.
         mag_step : float, optional
             Magnitude bin step. Auto-selected via ``infer_step`` if None.
+        mag_max : float, optional
+            Upper edge of the magnitude bins. Auto-selected as the 99th
+            percentile of active (above ``calm_threshold``) values across all
+            plotted groups if None. Set this explicitly — together with
+            ``mag_step`` — to force identical magnitude bins across separate
+            calls to ``plot_rose``, so different figures share the same scale
+            and legend. Regardless of this setting, if any group's data
+            exceeds the resulting top edge, an open-ended ">X" bin is always
+            added — see Notes.
         cmap : str, default "YlOrRd"
             Colormap for magnitude classes.
         calm_threshold : float, default 0.0
@@ -1671,6 +1850,22 @@ class TimeSeries:
             If no direction column is available.
         ValueError
             If no groups survive the ``min_entries`` threshold.
+
+        Notes
+        -----
+        Magnitude bins are derived once, from the pooled data across every
+        group being plotted (so all panels share identical bins). If any
+        group's data exceeds the resulting top edge (or falls below the
+        bottom edge), the bin set is extended with an open-ended bucket on
+        that side — e.g. ">6 m/s" — on top of the normal bins, and every
+        panel (plus the shared legend) uses this same extended bin set. This
+        mirrors the open-ended-bin behaviour of the underlying
+        ``plots.plot_rose`` function, applied globally rather than per-panel,
+        so the shared legend and every panel's colour mapping always agree —
+        a panel whose own data doesn't reach the overflow bucket simply draws
+        it as empty, rather than the bucket being silently absent from
+        panels or the legend. This guarantees out-of-range data is always
+        visibly represented and never silently dropped or hidden.
         """
         # ------------------------------------------------------------------ #
         # Resolve magnitude and direction columns                              #
@@ -1690,7 +1885,7 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         # Build groups                                                         #
         # ------------------------------------------------------------------ #
-        if by == "all":
+        if by in ("all", "omni"):
             groups_mag = {"All": self.data[mag_var.col].dropna()}
         else:
             groups_mag = self._get_groups(
@@ -1703,16 +1898,16 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         # Reformat labels when grouping by a variable column                 #
         # ------------------------------------------------------------------ #
-        if by not in ("all", "month", "season", "year") and by in self._variables:
+        if by not in ("all", "omni", "month", "season", "year") and by in self._variables:
             by_var = self._variables[by]
             unit   = f" {by_var.unit}" if by_var.unit else ""
             keys   = list(groups_mag.keys())
             # Keys are already sorted left-edge strings — zip with the next key
             # to form "lo–hi" labels without any float conversion.
             new_keys = [
-                f"${by_var.symbol}$ {lo}–{hi}{unit}"
+                f"{by_var.symbol} {lo}–{hi}{unit}"
                 for lo, hi in zip(keys, keys[1:])
-            ] + [f"${by_var.symbol}$ >{keys[-1]}{unit}"]
+            ] + [f"{by_var.symbol} >{keys[-1]}{unit}"]
             groups_mag = dict(zip(new_keys, groups_mag.values()))
 
         # ------------------------------------------------------------------ #
@@ -1752,10 +1947,26 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         all_mag = np.concatenate([mv for mv, _ in valid_groups.values()])
         active  = all_mag[all_mag > calm_threshold]
-        p99     = float(np.percentile(active, 99)) if len(active) else 1.0
+
+        if mag_max is not None:
+            mag_top = float(mag_max)
+        else:
+            mag_top = float(np.percentile(active, 99)) if len(active) else 1.0
 
         _mag_step = mag_step or infer_step(pd.Series(active), target=7)
-        mag_bins  = np.arange(0, p99 + _mag_step, _mag_step)
+        mag_bins  = np.arange(0, mag_top + _mag_step, _mag_step)
+
+        # Mirror plot_rose's own open-ended-bin logic, globally, so every
+        # panel and the shared legend agree on the same (possibly extended)
+        # bin set. plot_rose extends edges per-call based on that call's own
+        # data; here the check runs against the pooled data across every
+        # group, since the bins/legend are shared and must be a superset of
+        # whatever any single panel could need. See Notes in the docstring.
+        legend_edges = mag_bins
+        if len(active) and active.min() < legend_edges[0]:
+            legend_edges = np.concatenate(([-np.inf], legend_edges))
+        if len(active) and active.max() >= legend_edges[-1]:
+            legend_edges = np.concatenate((legend_edges, [np.inf]))
 
         # ------------------------------------------------------------------ #
         # Shared radial scale                                                  #
@@ -1785,15 +1996,26 @@ class TimeSeries:
 
         # ------------------------------------------------------------------ #
         # Shared legend patches (built once, reused across figures)           #
+        # Uses legend_edges (possibly open-ended) rather than the inner       #
+        # mag_bins, so an overflow/underflow bucket is always represented     #
+        # here if any group needs one.                                        #
         # ------------------------------------------------------------------ #
-        n_mag    = len(mag_bins) - 1
+        n_mag    = len(legend_edges) - 1
         cm_obj   = plt.get_cmap(cmap, n_mag)
         colors   = [cm_obj(i / n_mag) for i in range(n_mag)]
         unit_str = f" {mag_var.unit}" if mag_var.unit else ""
-        patches  = [
+
+        def _legend_label(lo, hi):
+            if np.isneginf(lo):
+                return f"<{hi:g}{unit_str}"
+            if np.isposinf(hi):
+                return f">{lo:g}{unit_str}"
+            return f"{lo:g}–{hi:g}{unit_str}"
+
+        patches = [
             mpatches.Patch(
                 facecolor=colors[i],
-                label=f"{mag_bins[i]:g}–{mag_bins[i+1]:g}{unit_str}",
+                label=_legend_label(legend_edges[i], legend_edges[i + 1]),
             )
             for i in range(n_mag)
         ]
@@ -1830,7 +2052,15 @@ class TimeSeries:
                 plot_rose(
                     mag_vals, dir_vals, ax,
                     n_dir_bins=n_dir_bins,
-                    mag_bins=mag_bins,
+                    # Pass the (possibly extended) legend_edges as the bin
+                    # set for every panel, not just mag_bins. This makes
+                    # plot_rose's own overflow check a no-op (legend_edges[-1]
+                    # is already +inf whenever any group overflowed), so every
+                    # panel divides the colormap into exactly n_mag steps —
+                    # identical to the shared legend — rather than each panel
+                    # silently computing a different-sized bin set and set of
+                    # colours whenever only some panels individually overflow.
+                    mag_bins=legend_edges,
                     cmap=cmap,
                     r_max=r_max,
                     calm_threshold=calm_threshold,
@@ -1847,18 +2077,18 @@ class TimeSeries:
                 handles=patches,
                 title=mag_var.name,
                 loc="lower center",
-                bbox_to_anchor=(0.5, 0.0),
+                bbox_to_anchor=(0.5, -0.1/_nrows),
                 ncol=min(n_mag, 6),
                 frameon=False,
                 handlelength=1.2,
             )
-            fig.suptitle(f"{mag_var.name} rose by {by}", y=1.01)
             fig.tight_layout()
             return fig
 
         figures = [_make_figure(chunk) for chunk in panel_chunks]
 
         return figures[0] if panels_per_fig is None else figures
+
 
     def statistics_2d(
         self,
@@ -1891,13 +2121,18 @@ class TimeSeries:
         col : str, default "direction"
             Grouping for the column axis. Same options as ``row``.
         column : str, optional
-            Column to aggregate. Defaults to the primary variable.
+            Column to aggregate. Defaults to the primary variable. Irrelevant
+            for ``stat="count"``/``"density"`` (which only count rows), but
+            still determines which rows count as valid (non-NaN on this column).
         stat : str, default "mean"
             Statistic to compute per cell. Supported:
 
             - ``"mean"``, ``"std"``, ``"min"``, ``"max"``
-            - ``"count"`` — number of observations in the cell
-            - ``"p{n}"``  — percentile, e.g. ``"p90"``, ``"p99"``
+            - ``"count"``   — number of observations in the cell
+            - ``"density"`` — ``count`` as a percentage of all valid rows
+            (``100 * count / len(data)``), i.e. the distribution of data
+            across cells rather than a per-cell row count
+            - ``"p{n}"``    — percentile, e.g. ``"p90"``, ``"p99"``
 
         step_row : float, optional
             Bin step for the row axis when ``row`` is a numeric column.
@@ -1928,9 +2163,10 @@ class TimeSeries:
         >>> ts.statistics_2d(row="month", col="tp", stat="mean")
         >>> ts.statistics_2d(row="year",  col="month", stat="p90")
         >>> ts.statistics_2d(row="hs",    col="tp",    stat="count", margins=False)
+        >>> ts.statistics_2d(row="month", col="direction", stat="density")
         """
 
-        if row == "direction" or col == "direction": 
+        if row == "direction" or col == "direction":
             self._require_direction("statistics_2d")
 
         # ------------------------------------------------------------------ #
@@ -1938,17 +2174,24 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         var = self._resolve_column(column, default=self.primary)
 
+        # Total valid rows — denominator for "density". Computed once, on the
+        # same column used to build row/col groups, so it's consistent with
+        # what "count" itself is counting.
+        n_total = len(self.data[var.col].dropna())
+
         # ------------------------------------------------------------------ #
         # Parse stat                                                           #
         # ------------------------------------------------------------------ #
         def _apply_stat(s: pd.Series) -> float:
             if s.empty:
-                return np.nan
-            if stat == "mean":   return s.mean()
-            elif stat == "std":  return s.std()
-            elif stat == "min":  return s.min()
-            elif stat == "max":  return s.max()
+                return np.nan if stat != "count" and stat != "density" else 0.0
+            if stat == "mean":    return s.mean()
+            elif stat == "std":   return s.std()
+            elif stat == "min":   return s.min()
+            elif stat == "max":   return s.max()
             elif stat == "count": return float(len(s))
+            elif stat == "density":
+                return 100 * len(s) / n_total if n_total else np.nan
             elif stat.startswith("p"):
                 try:
                     return s.quantile(float(stat[1:]) / 100)
@@ -1956,7 +2199,7 @@ class TimeSeries:
                     pass
             raise ValueError(
                 f"Unknown stat '{stat}'. Use 'mean', 'std', 'min', 'max', "
-                f"'count', or 'p<n>' (e.g. 'p90')."
+                f"'count', 'density', or 'p<n>' (e.g. 'p90')."
             )
 
         # ------------------------------------------------------------------ #
@@ -2099,7 +2342,7 @@ class TimeSeries:
             row_labels = [_row_label(f) for f in func]
             row_labels = [r for r in row_labels if r in df.index]
 
-            var  = self._resolve_columns(column, default=[self.primary])[0]
+            var  = self._resolve_column(column, default=self.primary)
 
             # ------------------------------------------------------------------ #
             # Column labels: format bin edges as "lo–hi unit" when by is a var   #
@@ -2186,8 +2429,8 @@ class TimeSeries:
 
             # x-axis label and title: use LaTeX symbol when by is a Variable
             if by_var is not None:
-                col_axis_label = f"${by_var.symbol}$ ({by_var.unit})" if by_var.unit and by_var.unit != "-" else f"${by_var.symbol}$"
-                title_by       = f"${by_var.symbol}$"
+                col_axis_label = f"{by_var.symbol} ({by_var.unit})" if by_var.unit and by_var.unit != "-" else f"{by_var.symbol}"
+                title_by       = f"{by_var.symbol}"
             else:
                 col_axis_label = by.capitalize()
                 title_by       = by
@@ -2244,218 +2487,336 @@ class TimeSeries:
 
             return ax
 
-
     def plot_statistics_2d(
-            self,
-            row: typing.Literal["month", "season", "year", "direction", "day", "hour"] | str = "month",
-            col: typing.Literal["month", "season", "year", "direction", "day", "hour"] | str = "direction",
-            column: str = None,
-            stat: str = "mean",
-            step_row: float = None,
-            step_col: float = None,
-            margins: bool = False,
-            sectors: int = None,
-            seasons_row: dict[str, list[int]] = None,
-            seasons_col: dict[str, list[int]] = None,
-            cmap: str = "viridis",
-            annotate: bool = True,
-            fmt: str = ".2g",
-            ax: "plt.Axes | None" = None,
-            figsize: "tuple[float, float] | None" = None,
-        ) -> "plt.Axes":
-            """
-            Heatmap of ``statistics_2d`` — one variable aggregated across two
-            grouping dimensions.
+        self,
+        row: typing.Literal["month", "season", "year", "direction", "day", "hour"] | str = "month",
+        col: typing.Literal["month", "season", "year", "direction", "day", "hour"] | str = "direction",
+        column: str = None,
+        stat_cells: str = "count",
+        stat_margins: str = "density",
+        step_row: float = None,
+        step_col: float = None,
+        margins: bool = False,
+        sectors: int = None,
+        seasons_row: dict[str, list[int]] = None,
+        seasons_col: dict[str, list[int]] = None,
+        cmap: str = "viridis",
+        norm: "typing.Literal['linear', 'log'] | mcolors.Normalize" = "linear",
+        annotate: bool = True,
+        fmt_cells: str = ".0f",
+        fmt_margins: str = ".2f",
+        text_color_threshold: float = 0.5,
+        text_color: "typing.Literal['auto'] | str" = "auto",
+        ax: "plt.Axes | None" = None,
+        figsize: "tuple[float, float] | None" = None,
+    ) -> "plt.Axes":
+        """
+        Heatmap of ``statistics_2d`` — one variable aggregated across two
+        grouping dimensions.
 
-            Parameters
-            ----------
-            row : {"month", "season", "year", "direction", "day", "hour"} or str
-                Row grouping strategy. Pass a column name to bin by value.
-            col : {"month", "season", "year", "direction", "day", "hour"} or str
-                Column grouping strategy. Pass a column name to bin by value.
-            column : str, optional
-                Variable to aggregate. Defaults to the primary variable.
-            stat : str, default "mean"
-                Aggregation statistic. Any token accepted by ``statistics_2d``
-                is valid: ``"mean"``, ``"std"``, ``"min"``, ``"max"``,
-                ``"count"``, or ``"p<n>"`` (e.g. ``"p90"``).
-            step_row : float, optional
-                Bin width for the row axis when ``row`` is a column name.
-            step_col : float, optional
-                Bin width for the column axis when ``col`` is a column name.
-            margins : bool, default False
-                If True, append an "All" row and column with overall statistics.
-            sectors : int, optional
-                Number of directional sectors. Used only when ``row`` or
-                ``col`` is ``"direction"``.
-            seasons_row : dict[str, list[int]], optional
-                Custom season map for the row axis. Used only when
-                ``row="season"``.
-            seasons_col : dict[str, list[int]], optional
-                Custom season map for the column axis. Used only when
-                ``col="season"``.
-            cmap : str, default "viridis"
-                Matplotlib colormap.
-            annotate : bool, default True
-                If True, write the cell value inside each cell. Suppressed
-                automatically when either axis has more than 24 groups, as
-                annotations would be illegibly small.
-            fmt : str, default ".2g"
-                Format string for cell annotations, e.g. ``".1f"``, ``".0f"``.
-            ax : plt.Axes, optional
-                Axes to draw on. If None, a new figure is created.
-            figsize : tuple[float, float], optional
-                Figure size in inches. Ignored when ``ax`` is supplied.
+        Parameters
+        ----------
+        row : {"month", "season", "year", "direction", "day", "hour"} or str
+            Row grouping strategy. Pass a column name to bin by value.
+        col : {"month", "season", "year", "direction", "day", "hour"} or str
+            Column grouping strategy. Pass a column name to bin by value.
+        column : str, optional
+            Variable to aggregate. Defaults to the primary variable. Ignored
+            in the colorbar label for stats that skip the variable
+            (``"count"``/``"density"``; see ``stat_cells``).
+        stat_cells : str, default "mean"
+            Statistic computed per heatmap cell. Any token accepted by
+            ``statistics_2d``: ``"mean"``, ``"std"``, ``"min"``, ``"max"``,
+            ``"count"``, ``"density"``, or ``"p<n>"`` (e.g. ``"p90"``).
+        stat_margins : str, optional
+            Statistic computed for the row/column margins (shown outside the
+            heatmap when ``margins=True``). Computed independently over the
+            full marginal row or column — not derived from the per-cell
+            values — so it can differ meaningfully from ``stat_cells``. E.g.
+            ``stat_cells="mean"`` with ``stat_margins="density"`` shows mean
+            per cell but the % of all data each row/column holds in the
+            margins. Defaults to ``stat_cells`` if None.
+        step_row : float, optional
+            Bin width for the row axis when ``row`` is a column name.
+        step_col : float, optional
+            Bin width for the col axis when ``col`` is a column name.
+        margins : bool, default False
+            If True, compute an "All" row and column and render them as
+            tables flush against the top and right of the heatmap (outside
+            the main grid), rather than as extra heatmap cells. Empty
+            margins (no observations in that row/column) render as blank.
+        sectors : int, optional
+            Number of directional sectors. Used only when ``row`` or
+            ``col`` is ``"direction"``.
+        seasons_row : dict[str, list[int]], optional
+            Custom season map for the row axis. Used only when
+            ``row="season"``.
+        seasons_col : dict[str, list[int]], optional
+            Custom season map for the col axis. Used only when
+            ``col="season"``.
+        cmap : str, default "viridis"
+            Matplotlib colormap.
+        norm : {"linear", "log"} or matplotlib.colors.Normalize, default "linear"
+            Colour normalization. "linear" and "log" build a Normalize /
+            LogNorm with default bounds; alternatively pass a constructed
+            Normalize instance for full control.
 
-            Returns
-            -------
-            plt.Axes
+            Default bounds (only filled in where not already set on a
+            supplied norm instance): if every value is positive, vmin=0
+            (vmin=min(strictly positive values) for "log", since LogNorm
+            forbids vmin<=0) and vmax=max(values); otherwise
+            vmin=min(values), vmax=max(values).
+        annotate : bool, default True
+            If True, write the cell value inside each cell.
+        fmt_cells : str, default ".2g"
+            Format string for cell annotations, e.g. ``".1f"``, ``".0f"``.
+        fmt_margins : str, optional
+            Format string for margin values. Defaults to ``fmt_cells`` if None.
+        text_color_threshold : float, default 0.5
+            Perceived-luminance cutoff (0=black, 1=white) for choosing cell
+            annotation text colour. Ignored if `text_color` is not "auto".
+        text_color : "auto" or a matplotlib colour, default "auto"
+            If "auto", pick white/black per cell by luminance. Otherwise use
+            this colour for every annotation.
+        ax : plt.Axes, optional
+            Axes to draw on. If None, a new figure is created.
+        figsize : tuple[float, float], optional
+            Figure size in inches. Ignored when ``ax`` is supplied.
 
-            Notes
-            -----
-            For keyword groupings (month, season, direction, day, hour) tick
-            marks are placed at cell centres and every label is shown. For
-            numeric bin groupings ticks sit at cell edges. When either axis
-            has more than 12 groups only every N-th label is shown so that
-            text does not overlap; the spacing N is chosen automatically.
-            """
+        Returns
+        -------
+        plt.Axes
 
-            if row == "direction" or col == "direction": 
-                self._require_direction("statistics_2d")
+        Notes
+        -----
+        For keyword groupings (month, season, direction, day, hour) tick
+        marks are placed at cell centres. For numeric bin groupings ticks
+        sit at cell edges. Every row and column label is always shown, with
+        a fixed decimal precision derived from the bin step on each axis
+        independently. No plot title is set.
+        """
 
-            # ------------------------------------------------------------------ #
-            # Compute table                                                        #
-            # ------------------------------------------------------------------ #
-            df = self.statistics_2d(
-                row=row, col=col, column=column, stat=stat,
-                step_row=step_row, step_col=step_col, margins=margins,
+        _STAT_LABELS: dict[str, dict] = {
+            "min":     {"display": "Minimum",   "with_variable": True},
+            "max":     {"display": "Maximum",   "with_variable": True},
+            "mean":    {"display": "Mean",      "with_variable": True},
+            "std":     {"display": "Std. dev.", "with_variable": True},
+            "count":   {"display": "Entries",   "with_variable": False},
+            "density": {"display": "%",         "with_variable": False},
+        }
+
+        def _stat_label(stat: str) -> tuple[str, bool]:
+            entry = _STAT_LABELS.get(stat)
+            if entry is not None:
+                return entry["display"], entry["with_variable"]
+            return (stat.upper() if stat.lower().startswith("p") else stat.capitalize()), True
+
+        stat_margins = stat_margins if stat_margins is not None else stat_cells
+        fmt_margins  = fmt_margins  if fmt_margins  is not None else fmt_cells
+
+        if row == "direction" or col == "direction":
+            self._require_direction("statistics_2d")
+
+        # ------------------------------------------------------------------ #
+        # Compute cell table (always stat_cells, never margins baked in)      #
+        # ------------------------------------------------------------------ #
+        df = self.statistics_2d(
+            row=row, col=col, column=column, stat=stat_cells,
+            step_row=step_row, step_col=step_col, margins=False,
+            sectors=sectors, seasons_row=seasons_row, seasons_col=seasons_col,
+        )
+
+        margin_col = margin_row = None
+        if margins:
+            # Independent statistics_2d call using stat_margins — margins
+            # are NOT derived from the per-cell stat_cells values, since
+            # e.g. mean-of-cells != mean-of-whole-row in general.
+            df_m = self.statistics_2d(
+                row=row, col=col, column=column, stat=stat_margins,
+                step_row=step_row, step_col=step_col, margins=True,
                 sectors=sectors, seasons_row=seasons_row, seasons_col=seasons_col,
             )
+            margin_col = df_m.loc[df.index, "All"]      # per-row summary -> right
+            margin_row = df_m.loc["All", df.columns]     # per-col summary -> top
 
-            var       = self._resolve_column(column, default=self.primary)
-            _keywords = {"month", "season", "year", "direction", "day", "hour", "all"}
+        var       = self._resolve_column(column, default=self.primary)
+        _keywords = {"month", "season", "year", "direction", "day", "hour", "all"}
+        stat_display, with_variable = _stat_label(stat_cells)
 
-            # ------------------------------------------------------------------ #
-            # Tick positions and labels                                            #
-            # ------------------------------------------------------------------ #
-            def _tick_info(labels, by, step):
-                """
-                Return (tick_positions, tick_labels, is_numeric).
+        # ------------------------------------------------------------------ #
+        # Decimal precision derived from bin step                             #
+        # ------------------------------------------------------------------ #
+        def _decimals_for_step(step: float, max_decimals: int = 8) -> int:
+            step = abs(step)
+            for d in range(max_decimals + 1):
+                if abs(round(step, d) - step) < 1e-9:
+                    return d
+            return max_decimals
 
-                For keyword groupings: ticks at cell centres (0.5, 1.5, …).
-                For numeric bins: ticks at cell edges (0, 1, 2, …, n).
-                When there are more than 12 labels, only every N-th label is
-                shown; intervening positions get an empty string so the tick
-                mark still appears but does not crowd the axis.
-                """
-                if by in _keywords:
-                    positions = np.arange(len(labels)) + 0.5
+        # ------------------------------------------------------------------ #
+        # Tick positions and labels                                           #
+        # ------------------------------------------------------------------ #
+        def _tick_info(labels, by, step):
+            if by in _keywords:
+                positions = np.arange(len(labels)) + 0.5
+                tick_labels = list(labels)
+                is_numeric  = False
+            else:
+                try:
+                    edges = [float(l) for l in labels]
+                    inferred_step = step or (
+                        (edges[1] - edges[0]) if len(edges) > 1 else 1.0
+                    )
+                    edges.append(edges[-1] + inferred_step)
+                    positions    = np.arange(len(edges))
+                    decimals     = _decimals_for_step(inferred_step)
+                    tick_labels  = [f"{e:.{decimals}f}" for e in edges]
+                    is_numeric   = True
+                except (ValueError, IndexError):
+                    positions   = np.arange(len(labels)) + 0.5
                     tick_labels = list(labels)
                     is_numeric  = False
-                else:
-                    # Numeric bins — reconstruct edges from left-edge strings
-                    try:
-                        edges = [float(l) for l in labels]
-                        inferred_step = step or (
-                            (edges[1] - edges[0]) if len(edges) > 1 else 1.0
-                        )
-                        edges.append(edges[-1] + inferred_step)
-                        positions   = np.arange(len(edges))
-                        tick_labels = [f"{e:g}" for e in edges]
-                        is_numeric  = True
-                    except (ValueError, IndexError):
-                        positions   = np.arange(len(labels)) + 0.5
-                        tick_labels = list(labels)
-                        is_numeric  = False
 
-                # Sparse labels when there are more than 12 entries
-                if len(tick_labels) > 12:
-                    # Choose step so we get roughly 8–10 visible labels
-                    n      = len(tick_labels)
-                    stride = max(1, round(n / 9))
-                    tick_labels = [
-                        lbl if i % stride == 0 else ""
-                        for i, lbl in enumerate(tick_labels)
-                    ]
+            return positions, tick_labels, is_numeric
 
-                return positions, tick_labels, is_numeric
+        x_ticks, x_labels, x_numeric = _tick_info(df.columns, col, step_col)
+        y_ticks, y_labels, y_numeric = _tick_info(df.index,   row, step_row)
 
-            x_ticks, x_labels, x_numeric = _tick_info(df.columns, col, step_col)
-            y_ticks, y_labels, y_numeric = _tick_info(df.index,   row, step_row)
+        # ------------------------------------------------------------------ #
+        # Figure                                                               #
+        # ------------------------------------------------------------------ #
+        if ax is None:
+            _, ax = plt.subplots(figsize=figsize)
+            ax.figure.set_layout_engine("constrained")
 
-            # ------------------------------------------------------------------ #
-            # Figure                                                               #
-            # ------------------------------------------------------------------ #
-            if ax is None:
-                _, ax = plt.subplots(figsize=figsize)
+        # ------------------------------------------------------------------ #
+        # Norm resolution                                                      #
+        # ------------------------------------------------------------------ #
+        def _resolve_norm(norm, data_arr: np.ndarray) -> mcolors.Normalize:
+            finite       = data_arr[np.isfinite(data_arr)]
+            all_positive = finite.size > 0 and np.all(finite > 0)
+            data_min     = float(np.nanmin(data_arr))
+            data_max     = float(np.nanmax(data_arr))
 
-            # ------------------------------------------------------------------ #
-            # Heatmap                                                              #
-            # ------------------------------------------------------------------ #
-            data_arr   = df.values.astype(float)
-            vmin, vmax = np.nanmin(data_arr), np.nanmax(data_arr)
+            is_log = isinstance(norm, mcolors.LogNorm) or norm == "log"
 
-            mesh = ax.pcolormesh(data_arr, cmap=cmap, vmin=vmin, vmax=vmax)
+            if is_log:
+                positive = finite[finite > 0]
+                if positive.size == 0:
+                    raise ValueError(
+                        "norm='log' requires at least one strictly positive "
+                        "value in the data; all values are zero, negative, or NaN."
+                    )
+                log_vmin_default = float(positive.min())
 
-            # ------------------------------------------------------------------ #
-            # Colorbar                                                             #
-            # ------------------------------------------------------------------ #
-            unit_str = f" [{var.unit}]" if var.unit else ""
+            if isinstance(norm, mcolors.Normalize):
+                if norm.vmin is None:
+                    norm.vmin = log_vmin_default if is_log else (data_min if not all_positive else 0.0)
+                if norm.vmax is None:
+                    norm.vmax = data_max
+                return norm
+
+            if norm == "log":
+                return mcolors.LogNorm(vmin=log_vmin_default, vmax=data_max)
+
+            if norm == "linear":
+                vmin = 0.0 if all_positive else data_min
+                return mcolors.Normalize(vmin=vmin, vmax=data_max)
+
+            raise ValueError(
+                f"norm must be 'linear', 'log', or a matplotlib Normalize "
+                f"instance; got {norm!r}."
+            )
+
+        # ------------------------------------------------------------------ #
+        # Heatmap                                                              #
+        # ------------------------------------------------------------------ #
+        data_arr = df.values.astype(float)
+        norm_obj = _resolve_norm(norm, data_arr)
+
+        mesh = ax.pcolormesh(data_arr, cmap=cmap, norm=norm_obj)
+
+        # ------------------------------------------------------------------ #
+        # Colorbar                                                             #
+        # ------------------------------------------------------------------ #
+        if margins:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="4%", pad=0.55)
+            cbar = ax.figure.colorbar(mesh, cax=cax)
+        else:
             cbar = ax.figure.colorbar(mesh, ax=ax, pad=0.02)
-            cbar.set_label(f"{stat}  {var.name}{unit_str}")
 
-            # ------------------------------------------------------------------ #
-            # Tick labels                                                          #
-            # ------------------------------------------------------------------ #
-            ax.set_xticks(x_ticks)
-            ax.set_yticks(y_ticks)
-            ax.set_xticklabels(x_labels, rotation=45, ha="right" if x_numeric else "center")
-            ax.set_yticklabels(y_labels)
+        if with_variable:
+            cbar.set_label(f"{stat_display} of {var.short_label}")
+        else:
+            cbar.set_label(stat_display)
 
-            ax.tick_params(axis="x", length=4)
-            ax.tick_params(axis="y", length=4)
+        # ------------------------------------------------------------------ #
+        # Tick labels                                                         #
+        # ------------------------------------------------------------------ #
+        ax.set_xticks(x_ticks)
+        ax.set_yticks(y_ticks)
+        ax.set_xticklabels(x_labels, rotation=45, ha="right" if x_numeric else "center")
+        ax.set_yticklabels(y_labels)
 
-            # ------------------------------------------------------------------ #
-            # Axis labels and title                                                #
-            # ------------------------------------------------------------------ #
-            def _axis_label(by, by_var=None):
-                if by_var is not None:
-                    unit = by_var.unit
-                    return f"${by_var.symbol}$" + (f" ({unit})" if unit and unit != "-" else "")
-                return by.capitalize()
+        ax.tick_params(axis="x", length=4)
+        ax.tick_params(axis="y", length=4)
 
-            row_var = self._variables.get(row, None)
-            col_var = self._variables.get(col, None)
+        # ------------------------------------------------------------------ #
+        # Axis labels                                                         #
+        # ------------------------------------------------------------------ #
+        def _axis_label(by, by_var=None):
+            if by_var is not None:
+                return by_var.axis_label
+            return by.capitalize()
 
-            ax.set_xlabel(_axis_label(col, col_var))
-            ax.set_ylabel(_axis_label(row, row_var))
+        row_var = self._variables.get(row, None)
+        col_var = self._variables.get(col, None)
 
-            title_col = f"${col_var.symbol}$" if col_var else col
-            title_row = f"${row_var.symbol}$" if row_var else row
-            ax.set_title(f"{var.name} — {stat} by {title_row} × {title_col}")
+        ax.set_xlabel(_axis_label(col, col_var))
+        ax.set_ylabel(_axis_label(row, row_var))
 
-            # ------------------------------------------------------------------ #
-            # Cell annotations (suppressed for dense grids)                       #
-            # ------------------------------------------------------------------ #
-            dense = len(df.index) > 24 or len(df.columns) > 24
-            if annotate and not dense:
-                cm_obj = plt.get_cmap(cmap)
-                for i in range(len(df.index)):
-                    for j in range(len(df.columns)):
-                        val = data_arr[i, j]
-                        if not np.isnan(val):
-                            normed      = (val - vmin) / (vmax - vmin) if vmax > vmin else 0.5
-                            r, g, b, _ = cm_obj(normed)
+        # ------------------------------------------------------------------ #
+        # Cell annotations                                                     #
+        # ------------------------------------------------------------------ #
+        if annotate:
+            cm_obj = plt.get_cmap(cmap)
+            for i in range(len(df.index)):
+                for j in range(len(df.columns)):
+                    val = data_arr[i, j]
+                    if not np.isnan(val):
+                        if text_color == "auto":
+                            normed      = norm_obj(val)
+                            r, g, b, _  = cm_obj(normed)
                             perceived   = 0.299*r + 0.587*g + 0.114*b
-                            txt_color   = "white" if perceived < 0.5 else "black"
-                            ax.text(
-                                j + 0.5, i + 0.5,
-                                format(val, fmt),
-                                ha="center", va="center",
-                                fontsize=8, color=txt_color,
-                            )
+                            txt_color   = "white" if perceived < text_color_threshold else "black"
+                        else:
+                            txt_color = text_color
+                        ax.text(
+                            j + 0.5, i + 0.5,
+                            format(val, fmt_cells),
+                            ha="center", va="center",
+                            fontsize=8, color=txt_color,
+                        )
 
-            return ax
+        # ------------------------------------------------------------------ #
+        # Margins — blank (not "nan") for empty rows/columns; right-margin    #
+        # reversed to match pcolormesh's bottom-up row order vs ax.table's    #
+        # top-down stacking                                                   #
+        # ------------------------------------------------------------------ #
+        if margins:
+            def _fmt_or_blank(v):
+                return "" if (v is None or (isinstance(v, float) and np.isnan(v))) else format(v, fmt_margins)
+
+            top_row   = [[_fmt_or_blank(v) for v in margin_row.values]]
+            right_col = [[_fmt_or_blank(v)] for v in margin_col.values[::-1]]
+
+            ax.table(top_row, loc="top", cellLoc="center")
+            ax.table(right_col, loc="right", cellLoc="center",
+                    bbox=(1, 0, 1 / len(df.columns), 1))
+
+        return ax
 
     def plot_timeseries(
         self,

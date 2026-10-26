@@ -1027,162 +1027,130 @@ class TimeSeriesValidation:
         ax.grid(True, linestyle=":", linewidth=0.6, color="0.75", zorder=1)
 
         return ax
-    
+
     def plot_rose(
         self,
-        magnitude_a:  tuple[str, str],
-        direction_a:  tuple[str, str],
-        magnitude_b:  tuple[str, str],
-        direction_b:  tuple[str, str],
+        magnitude:      tuple[str, str],
+        direction:      tuple[str, str],
         *,
         n_dir_bins:     int         = 16,
+        mag_bins:       "list[float] | None" = None,
         mag_step:       "float | None" = None,
         cmap:           str         = "viridis",
         calm_threshold: float       = 0.0,
-        figsize:        tuple[float, float] = (12, 6),
-    ) -> "plt.Figure":
+        r_max:          "float | None" = None,
+        r_ticks:        "list[float] | None" = None,
+        figsize:        "tuple[float, float] | None" = None,
+        ax:             "plt.Axes | None" = None,
+    ) -> "plt.Axes":
         """
-        Side-by-side rose plots for two (magnitude, direction) pairs.
+        Rose plot for a single (magnitude, direction) pair.
 
-        Both panels share identical magnitude bin edges, colormap, and radial
-        scale so they are directly visually comparable.  The single-rose
-        drawing logic lives in ``utils.plot_rose``; this method is responsible
-        only for computing the shared scaling and dispatching.
+        The single-rose drawing logic lives in ``utils.plot_rose``; this
+        method is responsible only for retrieving the data and dispatching.
 
         Parameters
         ----------
-        magnitude_a, magnitude_b : tuple[str, str]
-            (source_key, column_name) for the magnitude variable of each panel,
-            e.g. ``("model", "ws")`` and ``("buoy", "ws")``.
-        direction_a, direction_b : tuple[str, str]
-            (source_key, column_name) for the direction variable of each panel,
-            e.g. ``("model", "wdir")`` and ``("buoy", "wdir")``.
+        magnitude : tuple[str, str]
+            (source_key, column_name) for the magnitude variable,
+            e.g. ``("model", "ws")``.
+        direction : tuple[str, str]
+            (source_key, column_name) for the direction variable,
+            e.g. ``("model", "wdir")``.
             Directions must be in meteorological convention (from-direction,
             degrees clockwise from North).
         n_dir_bins : int, default 16
             Number of directional sectors passed to ``utils.plot_rose``.
+        mag_bins : list[float], optional
+            Explicit *inner* magnitude bin edges, e.g. ``[0, 2, 4, 6, 8]``.
+            These are automatically extended with open-ended outer bins, so
+            any value below the first edge or above the last edge is still
+            counted and shown as ``<lo`` / ``hi<`` rather than being dropped.
+            Pass identical bins (and ``r_max``/``r_ticks``) across multiple
+            calls to make several rose plots directly comparable.
         mag_step : float, optional
-            Force a specific bin step size (e.g. ``2.0`` for 0–2–4–6 … m/s).
-            If None, a nice step is chosen automatically from the joint 99th
-            percentile of both datasets, targeting ~7 bins.
-        cmap : str, default "YlOrRd"
+            Force a specific bin step size when ``mag_bins`` is not given
+            (e.g. ``2.0`` for 0-2-4-6 ... bins up to the 99th percentile,
+            with an open-ended top bin added automatically). If neither
+            ``mag_bins`` nor ``mag_step`` is given, a step is chosen
+            automatically, targeting ~7 bins.
+        cmap : str, default "viridis"
             Colormap for magnitude classes.
         calm_threshold : float, default 0.0
             Observations at or below this magnitude are classified as calm and
             excluded from directional statistics.
-        figsize : tuple[float, float], default (12, 6)
-            Figure size in inches.
+        r_max : float, optional
+            Maximum radial extent (0-1 fraction of total observations). If
+            None, derived automatically from this dataset alone. Pass the
+            same value across multiple calls for a shared radial scale.
+        r_ticks : list[float], optional
+            Explicit radial tick values in percent, e.g. ``[0, 5, 10, 15]``.
+            If None, ticks are chosen automatically. Pass the same values
+            across multiple calls for directly comparable panels.
+        figsize : tuple[float, float], optional
+            Figure size in inches, used only when creating a new figure (i.e.
+            when ``ax`` is None). If None, falls back to rcParams. Ignored if
+            ``ax`` is supplied.
+        ax : plt.Axes, optional
+            Polar-projection axes to draw into. If None, a new figure+axes is
+            created.
 
         Returns
         -------
-        fig : plt.Figure
+        ax : plt.Axes
 
         Notes
         -----
-        - Does not require temporal alignment. Each panel is drawn from its
-        raw source data so the full record length is used for each source.
-        - Shared magnitude bins are derived from the combined 99th percentile
-        of both datasets, ensuring neither panel clips its high-value tail.
-        - Shared ``r_max`` is the maximum sector total across both datasets
-        (with 15 % headroom), so a dominant direction in one panel does not
-        visually exaggerate the other.
+        - Magnitude bins are derived from the 99th percentile of the data,
+          targeting ~7 bins, unless ``mag_bins`` or ``mag_step`` is given.
+          Regardless of the source, an open-ended top bin (and, if relevant,
+          bottom bin) is always added so observations beyond the given range
+          are still counted -- not silently dropped.
+        - If ``ax`` is supplied, it must already have a polar projection
+        (``subplot_kw={"projection": "polar"}``); this method does not
+        re-project an existing axes.
         """
 
         # ------------------------------------------------------------------ #
-        # Retrieve raw series (no alignment required)                          #
+        # Retrieve raw series                                                  #
         # ------------------------------------------------------------------ #
-        mag_a, mag_var_a = self._get_source(magnitude_a)
-        dir_a, _         = self._get_source(direction_a)
-        mag_b, mag_var_b = self._get_source(magnitude_b)
-        dir_b, _         = self._get_source(direction_b)
+        mag, mag_var = self._get_source(magnitude)
+        dir_, _      = self._get_source(direction)
 
-        mag_a = mag_a.dropna().values.astype(float)
-        dir_a = dir_a.dropna().values.astype(float)
-        mag_b = mag_b.dropna().values.astype(float)
-        dir_b = dir_b.dropna().values.astype(float)
+        mag  = mag.dropna().values.astype(float)
+        dir_ = dir_.dropna().values.astype(float)
 
         # ------------------------------------------------------------------ #
-        # Shared magnitude bins                                                #
-        # Joint 99th percentile so neither panel clips its tail.              #
-        # Nice step targeting ~7 bins, or user-supplied mag_step.             #
+        # Axes                                                                  #
         # ------------------------------------------------------------------ #
-        combined_active = np.concatenate([
-            mag_a[mag_a > calm_threshold],
-            mag_b[mag_b > calm_threshold],
-        ])
-        p99 = float(np.percentile(combined_active, 99)) if len(combined_active) else 1.0
-
-        import pandas as pd
-        if mag_step is None:
-            mag_step = infer_step(pd.Series(combined_active), target=7)
-        mag_bins = np.arange(0, p99 + mag_step, mag_step)
-
-        # ------------------------------------------------------------------ #
-        # Shared radial scale                                                  #
-        # ------------------------------------------------------------------ #
-        def _sector_max(mag, direction):
-            n_total = len(mag)
-            if n_total == 0:
-                return 0.0
-            sector_width = 360.0 / n_dir_bins
-            dir_edges    = np.linspace(
-                -sector_width / 2, 360 - sector_width / 2, n_dir_bins + 1
+        if ax is None:
+            fig, ax = plt.subplots(
+                figsize=figsize,
+                subplot_kw={"projection": "polar"},
             )
-            active   = mag > calm_threshold
-            dir_norm = direction[active] % 360.0
-            totals   = np.zeros(n_dir_bins)
-            for d_idx in range(n_dir_bins):
-                d_lo = dir_edges[d_idx] % 360
-                d_hi = dir_edges[d_idx + 1] % 360
-                if d_lo < d_hi:
-                    in_dir = (dir_norm >= d_lo) & (dir_norm < d_hi)
-                else:
-                    in_dir = (dir_norm >= d_lo) | (dir_norm < d_hi)
-                totals[d_idx] = in_dir.sum() / n_total
-            return float(totals.max())
 
-        r_max = max(_sector_max(mag_a, dir_a), _sector_max(mag_b, dir_b)) * 1.15
+        src = magnitude[0]
 
-        # ------------------------------------------------------------------ #
-        # Figure                                                               #
-        # ------------------------------------------------------------------ #
-        fig, axes = plt.subplots(
-            1, 2,
-            figsize=figsize,
-            subplot_kw={"projection": "polar"},
-        )
-
-        src_a = magnitude_a[0]
-        src_b = magnitude_b[0]
-
+        # r_max, if not explicitly given, is left to utils.plot_rose to derive
+        # from this dataset's own totals (same as before) -- mag_bins/r_ticks
+        # are simply forwarded so the caller can force comparability across
+        # multiple plot_rose calls sharing the same axes limits and classes.
         plot_rose(
-            mag_a, dir_a, axes[0],
+            mag, dir_, ax,
             n_dir_bins=n_dir_bins,
             mag_bins=mag_bins,
+            mag_step=mag_step,
             cmap=cmap,
             r_max=r_max,
+            r_ticks=r_ticks,
             calm_threshold=calm_threshold,
-            title=f"{src_a.capitalize()} — {mag_var_a.name}",
+            title=f"{src.capitalize()} {mag_var.name}",
             legend=True,
-            mag_label=mag_var_a.name,
-            mag_unit=mag_var_a.unit,
+            mag_label=mag_var.name,
+            mag_unit=mag_var.unit,
         )
 
-        plot_rose(
-            mag_b, dir_b, axes[1],
-            n_dir_bins=n_dir_bins,
-            mag_bins=mag_bins,
-            cmap=cmap,
-            r_max=r_max,
-            calm_threshold=calm_threshold,
-            title=f"{src_b.capitalize()} — {mag_var_b.name}",
-            legend=True,
-            mag_label=mag_var_b.name,
-            mag_unit=mag_var_b.unit,
-        )
-
-        fig.tight_layout(w_pad=4)
-        return axes
+        return ax
     
     def plot_timeseries(
         self,

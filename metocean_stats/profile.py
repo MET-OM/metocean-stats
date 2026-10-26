@@ -96,8 +96,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .utils import groupby_month, groupby_season, groupby_sector, aggregate_statistics
+from .utils import groupby_month, groupby_season, groupby_sector, aggregate_statistics, dirmag_to_uv, uv_to_dirmag, infer_step, _extend_xlim_to_zero, _extend_ylim_to_zero
 from .EVA import UnivariateEVA
+from .plots import plot_rose
 
 # ---------------------------------------------------------------------------
 # Signature buckets, expressed structurally (roles, not names) since there
@@ -118,84 +119,28 @@ _SIGNATURE_LABELS = {
 # Variable -- shared metadata container, matching TimeSeries.Variable so the
 # two modules present the same interface for describing a column/variable.
 # ---------------------------------------------------------------------------
-
-@dataclass
-class Variable:
-    """
-    Metadata container for a single metocean variable.
-
-    Parameters
-    ----------
-    col : str
-        Variable name in the source ``xr.Dataset``. Must match exactly.
-    name : str
-        Human-readable name used in table headers and axis titles.
-        E.g. "Wind speed".
-    symbol : str
-        LaTeX-compatible symbol (without $ delimiters). E.g. "U_{10}".
-    unit : str
-        Physical unit string. E.g. "m/s", "degC".
-    label : str, optional
-        Short display label for legend entries or compact tables.
-        Defaults to symbol if not provided.
-
-    Notes
-    -----
-    Deliberately identical in shape to ``TimeSeries.Variable`` -- the two
-    classes describe variables the same way, so metadata built for one
-    reads naturally as documentation for the other.
-    """
-    col: str
-    name: str
-    symbol: str
-    unit: str
-    label: str = None
-
-    def __post_init__(self):
-        if not self.col:
-            raise ValueError("Variable.col must be a non-empty string.")
-        if not self.name:
-            raise ValueError(f"Variable '{self.col}': name must be a non-empty string.")
-        if self.label is None:
-            self.label = self.symbol
-
-    @property
-    def axis_label(self) -> str:
-        """Formatted axis label: 'Name, $symbol$ (unit)'."""
-        return f"{self.name}, ${self.symbol}$ ({self.unit})"
-
-    @property
-    def short_label(self) -> str:
-        """Shorter variable label: '$symbol$ (unit)'."""
-        return f"${self.symbol}$ ({self.unit})"
-
-    @property
-    def math_label(self) -> str:
-        """Symbol wrapped in LaTeX math delimiters: '$symbol$'."""
-        return f"${self.symbol}$"
-
-    def __repr__(self) -> str:
-        return (
-            f"Variable(col='{self.col}', name='{self.name}', "
-            f"symbol='{self.symbol}', unit='{self.unit}')"
-        )
-
+from .timeseries import Variable
 
 def _coerce_variable(v: "Variable | str") -> "Variable":
     """
     Promote a bare variable-name string to a Variable with placeholder
-    semantics (name = symbol = col, unit = ""). Matches
-    TimeSeries._coerce_variable exactly, so a string handed to either
-    class is treated the same way.
+    semantics (name = symbol = col, unit = ""). Accepts any object with
+    the required attributes (col, name, symbol, unit), not just instances
+    of this exact Variable class -- so a Variable-like object from
+    another module works the same as one constructed here.
     """
-    if isinstance(v, Variable):
-        return v
     if isinstance(v, str):
         return Variable(col=v, name=v, symbol=v, unit="")
-    raise TypeError(
-        f"Expected a Variable or a column name string, got {type(v)}. "
-        "Example: Variable('ws', 'Wind speed', 'U_{10}', 'm/s') or just 'ws'."
-    )
+
+    required = ("col", "name", "symbol", "unit")
+    missing = [attr for attr in required if not hasattr(v, attr)]
+    if missing:
+        raise TypeError(
+            f"Expected a Variable or a column name string, got {type(v)} "
+            f"missing attribute(s) {missing}. "
+            "Example: Variable('ws', 'Wind speed', 'U_{10}', 'm/s') or just 'ws'."
+        )
+    return v
 
 
 def _default_attrs_for(name: str) -> dict:
@@ -986,6 +931,102 @@ class ProfileTimeSeries:
         )
         return df
 
+    def _resolve_profile_levels_uv(
+        self,
+        var: str,
+        dir_var: str,
+        level_dim: str,
+        levels: list[float] | None,
+        interp: str = "nearest",
+        going_to: bool = True,
+    ) -> dict[float, pd.DataFrame]:
+        """
+        Resolve a (magnitude, direction) profile pair onto requested output
+        levels, interpolating through u/v (east/north) components rather
+        than magnitude/direction directly.
+
+        This is the vector-aware counterpart to `_resolve_level_axis`:
+        direction is circular (10 degrees and 350 degrees are 20 degrees
+        apart, not 340), so independently reindexing/interpolating a
+        direction column the same way a plain numeric column is handled
+        would silently produce wrong results whenever interp != "nearest"
+        (e.g. linearly "interpolating" 350 deg and 10 deg gives 180 deg --
+        the opposite direction). Converting to u/v first sidesteps this
+        entirely: u and v are ordinary Cartesian numbers, so standard
+        linear/quadratic/cubic interpolation across them is correct, and
+        converting back afterwards recovers a direction that is the actual
+        circular interpolation of the two bracketing directions.
+
+        For interp="nearest", converting via u/v changes nothing numerically
+        (nearest-neighbour selection doesn't blend anything), but the same
+        code path is used for both cases rather than special-casing
+        "nearest" to skip u/v -- one mechanism, not two to keep in sync.
+
+        Parameters
+        ----------
+        var : str
+            Magnitude profile variable name (e.g. current speed).
+        dir_var : str
+            Direction profile variable name. Must share `var`'s level
+            dimension (same requirement enforced elsewhere for `direction`,
+            e.g. at ProfileTimeSeries construction and in ProfileEVA).
+        level_dim : str
+            The shared level dimension of `var` and `dir_var`.
+        levels : list[float], optional
+            Requested output levels. None means "every level on
+            `level_dim`, unchanged" -- no resolution/interpolation is
+            attempted in that case.
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            Passed straight through to `_resolve_level_axis`'s underlying
+            logic, applied to the u/v components. See that function for
+            the full semantics, including how the resulting index is
+            labelled ("nearest" reports the real matched level; anything
+            else reports the requested level, since it is then a genuine
+            new interpolated estimate).
+        going_to : bool, default True
+            Direction convention passed through to dirmag_to_uv/uv_to_dirmag
+            (True = oceanographic "going to"; False = meteorological
+            "coming from"). Must match the convention `dir_var`'s values
+            are actually stored in.
+
+        Returns
+        -------
+        dict[float, pd.DataFrame]
+            One entry per resolved level, each a time-indexed DataFrame
+            with columns "magnitude" and "direction" (NaNs dropped), ready
+            to hand to `plot_rose` as its `magnitude`/`direction` arrays.
+            Keyed by the resolved level values exactly as
+            `_resolve_level_axis` would label them (see interp note above).
+        """
+        mag_df = self._profile_var_as_dataframe(var, level_dim).T   # level x time
+        dir_df = self._profile_var_as_dataframe(dir_var, level_dim).T  # level x time
+
+        if levels is None:
+            resolved_levels = list(mag_df.index)
+        else:
+            u, v = dirmag_to_uv(dir_df.values, mag_df.values, going_to=going_to)
+            u_df = pd.DataFrame(u, index=dir_df.index, columns=dir_df.columns)
+            v_df = pd.DataFrame(v, index=dir_df.index, columns=dir_df.columns)
+
+            u_resolved = _resolve_level_axis(u_df, levels, interp)
+            v_resolved = _resolve_level_axis(v_df, levels, interp)
+
+            dir_resolved, mag_resolved = uv_to_dirmag(
+                u_resolved.values, v_resolved.values, going_to=going_to
+            )
+            mag_df = pd.DataFrame(mag_resolved, index=u_resolved.index, columns=u_resolved.columns)
+            dir_df = pd.DataFrame(dir_resolved, index=u_resolved.index, columns=u_resolved.columns)
+            resolved_levels = list(mag_df.index)
+
+        out = {}
+        for level in resolved_levels:
+            level_df = pd.DataFrame({
+                "magnitude": mag_df.loc[level],
+                "direction": dir_df.loc[level],
+            }).dropna()
+            out[level] = level_df
+        return out
+
     def _get_groups(
         self,
         by: str,
@@ -1065,6 +1106,8 @@ class ProfileTimeSeries:
         direction: str | None = None,
         sectors: int | list[float] = 12,
         seasons: dict[str, list[int]] | None = None,
+        levels: list[float] | None = None,
+        interp: str = "nearest",
     ) -> pd.DataFrame:
         """
         Aggregated statistic(s) for one profile variable, with level
@@ -1075,11 +1118,11 @@ class ProfileTimeSeries:
         every statistic at once without producing a 3D result. Two modes
         are supported, chosen by `by`:
 
-          - by="all" (the default): no grouping. `stat` may be a list
+        - by="all" (the default): no grouping. `stat` may be a list
             (defaults to ["mean", "P90", "P99"]) -- the returned table
             has one column per requested statistic. This is the most
             common case: most variables are looked at as a whole first.
-          - by="month"/"season"/"direction"/"year": grouped. `stat` must
+        - by="month"/"season"/"direction"/"year": grouped. `stat` must
             be a single string in this mode -- the returned table has
             one column per group (+ an "All" column). Passing a list of
             stats together with a non-"all" `by` raises, since the
@@ -1116,13 +1159,25 @@ class ProfileTimeSeries:
             Only used when by="direction".
         seasons : dict[str, list[int]], optional
             Custom season -> month-list map. Only used when by="season".
+        levels : list[float], optional
+            Levels to report, as any numeric values -- not necessarily
+            ones present on the data's level coordinate. Resolved against
+            the levels actually computed, according to `interp`. Defaults
+            to every level on the variable's level dimension, unchanged.
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            How to resolve a requested level in `levels` that doesn't
+            fall exactly on the data's level coordinate. "nearest" (the
+            default) reports whichever computed level is closest;
+            anything else interpolates numerically between computed
+            levels via pandas/scipy. Ignored if `levels` is None. See
+            `_resolve_level_axis` for details.
 
         Returns
         -------
         pd.DataFrame
-            Index = level values for var's level dimension. Columns are
-            statistic names when by="all", or group labels (+ "All")
-            otherwise.
+            Index = level values for var's level dimension (or `levels`,
+            if given). Columns are statistic names when by="all", or
+            group labels (+ "All") otherwise.
         """
         if var is None:
             var = self.primary.col
@@ -1160,9 +1215,9 @@ class ProfileTimeSeries:
         if by == "all":
             full_df = self._profile_var_as_dataframe(var, level_dim)
             table = _reduce(full_df, stats)
-            table.index.name = level_dim
+            table.index.name = self._level_axis_label(level_dim)
             table.columns.name = "stat"
-            return table
+            return _resolve_level_axis(table, levels, interp)
 
         groups = self._get_groups(
             by, var, level_dim,
@@ -1173,9 +1228,9 @@ class ProfileTimeSeries:
         table = pd.DataFrame({
             label: _reduce(g, stats)[stats[0]] for label, g in groups.items()
         })
-        table.index.name = level_dim
+        table.index.name = self._level_axis_label(level_dim)
         table.columns.name = by
-        return table
+        return _resolve_level_axis(table, levels, interp)
 
     # ---------------------------------------------------------------------- #
     # Plotting
@@ -1183,20 +1238,10 @@ class ProfileTimeSeries:
 
     def _level_axis_label(self, level_dim: str) -> str:
         """
-        Build the y-axis label for a level dimension: its described name
-        if set, falling back to the raw dim name, always with unit
-        metres appended (level values are always metres by convention
-        in this class -- see Rule 5 / level_convention in the module
-        docstring) and the height/depth convention noted only when not
-        already implied by the label itself.
+        Build the y-axis label for a level dimension: just "Height [m]" or
+        "Depth [m]" depending on `level_convention".
         """
-        level_attrs = self.ds.coords[level_dim].attrs if level_dim in self.ds.coords else {}
-        level_label = level_attrs.get("name", level_dim)
-        convention_note = (
-            "" if self.level_convention in level_label.lower()
-            else f", {self.level_convention}"
-        )
-        return f"{level_label} (m{convention_note})"
+        return f"{self.level_convention.capitalize()} (m)"
 
     def plot_profile(
         self,
@@ -1210,6 +1255,11 @@ class ProfileTimeSeries:
         timestamps: level on the y-axis, value on the x-axis (the
         standard meteorological/oceanographic profile-plot convention),
         one line per requested timestamp.
+
+        Each actual sampled level (the variable's level coordinate) is
+        marked with a light dotted horizontal guide line and a marker on
+        each plotted line, matching plot_statistics/plot_return_values's
+        visual treatment.
 
         Parameters
         ----------
@@ -1267,9 +1317,15 @@ class ProfileTimeSeries:
             label = matched_time.strftime("%Y-%m-%d %H:%M")
             if abs((matched_time - req).total_seconds()) > 0:
                 label += f" (nearest to {req.strftime('%Y-%m-%d %H:%M')})"
-            style = dict(color=color) if n > 1 else {}
+            style = dict(color=color, marker=".") if n > 1 else dict(marker=".")
             style.update(plot_kwargs)
             ax.plot(values, levels, label=label, **style)
+
+        # Mark the actual sampled levels with light dotted guides, same
+        # treatment as plot_statistics/plot_return_values.
+        for level_value in levels:
+            ax.axhline(level_value, color="grey", linestyle=":",
+                    linewidth=0.8, alpha=0.5, zorder=0)
 
         var_attrs = da.attrs
         var_label = var_attrs.get("name", var)
@@ -1280,7 +1336,11 @@ class ProfileTimeSeries:
         if self.level_convention == "depth":
             ax.invert_yaxis()
 
+        ax.grid(True)
         ax.legend()
+
+        _extend_xlim_to_zero(ax)
+        _extend_ylim_to_zero(ax)
         return ax
 
     def plot_statistics(
@@ -1291,96 +1351,469 @@ class ProfileTimeSeries:
         direction: str | None = None,
         sectors: int | list[float] = 12,
         seasons: dict[str, list[int]] | None = None,
-        ax: "plt.Axes | None" = None,
-        **plot_kwargs,
-    ) -> "plt.Axes":
+        subplot_columns: int | None = None,
+        plot_kwargs: dict | None = None,
+        ax: "np.ndarray[plt.Axes] | None" = None,
+    ) -> "np.ndarray[plt.Axes]":
         """
-        Plot the table produced by statistics(var, by, stat, ...):
-        level on the y-axis, statistic value on the x-axis, one line per
-        column of that table. Accepts exactly the same grouping/
-        statistic options as statistics() -- including the same
-        by="all" + multi-stat default, and the same restriction that a
-        list of stats is only allowed when by="all" -- since this is
-        simply that table, plotted rather than returned as a DataFrame.
+        Plot the table(s) produced by statistics(var, by, stat, ...):
+        level on the y-axis, statistic value on the x-axis.
 
-        Line coloring: lines are colored along a continuous colormap by
-        their position in the table's columns -- in the order `stat`
-        was given (by="all") or in statistics()'s natural group order
-        (calendar order for month/season/year, ascending compass angle
-        for direction). Never re-sorted, since that order is already
-        meaningful. There is no separate "All" line unless by="all" --
-        a grouped plot (by="month" etc.) only ever shows the individual
-        groups, since the whole-record line would need to be requested
-        as its own statistics(by="all") table/plot instead.
+        Two layouts, chosen automatically by `by`:
+
+        - by="all" (the default): a single Axes, one line per requested
+            `stat` -- exactly as before. `stat` may be a list.
+        - by="month"/"season"/"direction"/"year": one subplot per group
+            (month, season, sector, or year), laid out the same way
+            `ProfileEVA.plot_return_values` lays out its per-month/per-
+            sector subplots (via the same `_get_n_axes` grid logic), each
+            comparing the requested statistic(s) as separate lines within
+            that group. `stat` may be a list here too -- unlike
+            `statistics()` itself, which restricts `stat` to a single value
+            whenever `by != "all"` (a single table has nowhere to put a
+            third axis). Here, each requested stat gets its own
+            `statistics()` call (one table per stat, level x group), and
+            the subplot grid supplies the missing axis -- mirroring how
+            `plot_return_values` calls `table_return_values` once per
+            return period and uses subplots for the month/sector axis.
+
+        This mirrors `plot_return_values` throughout: subplot grid,
+        shared x/y limits across subplots, level markers and dotted level
+        guides, and a single top-left legend, all behave identically --
+        so reading a grouped `plot_statistics` figure and a grouped
+        `plot_return_values` figure feels the same.
 
         Parameters
         ----------
         var : str, optional
             Name of the profile variable to plot. Defaults to
             `self.primary.col`, exactly as in statistics().
-        ax : matplotlib.axes.Axes, optional
-            Axes to draw on. A new figure/axes is created if omitted.
-        **plot_kwargs
+        by : {"all", "month", "season", "direction", "year"}
+            Grouping strategy. Defaults to "all" (single Axes, no
+            subplots).
+        stat : str | list[str]
+            Statistic(s) to plot as separate lines. Defaults to
+            ["mean", "P90", "P99"]. Unlike `statistics()`, a list is
+            accepted regardless of `by` -- see above.
+        direction : str, optional
+            Profile variable to use as direction when by="direction".
+            Passed straight through to `statistics()`.
+        sectors : int or list[float], default 12
+            Directional sectors. Only used when by="direction". Passed
+            straight through to `statistics()`.
+        seasons : dict[str, list[int]], optional
+            Custom season map. Only used when by="season". Passed
+            straight through to `statistics()`.
+        subplot_columns : int, optional
+            Max columns in the subplot grid, when by != "all". Defaults
+            to 3, matching `plot_return_values`'s default. Unused for
+            by="all" (always a single Axes).
+        plot_kwargs : dict, optional
             Passed through to ax.plot() for every line.
+        ax : matplotlib.axes.Axes or array of Axes, optional
+            Axes to draw on. For by="all", a single Axes (a new one is
+            created if omitted). For a grouped `by`, an array of Axes --
+            one per group, already flattened or in any array shape (a new
+            grid is created via `_get_n_axes` if omitted).
 
         Returns
         -------
-        matplotlib.axes.Axes
+        matplotlib.axes.Axes or np.ndarray of matplotlib.axes.Axes
+            A single Axes for by="all"; an array of Axes otherwise.
         """
         import matplotlib.pyplot as plt
 
-        # var resolution (None -> self.primary.col) is delegated to
-        # statistics() so the two methods' defaulting behaviour stays
-        # identical by construction. The resolved name is still needed
-        # below (axis labels, ds[var].attrs), so mirror the same default
-        # locally rather than re-deriving it some other way.
         if var is None:
             var = self.primary.col
-        table = self.statistics(
-            var=var, by=by, stat=stat, direction=direction,
-            sectors=sectors, seasons=seasons,
-        )
 
-        if by != "all" and "All" in table.columns:
-            table = table.drop(columns="All")
-
-        if by == "direction":
-            # groupby_sector labels sort alphabetically as plain strings
-            # ("112-158°" < "22-68°") -- reorder by each sector's
-            # starting compass angle so the legend/colormap progress
-            # sensibly, rather than re-sorting arbitrarily.
-            def _sector_start_angle(label: str) -> float:
-                return float(label.split("-")[0])
-            table = table[sorted(table.columns, key=_sector_start_angle)]
-
-        if ax is None:
-            _, ax = plt.subplots()
-
-        n = table.shape[1]
-        cmap = plt.get_cmap("viridis")
-        colors = [cmap(i / max(n - 1, 1)) for i in range(n)]
-
-        for color, (label, series) in zip(colors, table.items()):
-            style = dict(color=color) if n > 1 else {}
-            style.update(plot_kwargs)
-            ax.plot(series.values, series.index.values, label=str(label), **style)
+        stats = [stat] if isinstance(stat, str) else list(stat)
+        plot_kwargs = {} if plot_kwargs is None else dict(plot_kwargs)
 
         da = self.ds[var]
         var_attrs = da.attrs
         var_label = var_attrs.get("name", var)
         var_units = var_attrs.get("units")
-        ax.set_xlabel(f"{var_label}" + (f" ({var_units})" if var_units else ""))
+        level_dim = [d for d in self.ds[var].dims if d != self.time_dim][0]
+        level_label = self._level_axis_label(level_dim)
+        invert = self.level_convention == "depth"
 
-        level_dim = table.index.name
-        ax.set_ylabel(self._level_axis_label(level_dim))
-        if self.level_convention == "depth":
-            ax.invert_yaxis()
+        # --------------------------------------------------------------- #
+        # by="all": single Axes, one line per stat -- unchanged behaviour.#
+        # --------------------------------------------------------------- #
+        if by == "all":
+            table = self.statistics(var=var, by="all", stat=stats)
 
-        ax.legend(title=table.columns.name)
-        return ax
+            if ax is None:
+                _, ax = plt.subplots()
 
+            n = table.shape[1]
+            cmap = plt.get_cmap("viridis")
+            colors = [cmap(i / max(n - 1, 1)) for i in range(n)]
 
-def _get_n_axes(n_intervals: int, max_cols: int = 4):
+            for color, (label, series) in zip(colors, table.items()):
+                style = dict(color=color, marker=".") if n > 1 else dict(marker=".")
+                style.update(plot_kwargs)
+                ax.plot(series.values, series.index.values, label=str(label), **style)
+
+            for level_value in table.index.values:
+                ax.axhline(level_value, color="grey", linestyle=":",
+                        linewidth=0.8, alpha=0.5, zorder=0)
+
+            ax.set_xlabel(f"{var_label}" + (f" ({var_units})" if var_units else ""))
+            ax.set_ylabel(level_label)
+            if invert:
+                ax.invert_yaxis()
+            ax.grid(True)
+            legend_title = "Statistic" if table.columns.name == "stat" else table.columns.name
+            ax.legend(title=legend_title)
+
+            _extend_xlim_to_zero(ax)
+            _extend_ylim_to_zero(ax)
+            return ax
+
+        # --------------------------------------------------------------- #
+        # Grouped by: one subplot per group, one line per stat -- mirrors #
+        # plot_return_values exactly (one table per stat here, instead of #
+        # one table per return period there).                             #
+        # --------------------------------------------------------------- #
+        tables = {
+            s: self.statistics(
+                var=var, by=by, stat=s, direction=direction,
+                sectors=sectors, seasons=seasons,
+            ).drop(columns="All", errors="ignore")
+            for s in stats
+        }
+
+        first_table = next(iter(tables.values()))
+        columns = list(first_table.columns)
+
+        if by == "direction":
+            # groupby_sector labels sort alphabetically as plain strings
+            # ("112-158°" < "22-68°") -- reorder by each sector's starting
+            # compass angle so subplots progress sensibly, rather than
+            # re-sorting arbitrarily. Applied consistently to every stat's
+            # table via `columns`, since they all share the same columns.
+            def _sector_start_angle(label: str) -> float:
+                return float(label.split("-")[0])
+            columns = sorted(columns, key=_sector_start_angle)
+
+        owns_figure = ax is None
+        if ax is None:
+            if subplot_columns is None:
+                subplot_columns = 3
+            fig, ax_arr = _get_n_axes(len(columns), max_cols=subplot_columns)
+        else:
+            fig = None
+            ax_arr = np.array(ax).ravel()
+            if len(ax_arr) < len(columns):
+                raise ValueError(
+                    f"Expected ax to contain {len(columns)} axes "
+                    f"(one per {by} group), got {len(ax_arr)}."
+                )
+
+        # Shared x/y limits across all subplots, same reasoning as
+        # plot_return_values: explicit xlim/ylim rather than sharex/sharey,
+        # so every subplot keeps its own readable ticks.
+        share_limits = owns_figure
+        if share_limits:
+            all_values = np.concatenate([t.values.ravel() for t in tables.values()])
+            x_min, x_max = np.nanmin(all_values), np.nanmax(all_values)
+            y_min, y_max = first_table.index.min(), first_table.index.max()
+            x_pad = 0.05 * (x_max - x_min) if x_max > x_min else 1.0
+            y_pad = 0.05 * (y_max - y_min) if y_max > y_min else 1.0
+
+        cmap = plt.get_cmap("viridis")
+        n_stat = len(stats)
+        colors = [cmap(i / max(n_stat - 1, 1)) for i in range(n_stat)]
+
+        for col_idx, column in enumerate(columns):
+            axi = ax_arr[col_idx]
+            for s, color in zip(stats, colors):
+                table = tables[s]
+                style = dict(color=color, marker=".") if n_stat > 1 else dict(marker=".")
+                style.update(plot_kwargs)
+                axi.plot(
+                    table[column].values, table.index.values,
+                    label=str(s), **style,
+                )
+            # Mark the actual computed levels (this column's table index)
+            # with light dotted guides, same treatment as plot_return_values.
+            for level_value in first_table.index.values:
+                axi.axhline(level_value, color="grey", linestyle=":",
+                            linewidth=0.8, alpha=0.5, zorder=0)
+            axi.set_title(str(column))
+            axi.set_xlabel(
+                f"{var_label}" + (f" ({var_units})" if var_units else "")
+            )
+            axi.set_ylabel(level_label)
+
+            if share_limits:
+                axi.set_xlim(x_min - x_pad, x_max + x_pad)
+                axi.set_ylim(y_min - y_pad, y_max + y_pad)
+
+            if invert:
+                axi.invert_yaxis()
+            axi.grid(True)
+
+            if col_idx == 0:
+                axi.legend(title="Statistic")
+
+        for ax in ax_arr:
+            _extend_xlim_to_zero(ax)
+            _extend_ylim_to_zero(ax)
+        return ax_arr
+
+    def plot_rose(
+        self,
+        var: str | None = None,
+        direction: str | None = None,
+        levels: list[float] | None = None,
+        interp: str = "nearest",
+        going_to: bool = True,
+        n_dir_bins: int = 16,
+        mag_step: float = None,
+        mag_max: float = None,
+        cmap: str = "viridis",
+        calm_threshold: float = 0.0,
+        subplot_columns: int | None = None,
+        rose_kwargs: dict | None = None,
+        ax: "np.ndarray[plt.Axes] | None" = None,
+    ) -> "np.ndarray[plt.Axes]":
+        """
+        Rose plot(s) of one profile variable against a paired direction
+        variable, at one or more levels -- one polar subplot per requested
+        level, with a single shared legend drawn below the whole figure.
+
+        Levels are resolved exactly as in `statistics`/`table_return_values`
+        (any numeric values, not necessarily ones present on the level
+        coordinate, matched via `interp`), going through u/v (east/north)
+        components rather than magnitude/direction independently, since
+        direction is circular -- see `_resolve_profile_levels_uv`.
+
+        All panels share identical magnitude bin edges, colormap, and radial
+        scale. A single legend is drawn once below the whole figure, not per
+        panel and not inside the axes.
+
+        Parameters
+        ----------
+        var : str, optional
+            Magnitude profile variable (e.g. current speed). Defaults to
+            `self.primary.col`.
+        direction : str, optional
+            Direction profile variable. Falls back to `self.direction.col`
+            if not given; raises if neither is available.
+        levels : list[float], optional
+            Levels to plot, as any numeric values. Defaults to every level
+            on `var`'s level dimension.
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            How to resolve a requested level that doesn't fall exactly on
+            the data's level coordinate. "nearest" (the default) uses the
+            actual closest level's data unchanged; anything else
+            interpolates the underlying u/v components and converts back.
+            Ignored if `levels` is None.
+        going_to : bool, default True
+            Direction convention of `direction`'s stored values (True =
+            oceanographic "going to"; False = meteorological "coming
+            from"). Must match the data -- not inferred.
+        n_dir_bins : int, default 16
+            Number of compass sectors inside each rose panel.
+        mag_step : float, optional
+            Magnitude bin step. Auto-selected via `infer_step` if None.
+        mag_max : float, optional
+            Upper edge of the magnitude bins. Auto-selected as the 99th
+            percentile of active (above `calm_threshold`) values pooled
+            across every requested level if None. Set this explicitly
+            together with `mag_step` to force identical bins across
+            separate calls. An open-ended ">X" bin is still added if any
+            level's data exceeds the resulting top edge.
+        cmap : str, default "viridis"
+            Colormap for magnitude classes, shared by every panel and the
+            legend.
+        calm_threshold : float, default 0.0
+            Observations at or below this value are counted as calm.
+        subplot_columns : int, optional
+            Max columns in the subplot grid. Defaults to 3, matching
+            `plot_return_values`'s default.
+        rose_kwargs : dict, optional
+            Extra keyword arguments passed to every per-panel `plot_rose(...)`
+            call. `mag_bins`, `r_max`, `cmap`, `calm_threshold`, `legend`,
+            `mag_label`, `mag_unit`, and `title` are all set here and should
+            not be overridden through this dict.
+        ax : array of matplotlib.axes.Axes, optional
+            Polar axes to draw on -- one per requested level. If omitted, a
+            new constrained-layout figure with polar axes is created. When
+            supplied, the caller owns the figure and no legend is drawn.
+
+        Returns
+        -------
+        np.ndarray of matplotlib.axes.Axes
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+
+        if var is None:
+            var = self.primary.col
+        if var not in self.profile_vars:
+            raise ValueError(
+                f"'{var}' is not a recognised profile variable. "
+                f"Available: {self.profile_vars}"
+            )
+
+        dir_var = self._require_direction("plot_rose", direction)
+
+        level_dim = [d for d in self.ds[var].dims if d != self.time_dim][0]
+        dir_level_dim = [d for d in self.ds[dir_var].dims if d != self.time_dim][0]
+        if dir_level_dim != level_dim:
+            raise ValueError(
+                f"direction variable '{dir_var}' varies over level "
+                f"dimension '{dir_level_dim}', but '{var}' varies over "
+                f"'{level_dim}'. plot_rose requires both to share the same "
+                "level dimension."
+            )
+
+        rose_kwargs = {} if rose_kwargs is None else dict(rose_kwargs)
+
+        per_level = self._resolve_profile_levels_uv(
+            var, dir_var, level_dim, levels=levels, interp=interp, going_to=going_to,
+        )
+        resolved_levels = list(per_level.keys())
+
+        # ------------------------------------------------------------------ #
+        # Shared magnitude bins, mirroring TimeSeries.plot_rose's own        #
+        # pooled-data derivation, so every panel + the shared legend agree.  #
+        # ------------------------------------------------------------------ #
+        all_mag = np.concatenate([df["magnitude"].values for df in per_level.values()])
+        active = all_mag[all_mag > calm_threshold]
+
+        mag_top = float(mag_max) if mag_max is not None else (
+            float(np.percentile(active, 99)) if len(active) else 1.0
+        )
+        _mag_step = mag_step or infer_step(pd.Series(active), target=7)
+        mag_bins = np.arange(0, mag_top + _mag_step, _mag_step)
+
+        legend_edges = mag_bins
+        if len(active) and active.min() < legend_edges[0]:
+            legend_edges = np.concatenate(([-np.inf], legend_edges))
+        if len(active) and active.max() >= legend_edges[-1]:
+            legend_edges = np.concatenate((legend_edges, [np.inf]))
+
+        # ------------------------------------------------------------------ #
+        # Shared radial scale across every level's panel.                    #
+        # ------------------------------------------------------------------ #
+        def _sector_max(mag_vals, dir_vals):
+            sector_width = 360.0 / n_dir_bins
+            dir_edges = np.linspace(-sector_width / 2, 360 - sector_width / 2, n_dir_bins + 1)
+            n_total = len(mag_vals)
+            active_m = mag_vals > calm_threshold
+            dir_norm = dir_vals[active_m] % 360.0
+            totals = np.zeros(n_dir_bins)
+            for d_idx in range(n_dir_bins):
+                d_lo = dir_edges[d_idx] % 360
+                d_hi = dir_edges[d_idx + 1] % 360
+                if d_lo < d_hi:
+                    in_dir = (dir_norm >= d_lo) & (dir_norm < d_hi)
+                else:
+                    in_dir = (dir_norm >= d_lo) | (dir_norm < d_hi)
+                totals[d_idx] = in_dir.sum() / n_total
+            return float(totals.max())
+
+        r_max = max(
+            _sector_max(df["magnitude"].values, df["direction"].values)
+            for df in per_level.values()
+        ) * 1.15
+
+        # ------------------------------------------------------------------ #
+        # Shared legend patches, built once and drawn below the whole figure #
+        # ------------------------------------------------------------------ #
+        n_mag = len(legend_edges) - 1
+        cm_obj = plt.get_cmap(cmap, n_mag)
+        colors = [cm_obj(i / n_mag) for i in range(n_mag)]
+
+        var_meta = self._variables[var]
+        mag_label = var_meta.name
+        mag_unit = var_meta.unit
+        unit_str = f" {mag_unit}" if mag_unit else ""
+
+        def _legend_label(lo, hi):
+            if np.isneginf(lo):
+                return f"<{hi:g}{unit_str}"
+            if np.isposinf(hi):
+                return f">{lo:g}{unit_str}"
+            return f"{lo:g}\u2013{hi:g}{unit_str}"
+
+        patches = [
+            mpatches.Patch(facecolor=colors[i], label=_legend_label(legend_edges[i], legend_edges[i + 1]))
+            for i in range(n_mag)
+        ]
+
+        # ------------------------------------------------------------------ #
+        # Polar axes grid. Created directly with plt.subplots (not by        #
+        # converting rectangular axes) and with constrained layout, so the   #
+        # layout engine can measure polar titles and reserve space for the   #
+        # figure-level legend.                                               #
+        # ------------------------------------------------------------------ #
+        owns_figure = ax is None
+        if owns_figure:
+            if subplot_columns is None:
+                subplot_columns = 3
+            n = len(resolved_levels)
+            ncols = min(subplot_columns, n)
+            nrows = int(np.ceil(n / ncols))
+            fig, ax_arr = plt.subplots(
+                nrows, ncols,
+                subplot_kw={"projection": "polar"},
+                squeeze=False,
+                layout="constrained",
+            )
+            ax_arr = ax_arr.ravel()
+        else:
+            fig = None
+            ax_arr = np.array(ax).ravel()
+            if len(ax_arr) < len(resolved_levels):
+                raise ValueError(
+                    f"Expected ax to contain {len(resolved_levels)} axes "
+                    f"(one per requested level), got {len(ax_arr)}."
+                )
+
+        # ------------------------------------------------------------------ #
+        # Level label for titles: "Depth 1.0 m" / "Height 98.6 m".           #
+        # ------------------------------------------------------------------ #
+        level_word = self.level_convention.capitalize()  # "Depth" or "Height"
+
+        for idx, level in enumerate(resolved_levels):
+            df = per_level[level]
+            axi = ax_arr[idx]
+            plot_rose(
+                df["magnitude"].values, df["direction"].values,
+                ax=axi,
+                n_dir_bins=n_dir_bins,
+                mag_bins=legend_edges,
+                cmap=cmap,
+                r_max=r_max,
+                calm_threshold=calm_threshold,
+                title=f"{level_word} {level:.1f} m  (n={len(df):,})",
+                legend=False,
+                mag_label=mag_label,
+                mag_unit=mag_unit,
+                **rose_kwargs,
+            )
+
+        for a in ax_arr[len(resolved_levels):]:
+            a.set_visible(False)
+
+        if owns_figure:
+            fig.legend(
+                handles=patches,
+                title=mag_label,
+                loc="outside lower center",
+                ncol=min(n_mag, 6),
+                frameon=False,
+                handlelength=1.2,
+            )
+
+        return ax_arr
+
+def _get_n_axes(n_intervals: int, max_cols: int = 4, sharex=None, sharey=None):
     """
     Same subplot-grid layout UnivariateEVA uses for its per-group plots
     (plot_return_value_comparison, plot_return_value_confidence) --
@@ -1410,10 +1843,96 @@ def _get_n_axes(n_intervals: int, max_cols: int = 4):
         ncols = max_cols
 
     fig, axes = plt.subplots(
-        nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False, layout="constrained"
+        nrows=nrows, ncols=ncols, sharex=sharex, sharey=sharey, squeeze=False
     )
     return fig, axes.ravel()
 
+def _resolve_level_axis(
+    table: pd.DataFrame,
+    levels: list[float] | None,
+    interp: str = "nearest",
+) -> pd.DataFrame:
+    """
+    Reindex a level-indexed table (index = level values) onto a
+    requested set of levels, resolving values not already present in
+    the table's index according to `interp`.
+
+    Shared by every table-producing method's `levels=`/`interp=`
+    parameters (statistics, table_return_values). Deliberately a
+    post-processing step applied to an already-computed table, never
+    threaded into the computation itself: an EVA model cannot be
+    interpolated (there is no meaningful "halfway between two fitted
+    GPDs"), so an interpolated row here is always an interpolation of
+    *results* (return values, statistics), computed at the levels that
+    actually have data/models.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        Any level-indexed table (numeric index, one row per level).
+        Column structure is irrelevant and preserved as-is.
+    levels : list[float], optional
+        Requested level values. None means "leave the table's existing
+        index untouched" -- the default for every caller.
+    interp : {"nearest", "linear", "quadratic", "cubic", ...}
+        How to resolve a requested level that isn't already an exact
+        index value:
+          - "nearest": snap to the closest existing level (no
+            numerical interpolation of values -- the default, since it
+            never fabricates a value the data didn't actually produce).
+            The returned index holds the actual matched level, not the
+            requested one.
+          - anything else ("linear", "quadratic", "cubic", ...) is
+            passed straight to pandas' ``DataFrame.interpolate(method=...)``,
+            which wraps ``scipy.interpolate`` for the non-linear
+            methods. The returned index holds the requested levels
+            exactly.
+
+    Returns
+    -------
+    pd.DataFrame
+        Re-indexed per `levels`, if `levels` is not None (see Index
+        labelling above for what the resulting index actually
+        contains). Otherwise `table` unchanged.
+
+    Raises
+    ------
+    ValueError
+        If a requested level falls outside the table's existing index
+        range and interp is not "nearest" -- extrapolation is not
+        attempted; raising here makes the unsupported case explicit
+        instead of a silent NaN in a results table.
+    """
+    if levels is None:
+        return table
+
+    table = table.sort_index()
+    existing = table.index.to_numpy()
+
+    if interp == "nearest":
+        pos = table.index.get_indexer(levels, method="nearest")
+        resolved = table.iloc[pos].copy()
+        # Index intentionally kept as the ACTUAL matched levels (not
+        # `levels`, the requested ones) -- see docstring.
+        return resolved
+
+    out_of_range = [
+        lv for lv in levels if lv < existing.min() or lv > existing.max()
+    ]
+    if out_of_range:
+        raise ValueError(
+            f"Requested level(s) {out_of_range} fall outside the "
+            f"available range [{existing.min():g}, {existing.max():g}] "
+            f"and interp={interp!r} does not extrapolate. Use "
+            "interp='nearest', or request levels within range."
+        )
+
+    union_index = table.index.union(levels)
+    interpolated = table.reindex(union_index).interpolate(
+        method=interp, limit_area="inside"
+    )
+    # Index intentionally kept as the REQUESTED levels -- see docstring.
+    return interpolated.loc[levels]
 
 class ProfileEVA:
     """
@@ -1650,6 +2169,7 @@ class ProfileEVA:
         dist: str,
         return_period_size: str = "365.2425D",
         levels: list[float] | None = None,
+        interp: str = "nearest",
     ) -> pd.DataFrame:
         """
         Return-value table for one return period, with level on the
@@ -1695,14 +2215,19 @@ class ProfileEVA:
         return_period_size : str, default "365.2425D"
             Passed straight through.
         levels : list[float], optional
-            Subset of levels to include as rows. Defaults to every
-            level that has a fitted model (`self.models` with
-            `_fitted_models=True`) -- a level with no fitted model for
-            this (method, dist) has nothing to look up and is skipped
-            with a warning rather than raising, since a partially
-            fitted profile (e.g. one level's fit failed and was
-            skipped with errors="warn" during `.fit()`) shouldn't block
-            tabulating the levels that did fit.
+            Levels to report, as any numeric values -- not necessarily
+            ones that were fitted. Resolved against whichever levels
+            ended up fitted and tabulated, according to `interp`. None
+            (the default) returns one row per fitted level (every level
+            with a fitted model for this `(method, dist)`, skipped with a
+            warning otherwise, exactly as before).
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            How to resolve a requested level in `levels` that wasn't
+            itself fitted. "nearest" (the default) reports whichever
+            fitted level's row is closest; anything else interpolates
+            numerically between fitted levels' return values via
+            pandas/scipy. Ignored if `levels` is None. See
+            `_resolve_level_axis` for details.
 
         Returns
         -------
@@ -1715,7 +2240,7 @@ class ProfileEVA:
             UnivariateEVA.table_return_values_final's own columns are.
         """
         rp_label = f"{return_period}-year"
-        target_levels = list(self.models) if levels is None else list(levels)
+        target_levels = list(self.models)
 
         rows = {}
         skipped = []
@@ -1756,10 +2281,8 @@ class ProfileEVA:
             )
 
         table = pd.DataFrame(rows).T
-        table.index.name = self.level_dim
-        table.columns.name = "Omni" if grouping == "omni" else grouping
-        return table
-
+        table.index.name = self._pts._level_axis_label(self.level_dim)
+        return _resolve_level_axis(table, levels, interp)
 
     def plot_return_values(
         self,
@@ -1787,6 +2310,32 @@ class ProfileEVA:
         each subplot's per-return-period lines -- so the same
         UnivariateEVA return-value math and the same skipped-level
         handling apply here too.
+
+        For grouping="monthly" or "sectors", every subplot is drawn with
+        the same x- and y-axis limits, computed as the overall min/max
+        across all subplots/return periods, so values are directly
+        comparable by eye across months/sectors. This is done by setting
+        explicit xlim/ylim on each axis rather than matplotlib's
+        sharex/sharey, since sharing hides tick labels on interior
+        subplots -- here every subplot keeps its own readable ticks, just
+        pinned to the same range. Not applied for "omni" -- there is only
+        one subplot, so a shared range has no effect. Only applies when a
+        new grid is created (ax=None); an existing `ax` array passed in is
+        left with whatever limits it already has after plotting.
+
+        Each actual computed level (the ones in `table.index`, i.e. the
+        levels that had a fitted model, not necessarily every level in
+        `self.levels`) is marked with a light dotted horizontal guide
+        line, so the reader can see which depths the profile was actually
+        evaluated at. The plotted return-value lines themselves also carry
+        a marker at each computed level, for the same reason.
+
+        A single legend for return periods is drawn only on the first
+        (top-left) subplot rather than repeated on every one, since every
+        subplot shares the same set of return periods/colors and repeating
+        it would be redundant. Only drawn when `ax` is None (i.e. this call
+        owns the figure); if axes were passed in, the caller is left to
+        handle the legend themselves.
 
         Parameters
         ----------
@@ -1855,17 +2404,31 @@ class ProfileEVA:
         first_table = next(iter(tables.values()))
         columns = list(first_table.columns)
 
+        owns_figure = ax is None
         if ax is None:
             if subplot_columns is None:
                 subplot_columns = 3
             fig, ax_arr = _get_n_axes(len(columns), max_cols=subplot_columns)
         else:
+            fig = None
             ax_arr = np.array(ax).ravel()
             if len(ax_arr) < len(columns):
                 raise ValueError(
                     f"Expected ax to contain {len(columns)} axes "
                     f"(one per {grouping} group), got {len(ax_arr)}."
                 )
+
+        # Shared x/y limits across all subplots, computed manually rather
+        # than via sharex/sharey so every subplot keeps its own tick
+        # labels. Only meaningful (and only applied) when there's more
+        # than one subplot to compare.
+        share_limits = owns_figure and grouping in ("monthly", "sectors")
+        if share_limits:
+            all_values = np.concatenate([t.values.ravel() for t in tables.values()])
+            x_min, x_max = np.nanmin(all_values), np.nanmax(all_values)
+            y_min, y_max = first_table.index.min(), first_table.index.max()
+            x_pad = 0.05 * (x_max - x_min) if x_max > x_min else 1.0
+            y_pad = 0.05 * (y_max - y_min) if y_max > y_min else 1.0
 
         cmap = plt.get_cmap("viridis")
         n_rp = len(return_periods)
@@ -1879,26 +2442,39 @@ class ProfileEVA:
             axi = ax_arr[col_idx]
             for rp, color in zip(return_periods, colors):
                 table = tables[rp]
-                style = dict(color=color) if n_rp > 1 else {}
+                style = dict(color=color, marker=".") if n_rp > 1 else dict(marker=".")
                 style.update(plot_kwargs)
                 axi.plot(
                     table[column].values, table.index.values,
                     label=f"{rp}-year", **style,
                 )
+            # Mark the actual computed levels (this column's table index)
+            # with light dotted guides, so it's visible which depths were
+            # evaluated versus interpolated between.
+            for level_value in first_table.index.values:
+                axi.axhline(level_value, color="grey", linestyle=":",
+                            linewidth=0.8, alpha=0.5, zorder=0)
             axi.set_title(str(column))
             axi.set_xlabel(
                 f"{var_label}" + (f" ({var_units})" if var_units else "")
             )
             axi.set_ylabel(self._pts._level_axis_label(self.level_dim))
+
+            if share_limits:
+                axi.set_xlim(x_min - x_pad, x_max + x_pad)
+                axi.set_ylim(y_min - y_pad, y_max + y_pad)
+
             if self._pts.level_convention == "depth":
                 axi.invert_yaxis()
             axi.grid(True)
-            axi.legend(title="Return period")
 
+            if col_idx == 0:
+                axi.legend(title="Return period")
+
+        for ax in ax_arr:
+            _extend_xlim_to_zero(ax)
+            _extend_ylim_to_zero(ax)
         return ax_arr
-
-
-
     # ---------------------------------------------------------------------- #
     # Turkstra profiles
     # ---------------------------------------------------------------------- #
@@ -2023,6 +2599,7 @@ class ProfileEVA:
         dist: str | None = None,
         return_period_size: str = "365.2425D",
         levels: list[float] | None = None,
+        interp: str = "nearest",
     ) -> pd.DataFrame:
         """
         Turkstra combination-load profile table: for each level, the
@@ -2033,11 +2610,11 @@ class ProfileEVA:
 
         Two ways to define "worst case" at a level, chosen by `basis`:
 
-          - "percentile": worst case = the `percentile`-th percentile of
+        - "percentile": worst case = the `percentile`-th percentile of
             the raw data at that level (optionally restricted to one
             `month`). No EVA required -- this basis only ever touches
             the raw time series in `self._pts.ds`.
-          - "return_period": worst case = the `return_period`-year
+        - "return_period": worst case = the `return_period`-year
             return value from a fitted `(method, dist)` model at that
             level, taken from `self.table_return_values(...,
             grouping="omni")` -- which means `get_extremes()` and
@@ -2081,20 +2658,34 @@ class ProfileEVA:
         return_period_size : str, default "365.2425D"
             Passed to `table_return_values` when basis="return_period".
         levels : list[float], optional
-            Subset of levels to include. Defaults to every level in
-            `self.levels` (basis="percentile") or every fitted level
-            (basis="return_period", same default as
-            `table_return_values`).
+            Levels to report, as any numeric values -- not necessarily
+            ones actually computed. Applied identically to both the
+            output-level (row) axis and the anchor-level (column) axis.
+            Resolved according to `interp`. None (the default) returns
+            every computed level on both axes, unchanged.
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            How to resolve a requested level in `levels` that wasn't
+            itself computed. "nearest" (the default) reports whichever
+            computed level is closest, on each axis independently;
+            anything else interpolates numerically between computed
+            levels via pandas/scipy -- see the note above on why this is
+            better-justified for rows than for columns. Ignored if
+            `levels` is None. See `_resolve_level_axis` for the row-axis
+            mechanics (applied a second time, transposed, for columns).
 
         Returns
         -------
         pd.DataFrame
-            Index = level values (name = self.level_dim), one column
-            per anchor level plus a final "Worst case" column. Entry
-            (row=`dd`, col=`d`) is the conditionally-expected value at
-            level `dd` given level `d` is at its own worst case;
-            diagonal entries equal that level's own "Worst case" value
-            exactly.
+            Index = level values (name = "Depth (m)" or "Height (m)"),
+            one column per anchor level (name = "Anchor level (m)") plus
+            a final "Worst case" column. Entry (row=`dd`, col=`d`) is the
+            conditionally-expected value at level `dd` given level `d` is
+            at its own worst case; diagonal entries equal that level's
+            own "Worst case" value exactly (when `dd == d` survives
+            resolution on both axes unchanged -- an interpolated/relabelled
+            row or column is no longer guaranteed to line up with a
+            specific original anchor, so this exact-diagonal property is
+            only guaranteed for `levels=None`).
         """
         if basis not in ("percentile", "return_period"):
             raise ValueError(
@@ -2111,7 +2702,7 @@ class ProfileEVA:
                 )
 
             df = self._turkstra_series(month=month)
-            target_levels = list(self.levels) if levels is None else list(levels)
+            target_levels = list(self.levels)
             missing = [lv for lv in target_levels if lv not in df.columns]
             if missing:
                 raise ValueError(
@@ -2143,7 +2734,7 @@ class ProfileEVA:
             rp_table = self.table_return_values(
                 return_period=return_period, grouping="omni",
                 method=method, dist=dist,
-                return_period_size=return_period_size, levels=levels,
+                return_period_size=return_period_size,
             )
             worst_case = rp_table["Omni"]
             target_levels = list(worst_case.index)
@@ -2165,8 +2756,27 @@ class ProfileEVA:
 
         matrix = self._turkstra_matrix(df, worst_case)
         matrix["Worst case"] = worst_case.loc[matrix.index]
-        matrix.index.name = self.level_dim
-        matrix.columns.name = "anchor_level"
+
+        level_label = self._pts._level_axis_label(self.level_dim)
+        matrix.index.name = level_label
+
+        if levels is not None:
+            worst_case_col = matrix[["Worst case"]]
+            anchor_cols = matrix.drop(columns="Worst case")
+
+            # Row axis (output levels): same mechanism as table_return_values.
+            anchor_cols = _resolve_level_axis(anchor_cols, levels, interp)
+            worst_case_col = _resolve_level_axis(worst_case_col, levels, interp)
+
+            # Column axis (anchor levels): transpose so anchors become the
+            # row index, resolve, transpose back.
+            anchor_cols = _resolve_level_axis(anchor_cols.T, levels, interp).T
+
+            matrix = anchor_cols
+            matrix["Worst case"] = worst_case_col["Worst case"]
+            matrix.index.name = level_label
+
+        matrix.columns.name = "Anchor level (m)"
         return matrix
 
     def plot_turkstra(
@@ -2179,6 +2789,9 @@ class ProfileEVA:
         dist: str | None = None,
         return_period_size: str = "365.2425D",
         levels: list[float] | None = None,
+        cmap: str = "viridis",
+        fmt_legend: str = ".1f",
+        legend_ncols: int = 2,
         plot_kwargs: dict | None = None,
         worst_case_kwargs: dict | None = None,
         ax: "plt.Axes | None" = None,
@@ -2196,10 +2809,34 @@ class ProfileEVA:
         method/dist/return_period_size/levels arguments as
         `table_turkstra` -- this simply plots that table.
 
+        Each actual computed level (the table's index) is marked with a
+        light dotted horizontal guide line and a marker on each plotted
+        line, matching plot_profile/plot_statistics/plot_return_values's
+        visual treatment elsewhere in this class.
+
+        No title is drawn -- this plot is intended to be captioned
+        externally (e.g. in a LaTeX figure environment) rather than
+        carry its own title.
+
+        Legend ordering: anchor-level entries are sorted so the legend's
+        top-to-bottom order matches the plot's visual top-to-bottom order
+        -- ascending level values for depth-convention data (the y-axis is
+        inverted, so small depths plot near the top), descending for
+        height-convention data (the y-axis is not inverted, so large
+        heights plot near the top). The "Worst case" entry is always
+        listed last, regardless of sort direction, since it is a distinct
+        summary line rather than a level value.
+
         Parameters
         ----------
+        cmap : str, default "viridis"
+            Colormap used to colour the anchor-level lines.
+        fmt_legend : str, default ".1f"
+            Format spec (as used in an f-string, e.g. ".1f", ".2f", "g")
+            applied to each anchor level's numeric value in the legend.
         plot_kwargs : dict, optional
-            Passed to `ax.plot()` for every anchor-level line.
+            Passed to `ax.plot()` for every anchor-level line, overriding
+            this method's own color/marker defaults where they overlap.
         worst_case_kwargs : dict, optional
             Passed to `ax.plot()` for the "Worst case" line, on top of
             a bold-black default (`color="black", linewidth=2.5`) --
@@ -2225,22 +2862,31 @@ class ProfileEVA:
         )
         anchor_columns = [c for c in table.columns if c != "Worst case"]
 
+        # Sort anchor columns so the legend's top-to-bottom order matches
+        # the plot's visual top-to-bottom order -- see docstring.
+        is_depth = self._pts.level_convention == "depth"
+        anchor_columns = sorted(anchor_columns, reverse=not is_depth)
+
         if ax is None:
             _, ax = plt.subplots()
 
         n = len(anchor_columns)
-        cmap = plt.get_cmap("viridis")
-        colors = [cmap(i / max(n - 1, 1)) for i in range(n)]
+        cm_obj = plt.get_cmap(cmap)
+        colors = [cm_obj(i / max(n - 1, 1)) for i in range(n)]
 
         for anchor, color in zip(anchor_columns, colors):
-            style = dict(color=color)
+            style = dict(color=color, marker=".")
             style.update(plot_kwargs)
             ax.plot(
                 table[anchor].values, table.index.values,
-                label=str(anchor), **style,
+                label=f"{anchor:{fmt_legend}}", **style,
             )
 
-        wc_style = dict(color="black", linewidth=2.5)
+        for level_value in table.index.values:
+            ax.axhline(level_value, color="grey", linestyle=":",
+                    linewidth=0.8, alpha=0.5, zorder=0)
+
+        wc_style = dict(color="black", linewidth=2.5, marker=".")
         wc_style.update(worst_case_kwargs)
         ax.plot(
             table["Worst case"].values, table.index.values,
@@ -2252,21 +2898,19 @@ class ProfileEVA:
         var_units = primary_var_meta.unit
         ax.set_xlabel(f"{var_label}" + (f" ({var_units})" if var_units else ""))
         ax.set_ylabel(self._pts._level_axis_label(self.level_dim))
-        if self._pts.level_convention == "depth":
+        if is_depth:
             ax.invert_yaxis()
 
-        if basis == "percentile":
-            title = f"Turkstra profile — P{percentile}"
-            if month is not None:
-                title += f" ({month})"
-        else:
-            title = f"Turkstra profile — {return_period}-year ({method}, {dist})"
-        ax.set_title(title)
+        xlim = ax.get_xlim()
+        if xlim[0]>0 and xlim[1]>0:
+            ax.set_xlim([0,xlim[1]])
 
         ax.grid(True, color="lightgray", linestyle=":")
-        ax.legend(title="Anchor level", loc="upper left", bbox_to_anchor=(1, 1))
-        return ax
+        ax.legend(title="Anchor level (m)", loc="center left", bbox_to_anchor=(1, 0.5), ncols=legend_ncols)
 
+        _extend_xlim_to_zero(ax)
+        _extend_ylim_to_zero(ax)
+        return ax
 
     def __getitem__(self, level) -> UnivariateEVA:
         """

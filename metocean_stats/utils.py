@@ -137,9 +137,10 @@ def aggregate_statistics(series: pd.Series, func: list[str]) -> dict:
 
 
 def table_to_latex(
-        table:pd.DataFrame,
-        filename:str,
+        table: pd.DataFrame,
+        filename: str,
         float_format,
+        column_fmt: str = None,
     ):
     """
     Script to write a pandas dataframe to a latex .tex file.
@@ -148,12 +149,23 @@ def table_to_latex(
     otherwise the column name, if set, otherwise empty.
     """
     if not filename.endswith(".tex"): filename += ".tex"
+
+    if column_fmt is None and isinstance(float_format, str):
+        column_fmt = float_format
+
+    def _fmt_column(c):
+        if isinstance(c, str):
+            return c.replace("%", r"\%")
+        if column_fmt is not None:
+            return f"{c:{column_fmt}}"
+        return str(c)
+
     with open(filename, "w") as f:
         f.write("\\begin{tabular}{l"+"r"*len(table.columns)+"}\n")
         f.write("\\toprule \n")
         if table.index.name: f.write(f"{table.index.name}")
         elif table.columns.name: f.write(f"{table.columns.name}")
-        columns = [c.replace("%",r"\%") for c in table.columns]
+        columns = [_fmt_column(c) for c in table.columns]
         f.write(" & " + " & ".join(columns)+" \\\\\n")
         f.write("\\midrule\n")
         for index, row in table.iterrows():
@@ -209,3 +221,45 @@ def dirmag_to_uv(wind_direction, wind_speed, going_to=True):
     u = wind_speed*np.sin(wind_direction)
     v = wind_speed*np.cos(wind_direction)
     return u,v
+
+def uv_to_dirmag(u, v, going_to=True):
+    '''
+    Get direction (degrees, default: going to) and magnitude 
+    from u (east) and v (north) components.
+
+    Parameters
+    ---------
+    u : np.ndarray
+        Eastwards velocity
+    v : np.ndarray
+        Northwards velocity
+    going_to : bool, default True
+        Controls direction convention, False gives "from" direction.
+    '''
+    direction = np.degrees(np.arctan2(u,v))%360
+    
+    if not going_to:
+        direction = (direction+180)%360
+    
+    magnitude = np.sqrt(u**2+v**2)
+    return direction, magnitude
+
+def _extend_xlim_to_zero(ax: "plt.Axes") -> None:
+    """
+    Extend the x-axis limits to include 0.
+    """
+    xlim = ax.get_xlim()
+    if xlim[0] > 0 and xlim[1] > 0:
+        ax.set_xlim([0, xlim[1]])
+    elif xlim[0] < 0 and xlim[1] < 0:
+        ax.set_xlim([xlim[0], 0])
+
+def _extend_ylim_to_zero(ax: "plt.Axes") -> None:
+    """
+    Extend the x-axis limits to include 0.
+    """
+    ylim = ax.get_ylim()
+    if ylim[0] > 0 and ylim[1] > 0:
+        ax.set_ylim([0, ylim[1]])
+    elif ylim[0] < 0 and ylim[1] < 0:
+        ax.set_ylim([ylim[0], 0])

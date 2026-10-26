@@ -29,17 +29,6 @@ def get_OMAE2020_Hs_Tz():
     dist_descriptions, fit_descriptions, semantics = predefined.get_OMAE2020_Hs_Tz()
     semantics["swap_axis"] = True
     dist_descriptions[0]["intervals"] = virocon.NumberOfIntervalsSlicer(15,min_n_points=20)
-
-    def _power3(x, a1, a2, a3):
-        return a1 + a2 * x**a3
-    bounds_mu = [(0, None), (None, None), (None, None)]
-    def _exp3(x, b1,b2,b3):
-        return b1 + b2 * np.exp(b3 * x)
-    bounds_sigma = [(0, None), (0, None), (None, None)]
-
-    dist_descriptions[1]["parameters"]["mu"] = virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$")
-    dist_descriptions[1]["parameters"]["sigma"] = virocon.DependenceFunction(_exp3, bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$")
-    fit_descriptions[1] = {"method":"mom"}
     semantics["names"][1] = "Peak wave period"
     semantics["symbols"][1] = "T_p"
     return dist_descriptions,fit_descriptions,semantics
@@ -70,9 +59,6 @@ def get_DNVGL_Hs_Tz():
         conditions and environmental loads.
 
     """
-    def _lnsquare(x, a1, a2, a3):
-        return np.log(a1 + a2 * np.sqrt(a3*x))
-
     def _power3(x, a1, a2, a3):
         return a1 + a2 * x**a3
 
@@ -92,7 +78,7 @@ def get_DNVGL_Hs_Tz():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {
-            "mu": virocon.DependenceFunction(_lnsquare, bounds_mu, latex="$\ln(a1 + a2 \sqrt{a3 * x})$"), 
+            "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x \exp(a3)$"), 
             # "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
             "sigma": virocon.DependenceFunction(_exp3, bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$")
             },
@@ -111,50 +97,54 @@ def get_DNVGL_Hs_Tz():
 
     return dist_descriptions, fit_descriptions, semantics
 
-
-def get_LoNoWe_hs_tp():
+def get_mixed_dnvgl_virocon_hs_tp():
     """
-    Similar to the DNV GL RP 2017 model, but uses the combined 
-    Lognormal-Weibull model in Hs (LoNoWe) rather than just weibull.
-    The model is fitted using the method of moment in scipy.
+    A model which improves the DNVGL model by implementing selected components from the virocon model:
+    * Exponentiated Weibull distribution of Hs gives a better fit, including low Hs values, than plain Weibull.
+    * The 2-parameter log-square-root model for mean Tp is more stable than the 3-parameter power law.
     """
 
-    def _power3(x, a, b, c):
-        return a + b * x**c
+    def _lnsquare2(x, a1, a2):
+        return np.log(a1 + a2 * np.sqrt(x))
+    bounds_mu = [(0, None), (0, None)]
+    mu_dep = virocon.DependenceFunction(
+        _lnsquare2, bounds=bounds_mu, latex="$\ln(a1 + a2 \sqrt{x})$"
+        )
 
-    def _exp3(x, a, b, c):
-        return a + b * np.exp(c * x)
-
-    bounds = [(None, None), (0, None), (None, None)]
+    def _exp3(x, b1,b2,b3):
+        return b1 + b2 * np.exp(b3 * x)
+    bounds_sigma = [(0, None), (0, None), (None, None)]
+    sigma_dep = virocon.DependenceFunction(
+        _exp3, bounds=bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$"
+        )
 
     dist_description_hs = {
-        "distribution": LoNoWeDistribution(),
-        "intervals": virocon.NumberOfIntervalsSlicer(10),
+        "distribution": virocon.ExponentiatedWeibullDistribution(),
+        "intervals": virocon.NumberOfIntervalsSlicer(15,min_n_points=25),
     }
 
-    dist_description_tz = {
+    dist_description_tp = {
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {
-            "mu": virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$"), 
-            "sigma": virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
-            },
+            "sigma": sigma_dep,
+            "mu": mu_dep,
+        },
     }
 
-    dist_descriptions = [dist_description_hs, dist_description_tz]
+    dist_descriptions = [dist_description_hs, dist_description_tp]
 
-    fit_descriptions = [{'method':'mom'},
-                        {'method':'mom'}]
+    fit_description_hs = {"method": "wlsq", "weights": "quadratic"}
+    fit_descriptions = [fit_description_hs, {"method":"mom"}]
 
     semantics = {
         "names": ["Significant wave height", "Peak wave period"],
         "symbols": ["H_s", "T_p"],
         "units": ["m", "s"],
-        "swap_axis": True
+        "swap_axis":True
     }
-    
-    return dist_descriptions,fit_descriptions,semantics
 
+    return dist_descriptions, fit_descriptions, semantics
 
 def get_virocon_V_Hs_Tz():
 

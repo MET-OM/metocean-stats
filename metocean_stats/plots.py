@@ -831,32 +831,39 @@ def plot_spectra(
         )
  
     return fig, axes
- 
+
+import numpy as np
+
+
+def _bin_label(lo, hi, unit_str=""):
+    """Format one bin edge pair, using '<hi' / 'lo<' for open (+/-inf) ends."""
+    if np.isneginf(lo):
+        return f"<{hi:g}{unit_str}"
+    if np.isposinf(hi):
+        return f"{lo:g}<{unit_str}"
+    return f"{lo:g}\u2013{hi:g}{unit_str}"
+
 
 def plot_rose(
-    magnitude: "np.ndarray",
-    direction: "np.ndarray",
-    ax: "plt.Axes",
+    magnitude,
+    direction,
+    ax=None,
     *,
-    n_dir_bins:     int   = 16,
-    mag_bins:       "np.ndarray | None" = None,
-    mag_step:       "float | None"      = None,
-    cmap:           str   = "YlOrRd",
-    r_max:          "float | None" = None,
-    calm_threshold: float = 0.0,
-    title:          str   = "",
-    legend:         bool  = True,
-    mag_label:      str   = "magnitude",
-    mag_unit:       str   = "",
-) -> None:
+    n_dir_bins=16,
+    mag_bins=None,
+    mag_step=None,
+    cmap="viridis",
+    r_max=None,
+    r_ticks=None,
+    calm_threshold=0.0,
+    title="",
+    legend=True,
+    mag_label="magnitude",
+    mag_unit="",
+    figsize=None,
+):
     """
     Draw a single wind / wave rose onto a polar Axes.
-
-    This is a standalone utility intended for ``utils.py``. It has no
-    dependency on ``TimeSeriesValidation`` — pass plain numpy arrays and a
-    pre-created polar Axes. The companion ``TimeSeriesValidation.plot_rose``
-    method calls this twice with shared ``mag_bins`` and ``r_max`` so both
-    panels are directly comparable.
 
     Parameters
     ----------
@@ -864,28 +871,37 @@ def plot_rose(
         1-D array of magnitudes (wind speed, wave height, current speed …).
     direction : np.ndarray
         1-D array of directions in degrees, meteorological convention
-        (direction *from*, 0° = North, clockwise positive). Must be the same
-        length as ``magnitude``.
-    ax : plt.Axes
+        (direction *from*, 0 deg = North, clockwise positive). Same length
+        as ``magnitude``.
+    ax : plt.Axes, optional
         A polar Axes (created with ``subplot_kw={"projection": "polar"}``).
-        The function draws onto this axes and returns None so the caller
-        controls figure layout.
+        If None, a new figure and polar axes are created automatically.
     n_dir_bins : int, default 16
-        Number of directional sectors. 16 → 22.5° sectors, 8 → 45° sectors.
-    mag_bins : np.ndarray, optional
-        Explicit bin edges, e.g. ``np.arange(0, 15, 2)``. Overrides both
-        auto-binning and ``mag_step``. Pass the same array to both
-        ``plot_rose`` calls to ensure identical colouring between panels.
+        Number of directional sectors. 16 -> 22.5 deg sectors, 8 -> 45 deg.
+    mag_bins : array-like, optional
+        Explicit bin edges spanning the *full* range end-to-end, e.g.
+        ``[0, 2, 4, 6, 8]``. These edges are used exactly as given -- no
+        open-ended bin is added unless data actually falls outside
+        ``[mag_bins[0], mag_bins[-1]]``, in which case a single extra
+        open-ended bin (``<lo`` and/or ``hi<``) is added on whichever side(s)
+        have out-of-range data, so nothing is silently dropped.
     mag_step : float, optional
         Force a specific bin step size, overriding auto-selection while still
         starting at 0 and extending to the 99th percentile. Ignored if
-        ``mag_bins`` is supplied.
+        ``mag_bins`` is supplied. As with auto-derived bins, an open-ended
+        top bin is added only if data exceeds the 99th-percentile-based
+        range.
     cmap : str, default "YlOrRd"
-        Matplotlib colormap used to colour magnitude classes (lowest → highest).
+        Matplotlib colormap used to colour magnitude classes (lowest -> highest).
     r_max : float, optional
-        Maximum radial extent as a fraction of total observations (0–1 scale).
-        If None, derived from the data. Pass the same value to both calls for
-        a shared radial scale.
+        Maximum radial extent as a fraction of total observations (0-1 scale).
+        If None, derived from the data. Pass the same value to multiple calls
+        for a shared radial scale.
+    r_ticks : array-like, optional
+        Explicit radial tick values, in percent (e.g. ``[0, 5, 10, 15]``).
+        If None, ticks are auto-inferred. Pass the same values across
+        multiple calls (together with a shared ``r_max``) for directly
+        comparable panels.
     calm_threshold : float, default 0.0
         Observations with magnitude <= this value are counted as "calm" and
         excluded from the directional bins (but noted in the title).
@@ -897,19 +913,31 @@ def plot_rose(
         Human-readable name for the magnitude variable, used in the legend.
     mag_unit : str, default ""
         Unit string appended to legend labels, e.g. "m/s" or "m".
+    figsize : tuple[float, float], optional
+        Figure size in inches, used only when ``ax`` is None.
+
+    Returns
+    -------
+    ax : plt.Axes
 
     Notes
     -----
-    - Directions are converted from meteorological (from-direction, CW from N)
-      to the polar Axes convention (CCW from East) internally.
+    - Directions are passed in meteorological convention directly; the polar
+      axes is configured with N at top, clockwise, so no manual rotation is
+      needed.
     - The radial axis shows percentage of total observations (including calm).
-    - ``r_max`` is expressed as a fraction (0–1); the axes tick labels are
-      converted to percentages automatically.
+    - Bin edges are used exactly as supplied (or as auto-derived). An extra
+      open-ended bin is added on a given side *only if* observations actually
+      fall outside that edge -- e.g. bins=[0,2,4] over data fully within
+      [0,4] produces exactly 2 bins (0-2, 2-4), no "4<" bin. If some data
+      exceeds 4, a "4<" bin is appended to catch it (and analogously for
+      data below the first edge).
     """
-    import numpy as np
     import matplotlib.pyplot as plt
     import matplotlib.cm as mcm
     import matplotlib.patches as mpatches
+    import pandas as pd
+    from metocean_stats.utils import infer_step  # adjust import to your package layout
 
     # ------------------------------------------------------------------ #
     # Input coercion and validation                                        #
@@ -923,10 +951,10 @@ def plot_rose(
             f"got {magnitude.shape} and {direction.shape}."
         )
 
-    valid     = np.isfinite(magnitude) & np.isfinite(direction)
+    valid = np.isfinite(magnitude) & np.isfinite(direction)
     magnitude = magnitude[valid]
     direction = direction[valid]
-    n_total   = len(magnitude)
+    n_total = len(magnitude)
 
     if n_total == 0:
         raise ValueError("No finite magnitude/direction pairs to plot.")
@@ -934,60 +962,70 @@ def plot_rose(
     # ------------------------------------------------------------------ #
     # Calm separation                                                      #
     # ------------------------------------------------------------------ #
-    active     = magnitude > calm_threshold
+    active = magnitude > calm_threshold
     mag_active = magnitude[active]
     dir_active = direction[active]
-    n_calm     = int((~active).sum())
+    n_calm = int((~active).sum())
 
     # ------------------------------------------------------------------ #
-    # Magnitude bins                                                       #
+    # Magnitude bins: build inner edges, then only add open ends if data  #
+    # actually falls outside them.                                        #
     # ------------------------------------------------------------------ #
-    if mag_bins is None:
+    if mag_bins is not None:
+        inner = np.sort(np.asarray(mag_bins, dtype=float))
+    else:
         p99 = float(np.percentile(mag_active, 99)) if len(mag_active) else 1.0
         if mag_step is None:
-            import pandas as pd
             mag_step = infer_step(pd.Series(mag_active), target=7)
-        mag_bins = np.arange(0, p99 + mag_step, mag_step)
+        inner = np.arange(0, p99 + mag_step, mag_step)
 
-    mag_bins = np.asarray(mag_bins, dtype=float)
-    n_mag    = len(mag_bins) - 1
-    cm_obj   = mcm.get_cmap(cmap, n_mag)
-    colors   = [cm_obj(i / n_mag) for i in range(n_mag)]
+    edges = inner
+    if len(mag_active) and mag_active.min() < inner[0]:
+        edges = np.concatenate(([-np.inf], edges))
+    if len(mag_active) and mag_active.max() >= inner[-1]:
+        edges = np.concatenate((edges, [np.inf]))
+
+    n_mag = len(edges) - 1
+    cm_obj = mcm.get_cmap(cmap, n_mag)
+    colors = [cm_obj(i / n_mag) for i in range(n_mag)]
 
     # ------------------------------------------------------------------ #
     # Directional bins                                                     #
     # ------------------------------------------------------------------ #
-    sector_width    = 360.0 / n_dir_bins
-    dir_edges       = np.linspace(
+    sector_width = 360.0 / n_dir_bins
+    dir_edges = np.linspace(
         -sector_width / 2, 360 - sector_width / 2, n_dir_bins + 1
     )
     dir_centres_met = np.linspace(0, 360 - sector_width, n_dir_bins)
-
-    # Pass meteorological directions directly in radians.
-    # set_theta_zero_location("N") and set_theta_direction(-1) already
-    # configure the axes to use 0° = North, clockwise — so no manual
-    # conversion is needed. Applying 90 - dir would double-transform.
     theta = np.deg2rad(dir_centres_met)
 
     # ------------------------------------------------------------------ #
-    # Bin counts: (n_dir_bins × n_mag) matrix                             #
+    # Bin counts: (n_dir_bins x n_mag) matrix                             #
     # ------------------------------------------------------------------ #
     dir_norm = dir_active % 360.0
-    counts   = np.zeros((n_dir_bins, n_mag), dtype=float)
+    counts = np.zeros((n_dir_bins, n_mag), dtype=float)
 
-    for m_idx in range(n_mag):
-        m_lo   = mag_bins[m_idx]
-        m_hi   = mag_bins[m_idx + 1]
-        in_mag = (mag_active >= m_lo) & (mag_active < m_hi)
+    for d_idx in range(n_dir_bins):
+        d_lo = dir_edges[d_idx] % 360
+        d_hi = dir_edges[d_idx + 1] % 360
+        if d_lo < d_hi:
+            in_dir = (dir_norm >= d_lo) & (dir_norm < d_hi)
+        else:
+            in_dir = (dir_norm >= d_lo) | (dir_norm < d_hi)
+        mag_dir = mag_active[in_dir]
 
-        for d_idx in range(n_dir_bins):
-            d_lo = dir_edges[d_idx] % 360
-            d_hi = dir_edges[d_idx + 1] % 360
-            if d_lo < d_hi:
-                in_dir = (dir_norm >= d_lo) & (dir_norm < d_hi)
+        for m_idx in range(n_mag):
+            m_lo, m_hi = edges[m_idx], edges[m_idx + 1]
+            if m_idx == n_mag - 1:
+                in_mag = (mag_dir >= m_lo) & (mag_dir <= m_hi)
             else:
-                in_dir = (dir_norm >= d_lo) | (dir_norm < d_hi)
-            counts[d_idx, m_idx] = np.sum(in_mag & in_dir)
+                in_mag = (mag_dir >= m_lo) & (mag_dir < m_hi)
+            counts[d_idx, m_idx] = in_mag.sum()
+
+    assert int(counts.sum()) == len(mag_active), (
+        f"Binning lost or double-counted observations: "
+        f"{int(counts.sum())} binned vs {len(mag_active)} active."
+    )
 
     # Express as fraction of ALL observations (including calm)
     fractions = counts / n_total
@@ -1000,6 +1038,12 @@ def plot_rose(
     if r_max is None:
         r_max = float(sector_totals.max()) * 1.15
     r_max = max(r_max, 1e-9)
+
+    # ------------------------------------------------------------------ #
+    # Axes                                                                  #
+    # ------------------------------------------------------------------ #
+    if ax is None:
+        _, ax = plt.subplots(figsize=figsize, subplot_kw={"projection": "polar"})
 
     # ------------------------------------------------------------------ #
     # Draw bars                                                            #
@@ -1030,26 +1074,27 @@ def plot_rose(
     ax.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda val, _: f"{val * 100:.0f}%")
     )
-    # Nice radial ticks in percentage space — same snap logic as infer_step
-    import pandas as pd
-    r_max_pct  = r_max * 100
-    tick_step  = infer_step(pd.Series([0.0, r_max_pct]), target=4)
-    tick_vals  = np.arange(tick_step, r_max_pct + tick_step * 0.5, tick_step)
-    ax.set_yticks(tick_vals / 100)   # back to fraction for the axes
+
+    if r_ticks is not None:
+        tick_vals = np.asarray(r_ticks, dtype=float)
+    else:
+        r_max_pct = r_max * 100
+        tick_step = infer_step(pd.Series([0.0, r_max_pct]), target=4)
+        tick_vals = np.arange(tick_step, r_max_pct + tick_step * 0.5, tick_step)
+    ax.set_yticks(tick_vals / 100)  # back to fraction for the axes
     ax.tick_params(axis="y", labelsize=7, pad=2)
 
     compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     ax.set_xticks(np.deg2rad(np.arange(0, 360, 45)))
     ax.set_xticklabels(compass, fontsize=8)
 
-    # Grid: draw on top of the background but below the bars
     ax.set_facecolor("#f0f0f0")
     ax.grid(True, color="#b0b8c8", linewidth=0.7, linestyle="-", zorder=2)
     ax.spines["polar"].set_visible(False)
 
-    calm_pct  = 100 * n_calm / n_total if n_total > 0 else 0.0
-    unit_str  = f" {mag_unit}" if mag_unit else ""
-    calm_note = f"calm (≤{calm_threshold:g}{unit_str}): {calm_pct:.1f}%"
+    calm_pct = 100 * n_calm / n_total if n_total > 0 else 0.0
+    unit_str = f" {mag_unit}" if mag_unit else ""
+    calm_note = f"calm (\u2264{calm_threshold:g}{unit_str}): {calm_pct:.1f}%"
     full_title = f"{title}\n{calm_note}" if title else calm_note
     ax.set_title(full_title, pad=12, fontsize=9)
 
@@ -1058,10 +1103,10 @@ def plot_rose(
     # ------------------------------------------------------------------ #
     if legend:
         unit_str = f" {mag_unit}" if mag_unit else ""
-        patches  = [
+        patches = [
             mpatches.Patch(
                 facecolor=colors[m_idx],
-                label=f"{mag_bins[m_idx]:g}–{mag_bins[m_idx + 1]:g}{unit_str}",
+                label=_bin_label(edges[m_idx], edges[m_idx + 1], unit_str),
             )
             for m_idx in range(n_mag)
         ]
@@ -1076,6 +1121,8 @@ def plot_rose(
             frameon=False,
             handlelength=1.2,
         )
+
+    return ax
 
 def plot_scatter_diagram(
         data: pd.DataFrame, 
