@@ -33,7 +33,12 @@ SOFTWARE.
 """
 
 from .bivariate_eva import BivariateEVA
+# Re-exported so the legacy flat-function API (plots.extreme, tables.extreme)
+# still imports; their call sites were written against the old CMA module and
+# are not guaranteed to behave the same against this rewritten class.
+from .jointmodel import JointProbabilityModel
 
 __all__ = [
-    "BivariateEVA"
+    "BivariateEVA",
+    "JointProbabilityModel",
 ]

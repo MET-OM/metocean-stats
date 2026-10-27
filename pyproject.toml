@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "metocean-stats"
 description = "metocean-stats - Tool for generation of metocean statistics"
-version = "2.0"
+version = "1.3.0"
 authors = [
   { name = "Konstantinos Christakos MET Norway & NTNU" },
   { name = "Erik Furevik, MET Norway" }
@@ -36,6 +36,9 @@ dependencies = [
   "virocon>=2.4",
   "tqdm",
   "lmoments3",
+  "windrose",
+  "requests",
+  "python-docx",
 ]
 
 [project.optional-dependencies]
