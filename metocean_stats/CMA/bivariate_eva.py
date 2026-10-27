@@ -9,27 +9,7 @@ from tqdm import tqdm
 from .jointmodel import JointProbabilityModel
 from . import predefined
 
-from ..utils import groupby_month, groupby_sector
-
-def _get_n_axes(n_intervals, max_cols=4):
-    if n_intervals <= 0:
-        raise ValueError(f"n_intervals should be a positive integer, but got {n_intervals}.")
-    elif n_intervals < max_cols**2:
-        table = np.array(
-            [
-                (rows, cols)
-                for cols in range(1, max_cols + 1)
-                for rows in range(1, cols + 1)
-            ]
-        )
-        table = table[np.prod(table, axis=1) >= n_intervals]
-        (nrows, ncols) = table[np.argmin(np.prod(table, axis=1) - n_intervals)]
-    else:
-        nrows = np.ceil(n_intervals / max_cols).astype(int)
-        ncols = max_cols
-
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False)
-    return fig, axes.ravel()
+from ..utils import groupby_with_metadata, get_n_axes, resolve_axes_grid
 
 
 class BivariateEVA:
@@ -83,15 +63,17 @@ class BivariateEVA:
         # labels = [f"{(bins[i]-dir_offset)%360:.0f}-{(bins[i+1]-dir_offset)%360:.0f}°" for i in range(sectors)]
         # data["sector"] = pd.cut((data[var_dir]+dir_offset)%360, bins=bins, labels=labels, right=False)
 
-        # Group the data
+        # Group the data. observed=True: a month/sector with zero
+        # observations can't fit a joint model, so it's dropped rather
+        # than kept as an empty group.
         self.data_omni = data
-        self.data_monthly = groupby_month(data)
+        month_meta = groupby_with_metadata(data, by="month", observed=True)
+        self.data_monthly = dict(zip(month_meta["label"], month_meta["data"]))
         if self._has_direction:
-            self.data_sectors = groupby_sector(
-                data,
-                var_dir=var_dir,
-                sectors=sectors,
+            sector_meta = groupby_with_metadata(
+                data, by="direction", var_dir=var_dir, sectors=sectors, observed=True,
                 )
+            self.data_sectors = dict(zip(sector_meta["label"], sector_meta["data"]))
         else:
             self.data_sectors = {}
 
@@ -197,8 +179,8 @@ class BivariateEVA:
             RVE:pd.DataFrame,
             ax:plt.Axes|list[plt.Axes]=None,
             contour_kwargs:dict={},
-            subplot_figures:int=2,
-            subplot_columns:int=None,
+            nfigs:int=2,
+            ncols:int=2,
             title_N_points=True
             ):
         """
@@ -236,23 +218,7 @@ class BivariateEVA:
             raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
 
         N_plots = len(all_groups)
-        if ax is None:
-            if subplot_figures == 1:
-                if subplot_columns is None: subplot_columns = 3
-                fig,ax = _get_n_axes(N_plots,max_cols = subplot_columns)
-                figures = np.array([fig])
-            else:
-                if subplot_columns is None: subplot_columns = 2
-                base = N_plots // subplot_figures
-                rem = N_plots % subplot_figures
-                subplots = [base+1]*rem + [base]*(subplot_figures-rem)
-                subplots = [_get_n_axes(n,max_cols=subplot_columns) for n in subplots]
-                figures = np.array([s[0] for s in subplots])
-                ax = np.concatenate([s[1] for s in subplots])
-        else:
-            ax = np.array(ax).ravel()
-        if len(ax) < N_plots:
-            raise ValueError(f"Expected ax to contain {N_plots} axes, got {len(ax)}.")
+        figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
 
         for i,(key,data) in enumerate(all_groups.items()):
             model = models.get(key)  # None if this fit failed/was skipped
@@ -449,7 +415,7 @@ class BivariateEVA:
             self,
             grouping:typing.Literal["omni","monthly","sectors"],
             axes:list[plt.Axes] = None,
-            max_cols:int = 4,
+            ncols:int = 4,
             title_N_points=False,
     ):
         if grouping == "sectors":
@@ -473,7 +439,7 @@ class BivariateEVA:
 
         N_plots = len(all_groups)
         if axes is None:
-            fig,axes = _get_n_axes(2*N_plots,max_cols=max_cols)
+            fig,axes = get_n_axes(2*N_plots,max_cols=ncols)
         elif len(axes) < 2*N_plots:
             raise ValueError(f"Need at least {2*N_plots} axes, got {len(axes)}.")
 
@@ -501,7 +467,7 @@ class BivariateEVA:
         self,
         grouping:typing.Literal["omni","monthly","sectors"],
         axes:list[plt.Axes] = None,
-        max_cols:int = 4,
+        ncols:int = 4,
         title_N_points=False,
     ):
         if grouping == "sectors":
@@ -525,7 +491,7 @@ class BivariateEVA:
 
         N_plots = len(all_groups)
         if axes is None:
-            fig,axes = _get_n_axes(2*N_plots,max_cols=max_cols)
+            fig,axes = get_n_axes(2*N_plots,max_cols=ncols)
         elif len(axes) < 2*N_plots:
             raise ValueError(f"Need at least {2*N_plots} axes, got {len(axes)}.")
 

@@ -12,6 +12,7 @@ from .spectral import _ROLE_TIME, _ROLE_FREQ, _ROLE_DIR, _ALIASES_FREQ, _ALIASES
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.ticker as mticker
+import matplotlib.patches as mpatches
 import cmocean
 import numpy as np
 import pandas as pd
@@ -500,7 +501,7 @@ def plot_spectra(
     row: str | None = None,
     col: str | None = None,
     col_wrap: int | None = None,
-    max_cols: int = 4,
+    ncols: int = 3,
     errors: Literal["ignore", "raise"] = "raise",
     radius: str = "frequency",
     plot_type: str = "pcolormesh",
@@ -510,6 +511,7 @@ def plot_spectra(
     log_scale: bool = True,
     dir_letters: bool = False,
     panel_size: float = 3.0,
+    figsize: "tuple[float, float] | None" = None,
     zoom: bool = True,
     logradius: bool = True,
     rmin: float | None = None,
@@ -567,7 +569,7 @@ def plot_spectra(
         "2017-01-01T00:00") to select a single step.
     row, col : str, optional
     col_wrap : int, optional
-    max_cols : int, default 4
+    ncols : int, default 3
     errors : {"ignore", "raise"}, default "raise"
         Governs auto-facet/flatten panel-count warnings/errors (not the
         fully-explicit row=+col= case). "raise": warn above
@@ -698,13 +700,12 @@ def plot_spectra(
     r_limits = (rmin, rmax)
  
     fig_kw = dict(subplot_kw=dict(projection="polar")) if dir_dim else {}
-    fig_kw["constrained_layout"] = True
     cbar_label = _colorbar_label(da) if dir_dim and freq_dim else None 
 
     def _draw_grid(nrows, ncols, cell_fn, n_real_panels):
         """cell_fn(panel_index) -> (panel_da, title)."""
         fig, axes = plt.subplots(
-            nrows, ncols, figsize=(panel_size * ncols, panel_size * nrows), **fig_kw
+            nrows, ncols, figsize=figsize or (panel_size * ncols, panel_size * nrows), **fig_kw
         )
         axes_flat = np.atleast_1d(axes).ravel()
         last_mesh = None
@@ -715,7 +716,7 @@ def plot_spectra(
             panel_da, title = cell_fn(i)
             mesh = _draw_one_panel(ax, panel_da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
             last_mesh = mesh if mesh is not None else last_mesh
-            ax.set_title(title, fontsize=9)
+            ax.set_title(title)
         if last_mesh is not None:
             fig.colorbar(
                 last_mesh, ax=axes_flat.tolist(), pad=0.02, shrink=0.6, label=cbar_label,
@@ -725,7 +726,7 @@ def plot_spectra(
  
     # --- Case A: single panel, nothing to facet at all --------------------- #
     if not requested and not unaccounted:
-        fig, ax = plt.subplots(figsize=(panel_size + 2, panel_size + 2), **fig_kw)
+        fig, ax = plt.subplots(figsize=figsize or (panel_size + 2, panel_size + 2), **fig_kw)
         mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmin, vmax, dir_letters, log_scale, r_zoom, logradius, r_limits, mask_below_vmin)
         if mesh is not None:
             fig.colorbar(
@@ -744,7 +745,7 @@ def plot_spectra(
         n_panels = len(primary_labels) * n_flat
         _check_panel_count(n_panels, unaccounted, errors)
  
-        wrap = col_wrap or max_cols
+        wrap = col_wrap or ncols
         n_secondary = min(n_flat, wrap)
         bands_per_primary = int(np.ceil(n_flat / n_secondary))
  
@@ -772,7 +773,7 @@ def plot_spectra(
         n_panels = len(combos)
         _check_panel_count(n_panels, unaccounted, errors)
  
-        nrows, ncols = _grid_shape(n_panels, max_cols=max_cols)
+        nrows, ncols = _grid_shape(n_panels, max_cols=ncols)
  
         def cell_fn(i):
             sel = dict(zip(unaccounted, combos[i]))
@@ -804,7 +805,7 @@ def plot_spectra(
         combos = [(r, c) for r in row_labels for c in col_labels]
         row_key, col_key = row, col
  
-    fig, axes = plt.subplots(nrows, ncols, figsize=(panel_size * ncols, panel_size * nrows), **fig_kw)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize or (panel_size * ncols, panel_size * nrows), **fig_kw)
     axes_flat = np.atleast_1d(axes).ravel()
  
     last_mesh = None
@@ -819,7 +820,7 @@ def plot_spectra(
         last_mesh = mesh if mesh is not None else last_mesh
         title = ", ".join(f"{k}={_format_panel_value(v)}" for k, v in sel.items())
         title += _group_count_suffix(ds, sel)
-        ax.set_title(title, fontsize=9)
+        ax.set_title(title)
  
     for ax in axes_flat[len(combos):]:
         ax.set_visible(False)
@@ -852,9 +853,12 @@ def plot_rose(
     n_dir_bins=16,
     mag_bins=None,
     mag_step=None,
+    mag_max=None,
     cmap="viridis",
     r_max=None,
     r_ticks=None,
+    r_step=None,
+    r_label_angle=None,
     calm_threshold=0.0,
     title="",
     legend=True,
@@ -886,11 +890,16 @@ def plot_rose(
         open-ended bin (``<lo`` and/or ``hi<``) is added on whichever side(s)
         have out-of-range data, so nothing is silently dropped.
     mag_step : float, optional
-        Force a specific bin step size, overriding auto-selection while still
-        starting at 0 and extending to the 99th percentile. Ignored if
-        ``mag_bins`` is supplied. As with auto-derived bins, an open-ended
-        top bin is added only if data exceeds the 99th-percentile-based
-        range.
+        Force a specific bin step size when ``mag_bins`` is not given,
+        overriding auto-selection while still starting at 0 and extending to
+        ``mag_max`` (or the 99th percentile if ``mag_max`` is None). As with
+        auto-derived bins, an open-ended top bin is added only if data
+        exceeds the resulting range.
+    mag_max : float, optional
+        Explicit top edge for auto-derived bins (ignored if ``mag_bins`` is
+        given). Defaults to the 99th percentile of the data. Set this
+        together with ``mag_step`` to force identical magnitude bins across
+        multiple calls.
     cmap : str, default "YlOrRd"
         Matplotlib colormap used to colour magnitude classes (lowest -> highest).
     r_max : float, optional
@@ -899,9 +908,17 @@ def plot_rose(
         for a shared radial scale.
     r_ticks : array-like, optional
         Explicit radial tick values, in percent (e.g. ``[0, 5, 10, 15]``).
-        If None, ticks are auto-inferred. Pass the same values across
-        multiple calls (together with a shared ``r_max``) for directly
-        comparable panels.
+        If None, ticks are auto-inferred (or spaced by ``r_step`` if given).
+        Pass the same values across multiple calls (together with a shared
+        ``r_max``) for directly comparable panels.
+    r_step : float, optional
+        Percent step between radial ticks, used to auto-generate ``r_ticks``
+        when it is not given explicitly. Ignored if ``r_ticks`` is supplied.
+    r_label_angle : float, optional
+        Angle (degrees, matplotlib convention) at which the radial
+        (percentage) tick labels are placed, e.g. ``90`` to move them to the
+        right of the plot and away from the data. Defaults to matplotlib's
+        own placement if None.
     calm_threshold : float, default 0.0
         Observations with magnitude <= this value are counted as "calm" and
         excluded from the directional bins (but noted in the title).
@@ -933,12 +950,6 @@ def plot_rose(
       exceeds 4, a "4<" bin is appended to catch it (and analogously for
       data below the first edge).
     """
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as mcm
-    import matplotlib.patches as mpatches
-    import pandas as pd
-    from metocean_stats.utils import infer_step  # adjust import to your package layout
-
     # ------------------------------------------------------------------ #
     # Input coercion and validation                                        #
     # ------------------------------------------------------------------ #
@@ -974,10 +985,12 @@ def plot_rose(
     if mag_bins is not None:
         inner = np.sort(np.asarray(mag_bins, dtype=float))
     else:
-        p99 = float(np.percentile(mag_active, 99)) if len(mag_active) else 1.0
+        top = mag_max if mag_max is not None else (
+            float(np.percentile(mag_active, 99)) if len(mag_active) else 1.0
+        )
         if mag_step is None:
             mag_step = infer_step(pd.Series(mag_active), target=7)
-        inner = np.arange(0, p99 + mag_step, mag_step)
+        inner = np.arange(0, top + mag_step, mag_step)
 
     edges = inner
     if len(mag_active) and mag_active.min() < inner[0]:
@@ -986,7 +999,7 @@ def plot_rose(
         edges = np.concatenate((edges, [np.inf]))
 
     n_mag = len(edges) - 1
-    cm_obj = mcm.get_cmap(cmap, n_mag)
+    cm_obj = plt.get_cmap(cmap, n_mag)
     colors = [cm_obj(i / n_mag) for i in range(n_mag)]
 
     # ------------------------------------------------------------------ #
@@ -1079,14 +1092,16 @@ def plot_rose(
         tick_vals = np.asarray(r_ticks, dtype=float)
     else:
         r_max_pct = r_max * 100
-        tick_step = infer_step(pd.Series([0.0, r_max_pct]), target=4)
+        tick_step = r_step if r_step is not None else infer_step(pd.Series([0.0, r_max_pct]), target=4)
         tick_vals = np.arange(tick_step, r_max_pct + tick_step * 0.5, tick_step)
     ax.set_yticks(tick_vals / 100)  # back to fraction for the axes
-    ax.tick_params(axis="y", labelsize=7, pad=2)
+    ax.tick_params(axis="y", pad=2)
+    if r_label_angle is not None:
+        ax.set_rlabel_position(r_label_angle)
 
     compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     ax.set_xticks(np.deg2rad(np.arange(0, 360, 45)))
-    ax.set_xticklabels(compass, fontsize=8)
+    ax.set_xticklabels(compass)
 
     ax.set_facecolor("#f0f0f0")
     ax.grid(True, color="#b0b8c8", linewidth=0.7, linestyle="-", zorder=2)
@@ -1096,7 +1111,7 @@ def plot_rose(
     unit_str = f" {mag_unit}" if mag_unit else ""
     calm_note = f"calm (\u2264{calm_threshold:g}{unit_str}): {calm_pct:.1f}%"
     full_title = f"{title}\n{calm_note}" if title else calm_note
-    ax.set_title(full_title, pad=12, fontsize=9)
+    ax.set_title(full_title, pad=12)
 
     # ------------------------------------------------------------------ #
     # Legend                                                               #
@@ -1116,8 +1131,6 @@ def plot_rose(
             loc="lower center",
             bbox_to_anchor=(0.5, -0.22),
             ncol=min(n_mag, 5),
-            fontsize=7,
-            title_fontsize=7,
             frameon=False,
             handlelength=1.2,
         )
@@ -1221,7 +1234,7 @@ def plot_scatter_diagram(
 
     data = data[[var1,var2]]
     if np.any(np.isnan(data)):
-        print("Warning: Removing NaN rows.")
+        warnings.warn("Removing NaN rows.", UserWarning, stacklevel=2)
         data = data.dropna(how="any")
 
     # Initial min and max
@@ -1242,13 +1255,13 @@ def plot_scatter_diagram(
         xmin = xlim[0] if xlim[0] is not None else xmin
         xmax = xlim[1] if xlim[1] is not None else xmax
         if (l:=data[(data[var2]<xmin)|(data[var2]>xmax)].size):
-            print(f"WARNING: {l} points excluded by chosen xlim {xlim}")
+            warnings.warn(f"{l} points excluded by chosen xlim {xlim}", UserWarning, stacklevel=2)
         diff = xmax-xmin
     if ylim is not None:
         ymin = ylim[0] if ylim[0] is not None else ymin
         ymax = ylim[1] if ylim[1] is not None else ymax
         if (l:=data[(data[var1]<ymin)|(data[var1]>ymax)].size):
-            print(f"WARNING: {l} points excluded by chosen ylim {ylim}")
+            warnings.warn(f"{l} points excluded by chosen ylim {ylim}", UserWarning, stacklevel=2)
 
     # Define bins and get histogram
     n_bins_x = int(np.round((xmax - xmin) / step_var2)) + 1
@@ -1291,9 +1304,13 @@ def plot_scatter_diagram(
     if hasattr(norm,"vmin") and (norm.vmin == None):
         norm.vmin = hist[hist>0].min()/10
 
-    ax = sns.heatmap(data=np.where(hist,hist, 1e-16),annot=text,fmt="",
+    # Empty cells (hist==0) are masked out rather than substituted with a
+    # tiny value, so they render as plain white (the axes' facecolor)
+    # instead of being colour-mapped near the bottom of `cmap`.
+    ax = sns.heatmap(data=hist, mask=(hist == 0), annot=text, fmt="",
                     xticklabels=False,yticklabels=False,
                     cbar=cbar,norm=norm,cmap=cmap,**kwargs)
+    ax.set_facecolor("white")
 
     sum_x = [[f"{i:{format_marginal}}"+suffix_margin for i in sum_x]]
     sum_y = [[f"{i:{format_marginal}}"+suffix_margin] for i in sum_y[::-1]]

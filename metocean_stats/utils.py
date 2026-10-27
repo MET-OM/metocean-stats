@@ -8,84 +8,332 @@ DEFAULT_SEASONS = {
     "SON": [9, 10, 11],
 }
 
-def groupby_season(
-    data: pd.DataFrame,
-    seasons: dict[str, list[int]] = None,
-    var: str = None,
-):
+MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _decimals_for_step(step: float) -> int:
     """
-    Group dataframe by meteorological season.
+    Smallest number of decimal places that renders `step` exactly (up to
+    float noise) -- so every edge derived from it (lo, lo+step, lo+2*step,
+    ...) can share one fixed precision, rather than each edge
+    independently stripping its own trailing zeros (e.g. step=0.5 giving
+    "0.5-1-1.5-2" instead of "0.5-1.0-1.5-2.0").
+    """
+    step = abs(float(step))
+    if step == 0:
+        return 0
+    for d in range(8):
+        scaled = step * 10**d
+        if abs(scaled - round(scaled)) < 1e-6 * max(1.0, scaled):
+            return d
+    return 8
+
+
+def bin_range_labels(edges, unit: str = "", wrap: float = None, fmt: str = "{:.10g}") -> list[str]:
+    """
+    Format consecutive bin edges as "lo-hiunit" range labels, e.g. "0-2 m"
+    or "30-60°" -- the single labelling convention shared by every
+    range-based (non-categorical) binning in the package, whether the bins
+    come from a plain variable (e.g. Hs) or a cyclic one (direction).
 
     Parameters
     ----------
-    data : pd.DataFrame
-        The data.
-    seasons : dict[str, list[int]], optional
-        Map of season name → list of month numbers.
-        Defaults to DJF / MAM / JJA / SON.
-    var : str, optional
-        If set, return a Series for that column only.
+    edges : array-like
+        Bin edges, length n+1 for n bins (edges[i] and edges[i+1] are the
+        low/high bound of bin i).
+    unit : str, optional
+        Suffix appended after each label, e.g. " m" or "°". Include any
+        separating space yourself; none is added automatically.
+    wrap : float, optional
+        If given (e.g. 360), edges are wrapped with ``% wrap`` before
+        formatting -- for cyclic axes like compass direction.
+    fmt : str, default "{:.10g}"
+        Format spec applied to each edge value.
     """
-    seasons = seasons or DEFAULT_SEASONS
+    edges = np.asarray(edges, dtype=float)
+    los, his = edges[:-1], edges[1:]
+    if wrap is not None:
+        los = los % wrap
+        his = his % wrap
+    return [f"{fmt.format(lo)}-{fmt.format(hi)}{unit}" for lo, hi in zip(los, his)]
 
-    result = {}
-    for name, months in seasons.items():
-        mask = data.index.month.isin(months)
-        grp  = data.loc[mask]
-        result[name] = grp[var] if var else grp
 
+def _empty_grouped_result() -> dict[str, list]:
+    return {k: [] for k in (
+        "data", "label", "left_label", "center_label", "right_label",
+        "left_tick", "center_tick", "right_tick",
+    )}
+
+
+def _append_group(result, data, label, left_label, center_label, right_label,
+                   left_tick, center_tick, right_tick) -> None:
+    result["data"].append(data)
+    result["label"].append(label)
+    result["left_label"].append(left_label)
+    result["center_label"].append(center_label)
+    result["right_label"].append(right_label)
+    result["left_tick"].append(left_tick)
+    result["center_tick"].append(center_tick)
+    result["right_tick"].append(right_tick)
+
+
+def groupby_with_metadata(
+        data: pd.DataFrame,
+        by: str,
+        var: str = None,
+        var_dir: str = None,
+        sectors: int | list[float] = 12,
+        seasons: dict[str, list[int]] = None,
+        step: float = None,
+        observed: bool = False,
+        ) -> dict[str, list]:
+    """
+    The package's single shared grouping primitive -- every class's
+    `_get_groups` (and the EVA/CMA classes' own direct grouping) delegates
+    here. Groups `data` by `by`, returning the groups alongside bin-edge
+    metadata computed directly from the actual bin boundaries used at
+    grouping time -- not reconstructed later by parsing a label string
+    back into numbers, which breaks down for things like direction's
+    wrap-around sector.
+
+    Grouping only ever returns groups and their bin geometry -- never
+    units or Variable metadata, which stay the calling class's job (it
+    knows the Variable; this function never does). Labels are therefore
+    always bare, e.g. "0-2" or "345", not "0-2 m" or "345°".
+
+    Parameters
+    ----------
+    by : {"month", "season", "direction", "year", "week", "day", "hour"}
+        or a column name in `data` (binned by value, step controlled by
+        `step`).
+    var : str, optional
+        Column to pull out of each group. Groups are DataFrames if not given.
+    var_dir, sectors, seasons, step
+        Direction column name/sector count/season map/bin step, used only
+        by the matching `by` value.
+    observed : bool, default False
+        Mirrors pandas' own `groupby(observed=...)`. False (the default)
+        means every category in the bin's full domain is represented,
+        even if empty (empty Series/DataFrame in "data"): all 12 months,
+        all 4 seasons, weeks 1-53, days 1-366, hours 0-23, every sector,
+        every variable bin between the data's min and max. True drops
+        categories with no observations. Consistent across every `by`
+        -- except "year", which has no fixed category domain to begin
+        with: `observed=False` there means every year in
+        [data.index.year.min(), data.index.year.max()], `observed=True`
+        means only years actually present.
+
+    Returns
+    -------
+    dict[str, list], one list per key below, all the same length (one
+    entry per bin, in the same order) -- so a caller picks out only the
+    keys it needs, and more keys can be added later without breaking any
+    existing caller:
+
+    - "data" : the grouped Series/DataFrame for that bin.
+    - "label", "left_label", "center_label", "right_label" : display text.
+    - "left_tick", "center_tick", "right_tick" : float tick positions, or
+      None for a bin with no meaningful numeric position (season). The
+      direction axis's ticks are the *unwrapped* sector edges (e.g. the
+      north sector is -15..15, not the wrapped 345..15) so they stay
+      monotonic across every sector; its labels still show the wrapped,
+      human-readable 0-360 form (e.g. "345").
+    """
+    if by == "month":
+        result = _empty_grouped_result()
+        months = sorted(data.index.month.unique()) if observed else list(range(1, 13))
+        for m in months:
+            mask = data.index.month == m
+            g = data.loc[mask, var] if var else data.loc[mask]
+            label = MONTH_ABBR[m - 1]
+            next_label = MONTH_ABBR[m] if m < 12 else ""
+            _append_group(result, g, label, label, label, next_label,
+                          float(m), m + 0.5, float(m + 1))
+        return result
+
+    if by == "season":
+        result = _empty_grouped_result()
+        for label, months in (seasons or DEFAULT_SEASONS).items():
+            mask = data.index.month.isin(months)
+            g = data.loc[mask, var] if var else data.loc[mask]
+            if observed and len(g) == 0:
+                continue
+            _append_group(result, g, label, label, label, label, None, None, None)
+        return result
+
+    if by == "year":
+        result = _empty_grouped_result()
+        if observed:
+            years = sorted(data.index.year.unique())
+        else:
+            years = range(data.index.year.min(), data.index.year.max() + 1)
+        for y in years:
+            mask = data.index.year == y
+            g = data.loc[mask, var] if var else data.loc[mask]
+            label = str(y)
+            _append_group(result, g, label, label, label, str(y + 1),
+                          float(y), y + 0.5, float(y + 1))
+        return result
+
+    if by == "week":
+        result = _empty_grouped_result()
+        weeks = sorted(data.index.isocalendar().week.unique()) if observed else range(1, 54)
+        for w in weeks:
+            mask = data.index.isocalendar().week == w
+            g = data.loc[mask, var] if var else data.loc[mask]
+            label = str(int(w))
+            _append_group(result, g, label, label, label, str(int(w) + 1),
+                          float(w), w + 0.5, float(w) + 1.0)
+        return result
+
+    if by in ("day", "dayofyear"):
+        result = _empty_grouped_result()
+        days = sorted(data.index.day_of_year.unique()) if observed else range(1, 367)
+        for d in days:
+            mask = data.index.day_of_year == d
+            g = data.loc[mask, var] if var else data.loc[mask]
+            label = str(int(d))
+            _append_group(result, g, label, label, label, str(int(d) + 1),
+                          float(d), d + 0.5, float(d) + 1.0)
+        return result
+
+    if by == "hour":
+        result = _empty_grouped_result()
+        for h in range(24):
+            mask = data.index.hour == h
+            if observed and not mask.any():
+                continue
+            g = data.loc[mask, var] if var else data.loc[mask]
+            label = str(h)
+            _append_group(result, g, label, label, label, str(h + 1),
+                          float(h), h + 0.5, float(h + 1))
+        return result
+
+    if by == "direction":
+        if var_dir is None:
+            raise ValueError("by='direction' requires a direction column (var_dir).")
+        if not hasattr(sectors, "__len__"):
+            sectors = np.linspace(0, 360, sectors + 1, dtype=int)
+        sectors = np.asarray(sectors, dtype=float)
+        dir_offset = (sectors[1] - sectors[0]) / 2
+
+        # Unwrapped edges (e.g. the north sector is -15..15, not the
+        # wrapped 345..15) so ticks stay monotonic across every sector;
+        # labels use the wrapped, human-readable 0-360 form.
+        lo_unwrapped = sectors[:-1] - dir_offset
+        hi_unwrapped = sectors[1:] - dir_offset
+        lo_wrapped = lo_unwrapped % 360
+        hi_wrapped = hi_unwrapped % 360
+        labels = [f"{lo:.0f}-{hi:.0f}" for lo, hi in zip(lo_wrapped, hi_wrapped)]
+
+        bins_col = pd.cut((data[var_dir] + dir_offset) % 360, bins=sectors,
+                           labels=labels, right=False)
+
+        result = _empty_grouped_result()
+        for label, g in data.groupby(bins_col, observed=observed):
+            i = labels.index(str(label))
+            _append_group(
+                result, g[var] if var else g, label,
+                f"{lo_wrapped[i]:.0f}", label, f"{hi_wrapped[i]:.0f}",
+                float(lo_unwrapped[i]), float((lo_unwrapped[i] + hi_unwrapped[i]) / 2),
+                float(hi_unwrapped[i]),
+            )
+        return result
+
+    if by not in data.columns:
+        raise ValueError(
+            "'by' must be one of 'month', 'season', 'direction', 'year', "
+            f"'week', 'day', 'hour', or a column name in `data`. Got '{by}'."
+        )
+
+    s_by  = data[by].dropna()
+    _step = step or infer_step(s_by)
+    edges = bin_edges(s_by, _step)
+    fmt = "{:." + str(_decimals_for_step(_step)) + "f}"
+    labels = bin_range_labels(edges, fmt=fmt)
+    bins_col = pd.cut(data[by], bins=edges, labels=labels, right=False)
+
+    result = _empty_grouped_result()
+    for label, g in data.groupby(bins_col, observed=observed):
+        i = labels.index(str(label))
+        lo, hi = edges[i], edges[i + 1]
+        _append_group(
+            result, g[var] if var else g, label,
+            fmt.format(lo), label, fmt.format(hi),
+            float(lo), float((lo + hi) / 2), float(hi),
+        )
     return result
 
-def groupby_month(
-        data:pd.DataFrame,
-        var:str=None,
-        ) -> dict[str,pd.Series|pd.DataFrame]:
+
+def get_n_axes(n_intervals: int, max_cols: int = 4, sharex=None, sharey=None):
     """
-    Group dataframe by month and return as dictionary.
+    Lay out `n_intervals` panels in a single figure as squarely as
+    possible (up to `max_cols` columns, then widening rows), via one
+    `plt.subplots()` call. Shared by every class that plots one subplot
+    per group (EVA, CMA, ProfileEVA).
 
-    Parameters
-    ----------
-    data : pd.DataFrame
-        The data.
-    var : str
-        If this is set, a dict of Series will be returned. Otherwise, DataFrames are returned.
-        
+    Returns
+    -------
+    (fig, axes) : tuple[plt.Figure, np.ndarray]
+        `axes` is always a flat 1-D array, length nrows*ncols (>= n_intervals).
     """
-    data.index = pd.to_datetime(data.index)
-    return {pd.to_datetime(k,format="%m").month_name()[:3]:g[var] if var else g
-            for k,g in data.groupby(data.index.month,observed=True)}
+    import matplotlib.pyplot as plt
 
-def groupby_sector(
-        data:pd.DataFrame,
-        var_dir:str,
-        sectors:int|list[float]=12,
-        var:str=None
-        ) -> dict[str,pd.Series|pd.DataFrame]:
+    if n_intervals <= 0:
+        raise ValueError(f"n_intervals should be a positive integer, but got {n_intervals}.")
+    elif n_intervals < max_cols**2:
+        table = np.array(
+            [
+                (rows, cols)
+                for cols in range(1, max_cols + 1)
+                for rows in range(1, cols + 1)
+            ]
+        )
+        table = table[np.prod(table, axis=1) >= n_intervals]
+        (nrows, ncols) = table[np.argmin(np.prod(table, axis=1) - n_intervals)]
+    else:
+        nrows = np.ceil(n_intervals / max_cols).astype(int)
+        ncols = max_cols
+
+    fig, axes = plt.subplots(
+        nrows=nrows, ncols=ncols, sharex=sharex, sharey=sharey, squeeze=False
+    )
+    return fig, axes.ravel()
+
+
+def resolve_axes_grid(n_panels: int, ax=None, ncols: int = 3, nfigs: int = 1):
     """
-    Group dataframe by direction sector.
+    Resolve the axes to plot `n_panels` group-subplots on: either validate
+    caller-supplied `ax`, or create one or more new figures via
+    `get_n_axes`, splitting panels evenly across `nfigs` figures when more
+    than one is requested. Shared "one subplot per group, across one or
+    more figures" layout used by EVA/CMA's per-group plot methods.
 
-    Parameters
-    ----------
-    data : pd.DataFrame
-        The data.
-    var_dir : str
-        Column name of the direction variable.
-    sectors : int or list of floats
-        If int, equally-sized sectors are created, with the first centered on north.
-        If a list of floats, the floats define the boundaries of the sectors.
-    var : str
-        If this is set, a dict of Series will be returned. Otherwise, DataFrames are returned.
+    Returns
+    -------
+    (figures, axes) : tuple[np.ndarray, np.ndarray]
+        `figures` is every newly-created Figure (empty if `ax` was
+        supplied -- nothing to adjust() in that case, since the caller
+        owns those figures). `axes` is a flat array of at least
+        `n_panels` Axes.
     """
+    if ax is not None:
+        axes = np.asarray(ax).ravel()
+        figures = np.array([])
+    elif nfigs == 1:
+        fig, axes = get_n_axes(n_panels, max_cols=ncols)
+        figures = np.array([fig])
+    else:
+        base, rem = divmod(n_panels, nfigs)
+        sizes = [base + 1] * rem + [base] * (nfigs - rem)
+        subplots = [get_n_axes(n, max_cols=ncols) for n in sizes]
+        figures = np.array([s[0] for s in subplots])
+        axes = np.concatenate([s[1] for s in subplots])
 
-    data = data.copy()
-
-    if not hasattr(sectors,"__len__"):
-        sectors = np.linspace(0, 360, sectors+1,dtype=int)
-
-    dir_offset = (sectors[1]-sectors[0])/2
-    labels = [f"{(sectors[i]-dir_offset)%360:.0f}-{(sectors[i+1]-dir_offset)%360:.0f}°" for i in range(len(sectors)-1)]
-    data["sector"] = pd.cut((data[var_dir]+dir_offset)%360, bins=sectors, labels=labels, right=False)
-    return {k:g[var] if var else g for k,g in data.groupby("sector",observed=True)}
+    if len(axes) < n_panels:
+        raise ValueError(f"Expected ax to contain {n_panels} axes, got {len(axes)}.")
+    return figures, axes
 
 
 def infer_step(s: pd.Series, target: int = 10) -> float:

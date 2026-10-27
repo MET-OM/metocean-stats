@@ -4,12 +4,11 @@ import typing
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import matplotlib.cm as cm
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
-from ..utils import groupby_month, groupby_season, groupby_sector, bin_edges, infer_step, aggregate_statistics
+from ..utils import aggregate_statistics, groupby_with_metadata
 
 class WeatherWindow:
     """
@@ -725,6 +724,7 @@ class WeatherWindow:
         sectors: int = None,
         seasons: dict = None,
         step: float = None,
+        observed: bool = False,
     ) -> dict[str, pd.Series]:
         """
         Create groupings for statistics aggregation.
@@ -741,6 +741,10 @@ class WeatherWindow:
             Custom season definitions (for by="season").
         step : float, optional
             Bin width for variable grouping (for by=column_name).
+        observed : bool, default False
+            Passed straight through to `groupby_with_metadata`. False
+            means every category of a fixed-domain grouping (month,
+            season, year) is always represented, even if empty.
         
         Returns
         -------
@@ -755,59 +759,35 @@ class WeatherWindow:
         if by == "direction":
             if self.direction is None:
                 raise ValueError("Direction not set. Provide direction parameter to __init__.")
-            
+
             data_clean = self.result[[self.direction, metric]].dropna() if metric else self.result[[self.direction]].dropna()
-            
-            return groupby_sector(
-                data_clean,
-                var_dir=self.direction,
-                sectors=sectors or 12,
-                var=metric
+
+            meta = groupby_with_metadata(
+                data_clean, by="direction", var=metric, var_dir=self.direction,
+                sectors=sectors or 12, observed=observed,
             )
-        
-        # For temporal groupings
-        if metric:
-            data_clean = self.result[[metric]].dropna()
-        else:
-            data_clean = self.result.dropna()
-        
-        if by == "month":
-            return groupby_month(data_clean, var=metric)
-        
-        elif by == "season":
-            return groupby_season(data_clean, seasons=seasons, var=metric)
-        
-        elif by == "year":
-            return {
-                str(y): g[metric] if metric else g
-                for y, g in data_clean.groupby(data_clean.index.year, observed=False)
-            }
-        
-        elif by in self.result.columns:
-            # Group by a variable (e.g., wind speed bins)
-            s_by = self.result[by].dropna()
-            _step = step or infer_step(s_by)
-            edges = bin_edges(s_by, _step)
-            labels = [f"{e:.10g}" for e in edges[:-1]]
-            bins = pd.cut(self.result[by], bins=edges, labels=labels, right=False)
-            
-            if metric:
-                return {
-                    k: g[metric].dropna() 
-                    for k, g in data_clean.groupby(bins, observed=False)
-                }
-            else:
-                return {
-                    k: g.dropna()
-                    for k, g in self.result.groupby(bins, observed=False)
-                }
-        
-        else:
-            raise ValueError(
-                f"'by' must be one of 'month', 'season', 'direction', 'year', "
-                f"or a column name in result. Got '{by}'. "
-                f"Available columns: {list(self.result.columns)}"
+            return {label: (s.dropna() if metric else s)
+                    for label, s in zip(meta["label"], meta["data"])}
+
+        if by in ("month", "season", "year"):
+            meta = groupby_with_metadata(
+                self.result, by=by, var=metric, seasons=seasons, observed=observed,
             )
+            return {label: (s.dropna() if metric else s)
+                    for label, s in zip(meta["label"], meta["data"])}
+
+        if by in self.result.columns:
+            meta = groupby_with_metadata(
+                self.result, by=by, var=metric, step=step, observed=observed,
+            )
+            return {label: (s.dropna() if metric else s)
+                    for label, s in zip(meta["label"], meta["data"])}
+
+        raise ValueError(
+            f"'by' must be one of 'month', 'season', 'direction', 'year', "
+            f"or a column name in result. Got '{by}'. "
+            f"Available columns: {list(self.result.columns)}"
+        )
 
     def _require_direction(self, method_name: str) -> None:
         """Raise a clear error if direction was not provided at initialisation."""
@@ -821,7 +801,7 @@ class WeatherWindow:
         """Return a DatetimeIndex of length n for climatological plotting, anchored to a dummy leap year (2000)."""
         year = 2000  # leap year so day 366 is valid
         if freq in ("h", "hour"):
-            return pd.date_range(f"{year}-01-01", periods=n, freq="h")
+            return pd.date_range(f"{year}-01-01", periods=n, freq=self.timestep)
         elif freq in ("D", "day"):
             return pd.date_range(f"{year}-01-01", periods=n, freq="D")
         elif freq in ("W", "week"):
@@ -894,10 +874,23 @@ class WeatherWindow:
                 "W": "Week",  "week": "Week",
                 "M": "Month", "month": "Month"}
 
+        ts_hours = self.timestep / pd.Timedelta(hours=1)
+        if ts_hours != 1:
+            labels["h"] = labels["hour"] = f"{ts_hours:g}h"
+
         # Maps each freq key to a (period_values, period_level_name) pair
         def _period_index(f):
             if f in ("h", "hour"):
-                return idx.dayofyear * 24 + idx.hour, "hour"
+                if self.timestep >= pd.Timedelta(days=1):
+                    raise ValueError(
+                        f"freq='h' requires sub-daily data, but this "
+                        f"WeatherWindow's timestep is {self.timestep} -- "
+                        "there is no finer-than-a-day resolution to show. "
+                        "Drop 'h' from freqs, or use 'D'/'W'/'M'."
+                    )
+                steps_per_day = int(np.ceil(pd.Timedelta(days=1) / self.timestep))
+                step_of_day = np.floor((idx - idx.normalize()) / self.timestep).astype(int)
+                return idx.dayofyear * steps_per_day + step_of_day, "hour"
             elif f in ("D", "day"):
                 return idx.dayofyear, "dayofyear"
             elif f in ("W", "week"):
@@ -1114,8 +1107,8 @@ class WeatherWindow:
         ax.set_ylabel(f"{metric_labels[metric]} [{unit}]")
         ax.set_xlim(-0.5, n_cats - 0.5)
         ax.set_ylim(bottom=0)
-        ax.set_title(f"{metric_labels[metric]}  ·  grouped by {by}", fontsize=11, pad=10)
-        ax.legend(title="Statistic", fontsize=8, title_fontsize=9)
+        ax.set_title(f"{metric_labels[metric]}  ·  grouped by {by}", pad=10)
+        ax.legend(title="Statistic")
         ax.grid(True, alpha=0.3, axis="both")
 
         # ------------------------------------------------------------------
@@ -1658,11 +1651,14 @@ class WeatherWindow:
                 ))
 
             for t_start, t_end, state in runs:
-                # Re-anchor to dummy year for a common x-axis
+                # Re-anchor to dummy year for a common x-axis. Keeps the full
+                # time-of-day (not just whole hours), so this is correct for
+                # any timestep -- truncating to `t_start.hour` alone silently
+                # snapped every bar edge to the hour for sub-hourly data.
                 x_start = pd.Timestamp(f"{DUMMY_YEAR}-{t_start.month:02d}-{t_start.day:02d}") \
-                          + pd.Timedelta(hours=t_start.hour)
+                          + (t_start - t_start.normalize())
                 x_end   = pd.Timestamp(f"{DUMMY_YEAR}-{t_end.month:02d}-{t_end.day:02d}") \
-                          + pd.Timedelta(hours=t_end.hour)
+                          + (t_end - t_end.normalize())
 
                 # Guard against Dec 31 → Jan 1 wrap-around spilling into next year
                 if x_end < x_start:
@@ -1688,21 +1684,21 @@ class WeatherWindow:
                     ax.text(
                         mdates.date2num(x1) + 3, y,
                         f"{pct:.0f}%",
-                        va="center", ha="left", fontsize=8, color="black",
+                        va="center", ha="left", color="black",
                     )
 
         # ------------------------------------------------------------------
         # Axes formatting
         # ------------------------------------------------------------------
         ax.set_yticks(range(1, n_years + 1))
-        ax.set_yticklabels(reversed(years), fontsize=9)
+        ax.set_yticklabels(reversed(years))
         ax.set_ylim(0.5, n_years + 0.5)
 
         ax.xaxis_date()
         ax.set_xlim(mdates.date2num(x0), mdates.date2num(x1) + (2 if show_pct else 0))
 
         ax.grid(axis="x", color="white", linewidth=0.8, zorder=2)
-        ax.tick_params(axis="x", labelsize=8)
+        ax.tick_params(axis="x")
 
         ax.set_xticks(ax.get_xticks())
         labels = [t.get_text().replace("2000-", "").strip() for t in ax.get_xticklabels()]
@@ -1716,7 +1712,7 @@ class WeatherWindow:
             mpatches.Patch(color=color_closed,  label="Window unavailable"),
             mpatches.Patch(color=color_unknown, label="Unknown"),
         ]
-        ax.legend(handles=legend_patches, loc="lower right", fontsize=8, framealpha=0.9)
+        ax.legend(handles=legend_patches, loc="lower right", framealpha=0.9)
 
         # Overall availability across all plotted years
         data_plotted = self.result[self.result.index.year.isin(years)]["can_start"]
@@ -1726,7 +1722,7 @@ class WeatherWindow:
         ax.set_title(
             "Weather window availability"
             + (f"  ·  overall {overall_pct:.1f}%" if not np.isnan(overall_pct) else ""),
-            fontsize=11, pad=10,
+            pad=10,
         )
 
         plt.tight_layout()
@@ -1807,7 +1803,6 @@ class WeatherWindow:
         self._require_fit()
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
-        import matplotlib.cm as cm
         from matplotlib.lines import Line2D
 
         # ------------------------------------------------------------------
@@ -1872,7 +1867,7 @@ class WeatherWindow:
         # tab10.colors is a plain tuple of 10 (R,G,B) values -- safe to index directly.
         # Index 0 is blue (same family as criteria_color), so we skip it and cycle
         # through the remaining 9 colours: orange, green, red, purple, brown, ...
-        _tab10_non_blue = [c for i, c in enumerate(plt.cm.tab10.colors) if i != 0]
+        _tab10_non_blue = [c for i, c in enumerate(plt.get_cmap("tab10").colors) if i != 0]
         window_colors = [_tab10_non_blue[i % len(_tab10_non_blue)] for i in range(n_windows)]
 
         show_static_thresholds = (n_windows == 0)
@@ -1985,7 +1980,7 @@ class WeatherWindow:
                             threshold_handles.append(l)
                             seen_labels.add(lbl)
                 if threshold_handles:
-                    ax.legend(handles=threshold_handles, fontsize=7, loc="upper right",
+                    ax.legend(handles=threshold_handles, loc="upper right",
                               framealpha=0.8)
 
             # Stepped threshold lines for each submitted window
@@ -2001,7 +1996,7 @@ class WeatherWindow:
                     ax.plot(times_l, vals_l, color=color, linewidth=1.8,
                             linestyle=":", zorder=3)
 
-            ax.set_ylabel(var, fontsize=9)
+            ax.set_ylabel(var)
             ax.grid(True, alpha=0.3)
 
         # ------------------------------------------------------------------
@@ -2021,7 +2016,7 @@ class WeatherWindow:
                         where="pre", zorder=3)
                 ax.set_ylim(-0.05, 1.15)
                 ax.set_yticks([0, 1])
-                ax.set_yticklabels(["No", "Yes"], fontsize=8)
+                ax.set_yticklabels(["No", "Yes"])
             else:
                 scaled = series * scale
                 ax.plot(df.index, scaled, color=criteria_color, linewidth=1, zorder=2)
@@ -2032,29 +2027,21 @@ class WeatherWindow:
             for t, color in zip(parsed_starts, window_colors):
                 ax.axvline(t, color=color, linewidth=1.5, linestyle="--", zorder=4)
 
-            ax.set_ylabel(metric_labels[col], fontsize=9)
+            ax.set_ylabel(metric_labels[col])
             ax.grid(True, alpha=0.3)
 
         # ------------------------------------------------------------------
         # Figure-level title and legend
         #
-        # When windows are provided:
-        #   - title goes top-left (via fig.text so the legend can occupy top-right)
-        #   - a single legend is placed above the figure at the top-right,
-        #     outside all axes, so it never overlaps any subplot
-        # When no windows:
-        #   - title is centred as normal via fig.suptitle
+        # Title goes on the first axes (figure suptitles are not used).
+        # When windows are provided, a single legend is placed above the
+        # figure at the top-right, outside all axes, so it never overlaps
+        # any subplot.
         # ------------------------------------------------------------------
         title_str = f"Weather window diagnostics  {x0.date()} to {x1.date()}"
+        axes[0].set_title(title_str, loc="left")
 
         if n_windows > 0:
-            # Title: top-left in figure coordinates, just above the axes
-            fig.text(
-                0.01, 1.0, title_str,
-                fontsize=11, va="bottom", ha="left",
-                transform=fig.transFigure,
-            )
-
             # Legend: one entry per window, placed top-right outside the axes.
             # We attach it to the figure rather than any single axes so it is
             # truly shared across all subplots and never clips the data.
@@ -2070,16 +2057,12 @@ class WeatherWindow:
             ]
             fig.legend(
                 handles=handles,
-                fontsize=7,
                 loc="lower right",
                 bbox_to_anchor=(1.0, 1.0),
                 bbox_transform=fig.transFigure,
                 title="Submitted windows  (start  |  stage durations)",
-                title_fontsize=7,
                 framealpha=0.9,
             )
-        else:
-            fig.suptitle(title_str, fontsize=11)
 
         plt.tight_layout()
         return axes

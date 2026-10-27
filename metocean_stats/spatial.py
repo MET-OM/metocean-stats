@@ -647,7 +647,7 @@ class Spatial:
     explicitly) and feature resolution are all derived from the data added.
     """
 
-    def __init__(self, projection=None, extent=None, figsize=None, title=None):
+    def __init__(self, projection=None, extent=None, figsize=None, title=None, layout="constrained"):
         self.projection_spec = projection
 
 
@@ -662,6 +662,7 @@ class Spatial:
         self.extent = extent
         self.figsize = figsize
         self.title = title
+        self.layout = layout
 
         self._layers = []
         self.artists = []
@@ -756,7 +757,7 @@ class Spatial:
             # are added, instead of using fixed subplot margins.
             self.fig, self.ax = plt.subplots(
                 figsize=self.figsize, subplot_kw={"projection": proj},
-                layout="constrained",
+                layout=self.layout,
             )
 
             projected_extent = _tight_projected_extent(proj, sample_lons, sample_lats)

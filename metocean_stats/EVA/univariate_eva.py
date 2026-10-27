@@ -1,4 +1,5 @@
 import copy
+import logging
 import warnings
 import typing
 
@@ -11,7 +12,11 @@ import pyextremes as pyex
 
 from tqdm import tqdm
 
-from ..utils import groupby_month, groupby_sector
+from ..utils import groupby_with_metadata, get_n_axes, resolve_axes_grid
+
+# pyextremes logs an INFO message on every EVA(...) call ("successfully
+# initialized EVA object"); silence it since we create many per fit.
+logging.getLogger("pyextremes").setLevel(logging.WARNING)
 
 def _dist_name_map(dist,abbreviate=True):
     """
@@ -47,26 +52,6 @@ def _dist_fit_method(dist,extreme_method):
     if extreme_method == "POT" and dist == "expon": return "Lmoments"
     return "MLE"
 
-def _get_n_axes(n_intervals, max_cols=4):
-    if n_intervals <= 0:
-        raise ValueError(f"n_intervals should be a positive integer, but got {n_intervals}.")
-    elif n_intervals < max_cols**2:
-        table = np.array(
-            [
-                (rows, cols)
-                for cols in range(1, max_cols + 1)
-                for rows in range(1, cols + 1)
-            ]
-        )
-        table = table[np.prod(table, axis=1) >= n_intervals]
-        (nrows, ncols) = table[np.argmin(np.prod(table, axis=1) - n_intervals)]
-    else:
-        nrows = np.ceil(n_intervals / max_cols).astype(int)
-        ncols = max_cols
-
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=False, sharey=False, squeeze=False)
-    return fig, axes.ravel()
-
 class UnivariateEVA:
     data_omni:pd.Series
     data_monthly:dict[str,pd.Series]
@@ -84,6 +69,7 @@ class UnivariateEVA:
                  var_unit:str=None,
                  sectors:int=12,
                  dist_name_map:callable=_dist_name_map,
+                 poisson_correction:bool=True,
                  ):
         """
         Initialize extreme value analysis module.
@@ -109,6 +95,16 @@ class UnivariateEVA:
             `var`, and "" respectively if not given.
         sectors : int, default 12
             Number of directional sectors. Ignored if var_dir is None.
+        poisson_correction : bool, default True
+            Whether return values (AM, POT, and IDM alike) are computed
+            under the Poisson-process interpretation of "return period"
+            (see `_poisson_exceedance_probability`) rather than the naive
+            "expected count of exceedances = 1" definition, which becomes
+            >= 1 (and therefore meaningless) whenever the requested return
+            period isn't large relative to the model's own candidate-event
+            rate -- e.g. any return period close to 1 year for AM, whose
+            rate is always ~1/year. Default for every return-value method
+            on this instance; overridable per call.
         """
 
         # Semantics (fall back to sensible defaults so direct construction
@@ -119,6 +115,7 @@ class UnivariateEVA:
         self.var_symbol = var_symbol if var_symbol is not None else var
         self.var_unit = var_unit if var_unit is not None else ""
         self.dist_name_map = dist_name_map
+        self.poisson_correction = poisson_correction
 
         # Direction is optional - sector-based analysis is only
         # available when a direction column is supplied.
@@ -133,16 +130,18 @@ class UnivariateEVA:
         # labels = [f"{(bins[i]-dir_offset)%360:.0f}-{(bins[i+1]-dir_offset)%360:.0f}°" for i in range(sectors)]
         # data["sector"] = pd.cut((data[var_dir]+dir_offset)%360, bins=bins, labels=labels, right=False)
 
-        # Group the data
+        # Group the data. observed=True: a month/sector with zero
+        # observations can't fit an EVA model, so it's dropped rather
+        # than kept as an empty group.
         self.data_omni = data[var]
-        self.data_monthly = groupby_month(data,var=var)
+        month_meta = groupby_with_metadata(data, by="month", var=var, observed=True)
+        self.data_monthly = dict(zip(month_meta["label"], month_meta["data"]))
         if self._has_direction:
-            self.data_sectors = groupby_sector(
-                data,
-                var_dir=var_dir,
-                sectors=sectors,
-                var=var
+            sector_meta = groupby_with_metadata(
+                data, by="direction", var=var, var_dir=var_dir, sectors=sectors,
+                observed=True,
                 )
+            self.data_sectors = dict(zip(sector_meta["label"], sector_meta["data"]))
         else:
             self.data_sectors = {}
 
@@ -164,10 +163,54 @@ class UnivariateEVA:
                 "groupings remain fully available."
             )
 
-    def _poisson_correction(self,T,method = None):
-        T = np.array(T)
-        if method not in ["AM","BM"]: return T
-        return 1/(1-np.exp(-(1/T)))
+    def _poisson_exceedance_probability(self, return_period, rate, poisson_correction=None):
+        """
+        Per-candidate exceedance probability for a given nominal return
+        period `return_period` (years) and candidate-event rate `rate`
+        (candidates/year) -- e.g. ~1/year for AM (exactly one candidate,
+        the block maximum, per year), or the empirical/duration-derived
+        rate of threshold exceedances for POT/IDM.
+
+        Two definitions, both ultimately requiring "P(exceed x_T within
+        `return_period` years) is governed by rate `1/return_period`":
+
+        - Naive (poisson_correction=False): expected count of exceedances
+          of x_T within `return_period` years is exactly 1, i.e.
+          ``rate * return_period * P(single candidate > x_T) = 1``, so
+          ``P(single candidate > x_T) = 1/(return_period*rate)``. Breaks
+          down (gives a probability >= 1, and therefore an undefined,
+          typically -inf, return value) whenever ``return_period*rate``
+          is not comfortably above 1.
+        - Poisson (poisson_correction=True, default): per Wikipedia's
+          "return period" article, treat exceedances of x_T as a Poisson
+          process with rate ``mu = 1/return_period``; the probability of
+          at least one exceedance within a 1-year window is then
+          ``1 - exp(-mu) = 1 - exp(-1/return_period)``. Equating this to
+          the probability that at least one of the ``rate`` candidates in
+          that year exceeds x_T (``1 - (1-p)**rate ~= 1 - exp(-rate*p)``
+          for the small ``p`` relevant here) gives
+          ``P(single candidate > x_T) = 1 - exp(-1/(return_period*rate))``.
+          Always a valid probability in (0, 1), and converges to the
+          naive definition as ``return_period*rate`` grows (see the
+          class docstring / Notes for example values), so in practice it
+          only matters when requesting a short return period relative to
+          the candidate rate (as is routinely the case for AM, whose
+          rate is always ~1/year).
+
+        Parameters
+        ----------
+        return_period : array-like
+            Nominal return period(s), in years.
+        rate : float
+            Candidate-event rate, in candidates/year.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        """
+        poisson_correction = self.poisson_correction if poisson_correction is None else poisson_correction
+        rt = np.asarray(return_period, dtype=np.float64) * rate
+        if poisson_correction:
+            return 1 - np.exp(-1 / rt)
+        return 1 / rt
 
     def _extremes_rate_from_duration(self,duration,return_period_size="365.2425D"):
 
@@ -176,12 +219,24 @@ class UnivariateEVA:
         return return_period_size / duration
 
     def _get_return_value(self,model,return_period,return_period_size="365.2425D",
-                           duration=None,exposure_fraction=1.0,alpha=None,**kwargs):
+                           duration=None,exposure_fraction=1.0,poisson_correction=None,alpha=None,**kwargs):
+        """
+        Return value(s) for `model` at the requested nominal `return_period`
+        (years), computed from the model's own fitted distribution via its
+        candidate-event exceedance probability -- applied identically
+        whether `model` is AM(BM), POT, or IDM (all reduce, at this level,
+        to "invert my fitted distribution at this exceedance probability");
+        only how that probability maps from `return_period` differs, via
+        each model's own candidate rate -- see `_poisson_exceedance_probability`.
 
-        if duration is None:
-            return model.get_return_value(return_period,return_period_size,alpha=alpha,**kwargs)
-
-        if model.extremes_method != "POT":
+        duration : str or pandas.Timedelta, optional
+            Explicit "duration of event", used to override the empirical
+            candidate rate with a physically-derived one (only valid for
+            POT-based models, since AM's rate is fixed by block_size).
+            When None (default), the candidate rate is the model's own
+            empirical rate: `len(model.extremes) / self.N_years`.
+        """
+        if duration is not None and model.extremes_method != "POT":
             raise ValueError(
                 "duration override is only valid for POT-based models (this "
                 "includes IDM, which is fit via the POT backend); got "
@@ -190,9 +245,10 @@ class UnivariateEVA:
                 "must be left as None for AM models."
             )
 
-        return_period_size = pd.to_timedelta(return_period_size)
-        full_year_extremes_rate = self._extremes_rate_from_duration(duration,return_period_size)
-        extremes_rate = full_year_extremes_rate*exposure_fraction
+        if duration is not None:
+            extremes_rate = self._extremes_rate_from_duration(duration,return_period_size) * exposure_fraction
+        else:
+            extremes_rate = len(model.extremes) / self.N_years
 
         return_period = np.asarray(return_period,dtype=np.float64).copy()
         if return_period.ndim == 0:
@@ -203,7 +259,9 @@ class UnivariateEVA:
                 f"argument, must be a scalar or 1D array"
             )
 
-        exceedance_probability = 1/return_period/extremes_rate
+        exceedance_probability = self._poisson_exceedance_probability(
+            return_period, extremes_rate, poisson_correction
+        )
 
         return tuple(
             model.extremes_transformer.transform(value)
@@ -447,6 +505,7 @@ class UnivariateEVA:
             return_period_size:str="365.2425D",
             duration_POT=None,
             duration_IDM=None,
+            poisson_correction=None,
             ax = None,
             scatter_kwargs_AM  = {},
             scatter_kwargs_POT = {},
@@ -466,6 +525,9 @@ class UnivariateEVA:
             empirical historical spacing between peaks, unchanged from
             before). Has no effect on AM curves/values, which are always
             governed by block_size.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given. See
+            `_poisson_exceedance_probability`.
         """
 
         # Input checks
@@ -504,7 +566,6 @@ class UnivariateEVA:
         models_AM = {k:v for k,v in models.items() if k[0]=="AM"}
         models_POT = {k:v for k,v in models.items() if k[0]=="POT"}
         models_IDM = {k:v for k,v in models.items() if k[0]=="IDM"}
-        corrected_return_periods = self._poisson_correction(return_periods,method="AM")
         RVE = {}
 
         # Iterate AM
@@ -520,10 +581,12 @@ class UnivariateEVA:
                 legend.append(f"AM, N={N_extremes_AM}")
                 smallest_extreme = np.minimum(smallest_extreme,model.extremes.min())
                 
-            plot_rv = model.get_return_value(plot_rp,return_period_size)[0]
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    poisson_correction=poisson_correction)[0]
             ax.plot(plot_rp,plot_rv,c=colors_am[i],
                     linestyle=plot_kwargs_AM["linestyle"])
-            RVE[(method,dist)] = model.get_return_value(corrected_return_periods,return_period_size)[0]
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    poisson_correction=poisson_correction)[0]
             legend.append(f"{self.dist_name_map(dist)}")
 
         for i in range(legend_fill[0]):
@@ -543,11 +606,13 @@ class UnivariateEVA:
                 smallest_extreme = np.minimum(smallest_extreme,model.extremes.min())
                 
             plot_rv = self._get_return_value(model,plot_rp,return_period_size,
-                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni))[0]
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
             ax.plot(plot_rp,plot_rv,c=colors_pot[i],
                     linestyle=plot_kwargs_POT["linestyle"])
             RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
-                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni))[0]
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
             legend.append(f"{self.dist_name_map(dist)}")
 
         for i in range(legend_fill[1]):
@@ -569,11 +634,13 @@ class UnivariateEVA:
                     smallest_extreme = model.extremes.min()
                 
             plot_rv = self._get_return_value(model,plot_rp,return_period_size,
-                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni))[0]
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
             ax.plot(plot_rp,plot_rv,c=colors_idm[i],
                     linestyle=plot_kwargs_IDM["linestyle"])
             RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
-                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni))[0]
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
             legend.append(f"{self.dist_name_map(dist)}")
 
         for i in range(legend_fill[2]):
@@ -612,8 +679,8 @@ class UnivariateEVA:
             grouping:typing.Literal["omni","sectors","monthly"],
             return_periods:list[float],
             ax: plt.Axes | list[plt.Axes] = None,
-            subplot_columns = None,
-            subplot_figures = 1,
+            ncols = 3,
+            nfigs = 1,
             **kwargs,
             ):
         """
@@ -626,9 +693,9 @@ class UnivariateEVA:
             List of return periods, in years.
         ax : matplotlib axes or list of axes
             Axes to plot on. Must correspond to the number of models.
-        subplot_columns : int
-            Only used if axes are not provided. Sets ncols in subplots.
-        subplot_figures : int
+        ncols : int
+            Only used if axes are not provided. Number of subplot columns.
+        nfigs : int
             Only used if axes are not provided. Option to divide plots over several figures.
         kwargs : keyword arguments passed to the return value plots:
          - duration_POT (str or pandas.Timedelta): Explicit duration of event
@@ -645,6 +712,8 @@ class UnivariateEVA:
          - plot_kwargs_IDM (dict): Keyword arguments passed to IDM-based distributions.
          - table_kwargs (dict): Keyword arguments passed to matplotlib Table (if used).
          - legend_kwargs (dict): Keyword arguments passed to matplotlib legend.
+         - poisson_correction (bool): Defaults to `self.poisson_correction` if not
+           given. See `_poisson_exceedance_probability`.
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
@@ -676,23 +745,7 @@ class UnivariateEVA:
             raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
 
         N_plots = len(models)
-        if ax is None:
-            if subplot_figures == 1:
-                if subplot_columns is None: subplot_columns = 3
-                fig,ax = _get_n_axes(N_plots,max_cols = subplot_columns)
-                figures = np.array([fig])
-            else:
-                if subplot_columns is None: subplot_columns = 2
-                base = N_plots // subplot_figures
-                rem = N_plots % subplot_figures
-                subplots = [base+1]*rem + [base]*(subplot_figures-rem)
-                subplots = [_get_n_axes(n,max_cols=subplot_columns) for n in subplots]
-                figures = np.array([s[0] for s in subplots])
-                ax = np.concat([s[1] for s in subplots])
-        else:
-            ax = np.array(ax).ravel()
-            if len(ax) < N_plots:
-                raise ValueError(f"Expected ax to contain {N_plots} axes, got {len(ax)}.")
+        figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
         for i,(subset,subset_models) in enumerate(models.items()):
             self._subplot_return_value_comparison(subset_models,return_periods,**kwargs,ax=ax[i])
             ax[i].set_title(f"{subset}",y=titlepos)
@@ -709,6 +762,7 @@ class UnivariateEVA:
             return_periods:list[float],
             return_period_size:str="365.2425D",
             duration=None,
+            poisson_correction=None,
             alphas:float|list[float]=[0.99,0.9],
             samples=300,
             cmap="viridis",
@@ -723,14 +777,16 @@ class UnivariateEVA:
             extremes rate (default=None, i.e. unchanged empirical
             behavior). Only valid when method is "POT" or "IDM"; must be
             left as None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given. See
+            `_poisson_exceedance_probability`.
         """
         if not hasattr(alphas,"__len__"): alphas = [alphas]
         alphas = np.sort(alphas)
-        corrected_rp = self._poisson_correction(return_periods,method)
 
         # Semantics
         if ax is None: fig,ax = plt.subplots()
-        plot_rp = np.power(10.,np.linspace(-1,np.log10(np.max(corrected_rp))*1.1,100))
+        plot_rp = np.power(10.,np.linspace(-1,np.log10(np.max(return_periods))*1.1,100))
         if not isinstance(cmap,mcolors.Colormap): cmap = plt.get_cmap(cmap)
         colors = cmap(np.linspace(0,1,len(alphas)+1))
 
@@ -741,6 +797,7 @@ class UnivariateEVA:
         for i,alpha in enumerate(alphas):
             rv,cl,cu = self._get_return_value(model,plot_rp,return_period_size,duration=duration,
                                                exposure_fraction=exposure_fraction,
+                                               poisson_correction=poisson_correction,
                                                alpha=alpha,n_samples=samples)
             if i == 0:
                 extremes_method = "BM" if method=="AM" else "POT"
@@ -752,8 +809,9 @@ class UnivariateEVA:
             ax.plot(plot_rp,cu,c=colors[i+1])
             ax.plot(plot_rp,cl,c=colors[i+1],label="_nolegend_")
             
-            rv,cl,cu = self._get_return_value(model,corrected_rp,return_period_size,duration=duration,
+            rv,cl,cu = self._get_return_value(model,return_periods,return_period_size,duration=duration,
                                                exposure_fraction=exposure_fraction,
+                                               poisson_correction=poisson_correction,
                                                alpha=alpha,n_samples=samples)
             exceedance = 1-alpha
             table[(100*(exceedance)/2)] = cl
@@ -792,9 +850,10 @@ class UnivariateEVA:
             dist:str,
             return_periods:list[float],
             ax:plt.Axes | list[plt.Axes] = None,
-            subplot_columns = None,
-            subplot_figures = 1,
+            ncols = 3,
+            nfigs = 1,
             duration=None,
+            poisson_correction=None,
             alphas = [0.99,0.9],
             cmap = "viridis",
             table_scale = 0.07,
@@ -807,6 +866,9 @@ class UnivariateEVA:
             extremes rate (default=None, i.e. unchanged empirical
             behavior). Only valid when method is "POT" or "IDM"; must be
             left as None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given. See
+            `_poisson_exceedance_probability`.
         """
 
         if not self._fitted_models:
@@ -826,7 +888,8 @@ class UnivariateEVA:
                 raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
             model = self.models_omni[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,duration=duration,alphas=alphas,samples=samples,
+                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                alphas=alphas,samples=samples,
                 cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax)
             ax.set_title("Omni",y=titlepos)
             return ax
@@ -839,28 +902,13 @@ class UnivariateEVA:
             raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
 
         N_plots = len(models)
-        if ax is None:
-            if subplot_figures == 1:
-                if subplot_columns is None: subplot_columns = 3
-                fig,ax = _get_n_axes(N_plots,max_cols = subplot_columns)
-                figures = np.array([fig])
-            else:
-                if subplot_columns is None: subplot_columns = 2
-                base = N_plots // subplot_figures
-                rem = N_plots % subplot_figures
-                subplots = [base+1]*rem + [base]*(subplot_figures-rem)
-                subplots = [_get_n_axes(n,max_cols=subplot_columns) for n in subplots]
-                figures = np.array([s[0] for s in subplots])
-                ax = np.concat([s[1] for s in subplots])
-        else:
-            ax = np.array(ax).ravel()
-            if len(ax) < N_plots:
-                raise ValueError(f"Expected ax to contain {N_plots} axes, got {len(ax)}.")
+        figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
 
         for i,(subset,subset_models) in enumerate(models.items()):
             model = subset_models[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,duration=duration,alphas=alphas,samples=samples,
+                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                alphas=alphas,samples=samples,
                 cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax[i])
             ax[i].set_title(f"{subset}",y=titlepos)
 
@@ -925,6 +973,7 @@ class UnivariateEVA:
             return_periods:list[float],
             return_period_size:str="365.2425D",
             duration=None,
+            poisson_correction=None,
             ):
         """
         Table of return values for a given distribution.
@@ -937,6 +986,9 @@ class UnivariateEVA:
             POT/IDM extremes rate (default=None, i.e. unchanged empirical
             behavior). Only valid when method is "POT" or "IDM"; must be
             left as None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given. See
+            `_poisson_exceedance_probability`.
         """
         
         if not self._fitted_models:
@@ -958,9 +1010,10 @@ class UnivariateEVA:
             model = subset_models[(method,self.dist_name_map(dist,False))]
             RVE[subset] = {f"{rp}-year":self._get_return_value(
                 model,
-                self._poisson_correction(rp,method),
+                rp,
                 return_period_size=return_period_size,
                 duration=duration,
+                poisson_correction=poisson_correction,
                 exposure_fraction=len(model.data)/len(self.data_omni))[0]
                 for rp in return_periods}
         
@@ -982,6 +1035,7 @@ class UnivariateEVA:
             dist:str,
             return_periods:list[float],
             duration=None,
+            poisson_correction=None,
             plot_kwargs = {},
             table_kwargs = {},
             ):
@@ -996,11 +1050,15 @@ class UnivariateEVA:
             POT/IDM extremes rate (default=None, i.e. unchanged empirical
             behavior). Only valid when method is "POT" or "IDM"; must be
             left as None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given. See
+            `_poisson_exceedance_probability`.
         """
         if grouping == "sectors":
             self._require_direction("plot_return_values_final(grouping='sectors')")
 
-        table = self.table_return_values_final(grouping,method,dist,return_periods,duration=duration)
+        table = self.table_return_values_final(grouping,method,dist,return_periods,duration=duration,
+                                                poisson_correction=poisson_correction)
         if grouping == "monthly": N = 12
         else: N = len(self.models_sectors)
         table = table[:N]

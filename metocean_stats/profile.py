@@ -96,9 +96,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .utils import groupby_month, groupby_season, groupby_sector, aggregate_statistics, dirmag_to_uv, uv_to_dirmag, infer_step, _extend_xlim_to_zero, _extend_ylim_to_zero
+from .utils import aggregate_statistics, dirmag_to_uv, uv_to_dirmag, infer_step, _extend_xlim_to_zero, _extend_ylim_to_zero, groupby_with_metadata, get_n_axes
 from .EVA import UnivariateEVA
-from .plots import plot_rose
+from .plotting import plot_rose
 
 # ---------------------------------------------------------------------------
 # Signature buckets, expressed structurally (roles, not names) since there
@@ -119,7 +119,7 @@ _SIGNATURE_LABELS = {
 # Variable -- shared metadata container, matching TimeSeries.Variable so the
 # two modules present the same interface for describing a column/variable.
 # ---------------------------------------------------------------------------
-from .timeseries import Variable
+from .timeseries import Variable, TimeSeries
 
 def _coerce_variable(v: "Variable | str") -> "Variable":
     """
@@ -320,17 +320,17 @@ class ProfileTimeSeries:
         self.level_convention = level_convention
         self.name = name
 
-        title = f"ProfileTimeSeries: {name}" if name else "ProfileTimeSeries"
-        print(title)
-        print("=" * len(title))
-
         # ------------------------------------------------------------------ #
         # 1. Squeeze -- drop any length-1 dimension entirely.                #
         # ------------------------------------------------------------------ #
         squeezed_dims = [d for d, n in ds.sizes.items() if n == 1]
         if squeezed_dims:
             ds = ds.squeeze(dim=squeezed_dims, drop=False)
-            print(f"Squeezed length-1 dimension(s): {squeezed_dims}")
+            warnings.warn(
+                f"Squeezed length-1 dimension(s): {squeezed_dims}.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         # ------------------------------------------------------------------ #
         # 2. Dimensionality check -- no variable may exceed 2 dims.          #
@@ -455,15 +455,6 @@ class ProfileTimeSeries:
         # EVA.get_extremes()/.fit() is called for a given level.            #
         # ------------------------------------------------------------------ #
         self.EVA = ProfileEVA(self, primary.col)
-
-        print()
-        self._print_variable_table()
-        print(f"\nlevel_convention : {self.level_convention}")
-        print(f"time_dim         : '{self.time_dim}'")
-        print(f"level_dim(s)     : {self.level_dims}")
-        print(f"primary          : '{self.primary.col}'")
-        if self.direction is not None:
-            print(f"direction        : '{self.direction.col}'")
 
     # ---------------------------------------------------------------------- #
     # Init helpers
@@ -743,8 +734,12 @@ class ProfileTimeSeries:
 
         if updates:
             ds = ds.assign_coords(updates)
-            for dim, vals in updates.items():
-                print(f"  '{dim}' level values normalized to positive magnitude")
+            for dim in updates:
+                warnings.warn(
+                    f"'{dim}' level values normalized to positive magnitude.",
+                    UserWarning,
+                    stacklevel=3,
+                )
 
         return ds
 
@@ -824,7 +819,7 @@ class ProfileTimeSeries:
             return "static variable"
         return "—"
 
-    def _print_variable_table(self) -> None:
+    def _variable_table_str(self) -> str:
         headers = ["variable", "kind", "name", "units", "dims"]
         rows = []
         for var_name, da in self.ds.data_vars.items():
@@ -844,10 +839,21 @@ class ProfileTimeSeries:
         def fmt_row(cells: list[str]) -> str:
             return "".join(f"{c:<{widths[i]}}" for i, c in enumerate(cells))
 
-        print(fmt_row(headers))
-        print("-" * sum(widths))
-        for row in rows:
-            print(fmt_row(row))
+        lines = [fmt_row(headers), "-" * sum(widths)]
+        lines += [fmt_row(row) for row in rows]
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        title = f"ProfileTimeSeries: {self.name}" if self.name else "ProfileTimeSeries"
+        lines = [title, "=" * len(title), ""]
+        lines.append(self._variable_table_str())
+        lines.append(f"\nlevel_convention : {self.level_convention}")
+        lines.append(f"time_dim         : '{self.time_dim}'")
+        lines.append(f"level_dim(s)     : {self.level_dims}")
+        lines.append(f"primary          : '{self.primary.col}'")
+        if self.direction is not None:
+            lines.append(f"direction        : '{self.direction.col}'")
+        return "\n".join(lines)
 
     # ---------------------------------------------------------------------- #
     # Properties
@@ -919,9 +925,8 @@ class ProfileTimeSeries:
         """
         Convert a (time, level_dim) profile variable into a plain
         time-indexed pd.DataFrame with one column per level, so the
-        pandas-based groupby_month / groupby_season / groupby_sector
-        utilities can be applied directly without reimplementing their
-        logic for xarray.
+        shared `groupby_with_metadata` utility can be applied directly
+        without reimplementing its logic for xarray.
         """
         da = self.ds[var].transpose(self.time_dim, level_dim)
         df = pd.DataFrame(
@@ -1039,10 +1044,10 @@ class ProfileTimeSeries:
         """
         Build named groups of `var` (as a time-indexed DataFrame, one
         column per level) according to `by`, using the shared
-        groupby_month / groupby_season / groupby_sector utilities
-        directly -- not a reimplementation, so grouping conventions
-        (month labels, season->month map, sector edges/centering/labels)
-        always stay in sync with the rest of the package.
+        `groupby_with_metadata` primitive directly -- not a
+        reimplementation, so grouping conventions (month labels,
+        season->month map, sector edges/centering/labels) always stay in
+        sync with the rest of the package.
         """
         df = self._profile_var_as_dataframe(var, level_dim)
 
@@ -1058,40 +1063,33 @@ class ProfileTimeSeries:
                     "the same level dimension as the variable being "
                     "grouped."
                 )
-            # groupby_sector groups by ONE direction column against a
-            # whole DataFrame. Since direction here is itself a profile
+            # groupby_with_metadata groups by ONE direction column against
+            # a whole DataFrame. Since direction here is itself a profile
             # variable (one value per level, not one shared value), each
             # level must be grouped by *its own* direction column -- so
-            # we call groupby_sector once per level and stitch the
-            # per-level Series back into per-sector DataFrames.
+            # we call it once per level and stitch the per-level Series
+            # back into per-sector DataFrames. observed=False (the
+            # default) keeps the same fixed sector set for every level,
+            # so no union-of-observed-labels bookkeeping is needed here.
             dir_df = self._profile_var_as_dataframe(dir_var, level_dim)
-            per_level_groups: dict[str, dict] = {}
+            per_level_meta: dict[str, dict] = {}
             for level in df.columns:
                 merged = pd.DataFrame({"value": df[level], "dir": dir_df[level]}).dropna()
-                sector_groups = groupby_sector(
-                    merged, var_dir="dir", sectors=sectors, var="value"
+                per_level_meta[level] = groupby_with_metadata(
+                    merged, by="direction", var="value", var_dir="dir", sectors=sectors,
                 )
-                per_level_groups[level] = sector_groups
 
-            all_labels = sorted({
-                label for lg in per_level_groups.values() for label in lg
-            })
+            labels = per_level_meta[df.columns[0]]["label"] if len(df.columns) else []
             groups = {}
-            for label in all_labels:
+            for i, label in enumerate(labels):
                 groups[label] = pd.DataFrame({
-                    level: per_level_groups[level].get(label, pd.Series(dtype=float))
-                    for level in df.columns
+                    level: per_level_meta[level]["data"][i] for level in df.columns
                 })
             return groups
 
-        if by == "month":
-            return groupby_month(df)
-
-        if by == "season":
-            return groupby_season(df, seasons=seasons)
-
-        if by == "year":
-            return {str(y): g for y, g in df.groupby(df.index.year)}
+        if by in ("month", "season", "year"):
+            meta = groupby_with_metadata(df, by=by, seasons=seasons)
+            return dict(zip(meta["label"], meta["data"]))
 
         raise ValueError(
             f"'by' must be one of 'month', 'season', 'direction', 'year'. "
@@ -1130,10 +1128,10 @@ class ProfileTimeSeries:
             method once per statistic instead.
 
         Grouping and aggregation are delegated to the shared
-        groupby_month / groupby_season / groupby_sector /
-        aggregate_statistics utilities (the same ones TimeSeries uses),
-        so conventions and accepted stat-name spellings ("mean", "p90",
-        "P90", "90%", ...) are identical across the package.
+        `groupby_with_metadata` / `aggregate_statistics` utilities (the
+        same ones TimeSeries uses), so conventions and accepted
+        stat-name spellings ("mean", "p90", "P90", "90%", ...) are
+        identical across the package.
 
         Parameters
         ----------
@@ -1351,7 +1349,9 @@ class ProfileTimeSeries:
         direction: str | None = None,
         sectors: int | list[float] = 12,
         seasons: dict[str, list[int]] | None = None,
-        subplot_columns: int | None = None,
+        levels: list[float] | None = None,
+        interp: str = "nearest",
+        ncols: int = 3,
         plot_kwargs: dict | None = None,
         ax: "np.ndarray[plt.Axes] | None" = None,
     ) -> "np.ndarray[plt.Axes]":
@@ -1404,7 +1404,7 @@ class ProfileTimeSeries:
         seasons : dict[str, list[int]], optional
             Custom season map. Only used when by="season". Passed
             straight through to `statistics()`.
-        subplot_columns : int, optional
+        ncols : int, optional
             Max columns in the subplot grid, when by != "all". Defaults
             to 3, matching `plot_return_values`'s default. Unused for
             by="all" (always a single Axes).
@@ -1441,7 +1441,7 @@ class ProfileTimeSeries:
         # by="all": single Axes, one line per stat -- unchanged behaviour.#
         # --------------------------------------------------------------- #
         if by == "all":
-            table = self.statistics(var=var, by="all", stat=stats)
+            table = self.statistics(var=var, by="all", stat=stats, levels=levels, interp=interp)
 
             if ax is None:
                 _, ax = plt.subplots()
@@ -1479,7 +1479,7 @@ class ProfileTimeSeries:
         tables = {
             s: self.statistics(
                 var=var, by=by, stat=s, direction=direction,
-                sectors=sectors, seasons=seasons,
+                sectors=sectors, seasons=seasons, levels=levels, interp=interp,
             ).drop(columns="All", errors="ignore")
             for s in stats
         }
@@ -1488,7 +1488,7 @@ class ProfileTimeSeries:
         columns = list(first_table.columns)
 
         if by == "direction":
-            # groupby_sector labels sort alphabetically as plain strings
+            # Direction labels sort alphabetically as plain strings
             # ("112-158°" < "22-68°") -- reorder by each sector's starting
             # compass angle so subplots progress sensibly, rather than
             # re-sorting arbitrarily. Applied consistently to every stat's
@@ -1499,9 +1499,7 @@ class ProfileTimeSeries:
 
         owns_figure = ax is None
         if ax is None:
-            if subplot_columns is None:
-                subplot_columns = 3
-            fig, ax_arr = _get_n_axes(len(columns), max_cols=subplot_columns)
+            fig, ax_arr = get_n_axes(len(columns), max_cols=ncols)
         else:
             fig = None
             ax_arr = np.array(ax).ravel()
@@ -1575,7 +1573,7 @@ class ProfileTimeSeries:
         mag_max: float = None,
         cmap: str = "viridis",
         calm_threshold: float = 0.0,
-        subplot_columns: int | None = None,
+        ncols: int = 3,
         rose_kwargs: dict | None = None,
         ax: "np.ndarray[plt.Axes] | None" = None,
     ) -> "np.ndarray[plt.Axes]":
@@ -1631,7 +1629,7 @@ class ProfileTimeSeries:
             legend.
         calm_threshold : float, default 0.0
             Observations at or below this value are counted as calm.
-        subplot_columns : int, optional
+        ncols : int, optional
             Max columns in the subplot grid. Defaults to 3, matching
             `plot_return_values`'s default.
         rose_kwargs : dict, optional
@@ -1754,10 +1752,8 @@ class ProfileTimeSeries:
         # ------------------------------------------------------------------ #
         owns_figure = ax is None
         if owns_figure:
-            if subplot_columns is None:
-                subplot_columns = 3
             n = len(resolved_levels)
-            ncols = min(subplot_columns, n)
+            ncols = min(ncols, n)
             nrows = int(np.ceil(n / ncols))
             fig, ax_arr = plt.subplots(
                 nrows, ncols,
@@ -1813,39 +1809,148 @@ class ProfileTimeSeries:
 
         return ax_arr
 
-def _get_n_axes(n_intervals: int, max_cols: int = 4, sharex=None, sharey=None):
-    """
-    Same subplot-grid layout UnivariateEVA uses for its per-group plots
-    (plot_return_value_comparison, plot_return_value_confidence) --
-    duplicated here rather than imported, since it's a small, dependency-
-    free helper and ProfileEVA's plot_return_values uses the identical
-    "one subplot per group, laid out as squarely as possible" logic for
-    its per-month/per-sector subplots.
-    """
-    import matplotlib.pyplot as plt
+    def to_timeseries(
+        self,
+        level: float,
+        interp: str = "nearest",
+        primary: str | None = None,
+        direction: str | None = None,
+        secondary: list[str] | None = None,
+        sectors: int = 12,
+    ) -> "TimeSeries":
+        """
+        Export one level of this profile as a `TimeSeries`.
 
-    if n_intervals <= 0:
-        raise ValueError(
-            f"n_intervals should be a positive integer, but got {n_intervals}."
-        )
-    elif n_intervals < max_cols**2:
-        table = np.array(
-            [
-                (rows, cols)
-                for cols in range(1, max_cols + 1)
-                for rows in range(1, cols + 1)
-            ]
-        )
-        table = table[np.prod(table, axis=1) >= n_intervals]
-        (nrows, ncols) = table[np.argmin(np.prod(table, axis=1) - n_intervals)]
-    else:
-        nrows = np.ceil(n_intervals / max_cols).astype(int)
-        ncols = max_cols
+        Useful for anything that only makes sense at a single level and
+        doesn't suit a per-level grid of subplots (e.g. a scatter diagram,
+        or any other `TimeSeries` method) -- resolve the level once here,
+        then use the full `TimeSeries` API on the result. Variable metadata
+        (name/symbol/unit) carries over unchanged.
 
-    fig, axes = plt.subplots(
-        nrows=nrows, ncols=ncols, sharex=sharex, sharey=sharey, squeeze=False
-    )
-    return fig, axes.ravel()
+        Every profile variable sharing `primary`'s level dimension is
+        sliced at `level` (resolved via `interp`, exactly as every other
+        level-resolving method in this class -- see `_resolve_level_axis`).
+        Every scalar (time-only) variable is carried over unchanged. A
+        profile variable on a *different* level dimension than `primary`
+        cannot be sliced at the same `level` meaningfully, so it is only
+        included if explicitly requested via `secondary` (which raises a
+        clear error in that case, rather than silently misaligning two
+        different grids) -- otherwise it's simply left out.
+
+        Parameters
+        ----------
+        level : float
+            Level to export, as any numeric value -- not necessarily one
+            present on `primary`'s level coordinate.
+        interp : {"nearest", "linear", "quadratic", "cubic", ...}
+            How to resolve `level` against the level coordinate actually
+            present. "nearest" (the default) selects the closest level;
+            anything else interpolates numerically between the two
+            bracketing levels. See `_resolve_level_axis` for details --
+            applied independently to every exported column, including
+            direction (circular interpolation is not special-cased here,
+            consistent with every other level-resolving method in this
+            class other than `plot_rose`).
+        primary : str, optional
+            Profile variable to use as the new TimeSeries's primary
+            variable. Defaults to `self.primary`.
+        direction : str, optional
+            Profile variable to use as the new TimeSeries's direction
+            variable. Defaults to `self.direction` if it shares the
+            resolved `primary`'s level dimension, otherwise omitted.
+        secondary : list[str], optional
+            Additional profile/scalar variables to include. Defaults to
+            every remaining profile variable sharing `primary`'s level
+            dimension, plus every scalar (time-only) variable.
+        sectors : int, default 12
+            Passed straight through to the new `TimeSeries`.
+
+        Returns
+        -------
+        TimeSeries
+        """
+        primary_var = self._variables[primary] if primary else self.primary
+        if primary is not None and primary not in self._variables:
+            raise ValueError(
+                f"primary='{primary}' is not a known variable. "
+                f"Available: {list(self._variables)}"
+            )
+        if primary_var.col not in self.profile_vars:
+            raise ValueError(
+                f"primary='{primary_var.col}' is not a profile variable. "
+                f"Available: {self.profile_vars}"
+            )
+        level_dim = [d for d in self.ds[primary_var.col].dims if d != self.time_dim][0]
+
+        def _at_level(col: str) -> pd.Series:
+            df = self._profile_var_as_dataframe(col, level_dim).T  # level x time
+            resolved = _resolve_level_axis(df, [level], interp)
+            return resolved.loc[resolved.index[0]].rename(col)
+
+        def _col_level_dim(col: str) -> str:
+            return [d for d in self.ds[col].dims if d != self.time_dim][0]
+
+        data = {primary_var.col: _at_level(primary_var.col)}
+
+        # --- direction -------------------------------------------------- #
+        if direction is not None and direction not in self._variables:
+            raise ValueError(
+                f"direction='{direction}' is not a known variable. "
+                f"Available: {list(self._variables)}"
+            )
+        dir_var = self._variables[direction] if direction else self.direction
+        if dir_var is not None and _col_level_dim(dir_var.col) != level_dim:
+            if direction is not None:
+                raise ValueError(
+                    f"direction='{dir_var.col}' varies over level dimension "
+                    f"'{_col_level_dim(dir_var.col)}', not '{level_dim}' "
+                    f"(primary='{primary_var.col}'s level dimension) -- "
+                    "cannot slice both at the same level."
+                )
+            dir_var = None  # default direction simply doesn't apply here
+        if dir_var is not None:
+            data[dir_var.col] = _at_level(dir_var.col)
+
+        # --- secondary ---------------------------------------------------- #
+        if secondary is None:
+            secondary_cols = [
+                v for v in self.profile_vars
+                if v not in {primary_var.col, dir_var.col if dir_var else None}
+                and _col_level_dim(v) == level_dim
+            ] + list(self.scalar_vars)
+        else:
+            secondary_cols = list(secondary)
+
+        secondary_vars = []
+        for col in secondary_cols:
+            if col in self.profile_vars:
+                if _col_level_dim(col) != level_dim:
+                    raise ValueError(
+                        f"secondary variable '{col}' varies over level "
+                        f"dimension '{_col_level_dim(col)}', not '{level_dim}' "
+                        f"-- cannot slice at the same level as "
+                        f"primary='{primary_var.col}'."
+                    )
+                data[col] = _at_level(col)
+            elif col in self.scalar_vars:
+                data[col] = self.ds[col].to_series().rename(col)
+            else:
+                raise ValueError(
+                    f"secondary variable '{col}' is neither a profile "
+                    "variable nor a scalar (time-only) variable on this "
+                    "ProfileTimeSeries."
+                )
+            secondary_vars.append(self._variables[col])
+
+        df = pd.DataFrame(data)
+
+        return TimeSeries(
+            df=df,
+            primary=primary_var,
+            direction=dir_var,
+            secondary=secondary_vars,
+            sectors=sectors,
+        )
 
 def _resolve_level_axis(
     table: pd.DataFrame,
@@ -2037,22 +2142,8 @@ class ProfileEVA:
             df = var_series.to_frame().dropna()
         return df
 
-    def _resolve_levels(self, levels) -> list:
-        """
-        `levels=None` (the default for both get_extremes and fit) means
-        "every level" -- broadcasting over the full set is the common
-        case (temperature, wind speed, current speed profiles are
-        usually analysed level-by-level in full, not level-by-level on
-        request), so no-argument calls do the whole profile rather than
-        requiring the caller to enumerate every level themselves.
-        """
-        if levels is None:
-            return list(self.levels)
-        return list(levels)
-
     def get_extremes(
         self,
-        levels: list[float] | None = None,
         th_omni: float | None = None,
         th_monthly: list[float] | None = None,
         th_sectors: list[float] | None = None,
@@ -2062,35 +2153,36 @@ class ProfileEVA:
         extremes_type: str = "high",
         errors: str = "raise",
         th_percentile: float = 0.98,
+        poisson_correction: bool = True,
     ) -> "ProfileEVA":
         """
-        Build (or rebuild) a UnivariateEVA for each requested level and
-        run its `get_extremes(...)`. All keyword arguments are passed
-        straight through to `UnivariateEVA.get_extremes` unchanged, so
-        every level is extracted with the same threshold/blocking
-        settings -- per-level threshold tuning is possible by calling
-        this once per level with different kwargs, since it is keyed by
-        level and safe to call again for a single level without
-        disturbing the others.
+        Build (or rebuild) a UnivariateEVA for every level and run its
+        `get_extremes(...)`. All keyword arguments are passed straight
+        through to `UnivariateEVA.get_extremes` unchanged, so every
+        level is extracted with the same threshold/blocking settings --
+        per-level threshold tuning is possible by calling this again for
+        a single level's worth of data via a fresh `ProfileEVA` scoped
+        to it, since the normal case (profile-wide EVA) always fits
+        every level together.
 
         Parameters
         ----------
-        levels : list[float], optional
-            Subset of levels (values from `self.levels`) to process.
-            Defaults to every level.
         th_omni, th_monthly, th_sectors, block_size, min_last_block, r,
         extremes_type, errors, th_percentile
             Passed straight through to `UnivariateEVA.get_extremes`. See
             that method for details -- thresholds left as None there are
             derived per level from `th_percentile`, independently for
             each level's own data.
+        poisson_correction : bool, default True
+            Passed straight through to each level's `UnivariateEVA`. See
+            `UnivariateEVA.__init__`/`_poisson_exceedance_probability`.
 
         Returns
         -------
         ProfileEVA
             self, so this chains directly into `.fit(...)`.
         """
-        for level in tqdm_levels(self._resolve_levels(levels), desc=f"EVA: {self.var}"):
+        for level in tqdm_levels(self.levels, desc=f"EVA: {self.var}"):
             df = self._level_dataframe(level)
             model = UnivariateEVA(
                 data=df,
@@ -2100,6 +2192,7 @@ class ProfileEVA:
                 var_symbol=self._var_symbol,
                 var_unit=self._var_unit,
                 sectors=getattr(self._pts, "sectors", 12),
+                poisson_correction=poisson_correction,
             )
             model.get_extremes(
                 th_omni=th_omni,
@@ -2117,7 +2210,6 @@ class ProfileEVA:
 
     def fit(
         self,
-        levels: list[float] | None = None,
         AM_dist: list[str] = [],
         POT_dist: list[str] = [],
         IDM_dist: list[str] = [],
@@ -2126,18 +2218,12 @@ class ProfileEVA:
         """
         Fit every already-extracted level's UnivariateEVA. All keyword
         arguments are passed straight through to
-        `UnivariateEVA.fit`. Raises per level if that level has no
-        extremes yet -- `get_extremes` must be called (for that level,
-        at least) before `fit`, matching UnivariateEVA's own
+        `UnivariateEVA.fit`. Raises if `get_extremes` hasn't been run
+        yet (nothing to fit), matching UnivariateEVA's own
         `_got_extremes` check.
 
         Parameters
         ----------
-        levels : list[float], optional
-            Subset of levels to fit. Defaults to every level that has
-            already had `get_extremes` run -- i.e. every key currently
-            in `self.models` -- not `self.levels`, since a level with no
-            extremes yet has nothing to fit.
         AM_dist, POT_dist, IDM_dist, errors
             Passed straight through to `UnivariateEVA.fit`.
 
@@ -2146,15 +2232,12 @@ class ProfileEVA:
         ProfileEVA
             self, so this chains directly into a plot/table method.
         """
-        target_levels = list(self.models) if levels is None else list(levels)
-        missing = [lv for lv in target_levels if lv not in self.models]
-        if missing:
+        if not self.models:
             raise ValueError(
-                f"No extremes found for level(s) {missing} -- call "
-                "get_extremes(levels=...) for these levels before fit()."
+                "No extremes found -- call get_extremes() before fit()."
             )
 
-        for level in tqdm_levels(target_levels, desc=f"Fitting: {self.var}"):
+        for level in tqdm_levels(list(self.models), desc=f"Fitting: {self.var}"):
             self.models[level].fit(
                 AM_dist=AM_dist, POT_dist=POT_dist, IDM_dist=IDM_dist,
                 errors=errors,
@@ -2269,8 +2352,9 @@ class ProfileEVA:
             warnings.warn(
                 f"Skipped level(s) {skipped}: no fitted model for "
                 f"({method}, {dist}) at this level. Call "
-                "get_extremes(levels=...) and fit(levels=...) for these "
-                "levels first if they should be included.",
+                "get_extremes() and fit() first -- both always run "
+                "every level, so a missing model usually means that "
+                f"({method}, {dist}) failed to fit at this level.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -2292,7 +2376,8 @@ class ProfileEVA:
         dist: str,
         return_period_size: str = "365.2425D",
         levels: list[float] | None = None,
-        subplot_columns: int | None = None,
+        interp: str = "nearest",
+        ncols: int = 3,
         plot_kwargs: dict | None = None,
         ax: "np.ndarray[plt.Axes] | None" = None,
     ) -> "np.ndarray[plt.Axes]":
@@ -2361,7 +2446,7 @@ class ProfileEVA:
         levels : list[float], optional
             Subset of levels to include. Defaults to every fitted level,
             same as `table_return_values`.
-        subplot_columns : int, optional
+        ncols : int, optional
             Max columns in the subplot grid. Defaults to 3, matching
             `UnivariateEVA.plot_return_value_comparison`'s default.
         plot_kwargs : dict, optional
@@ -2390,7 +2475,7 @@ class ProfileEVA:
             rp: self.table_return_values(
                 return_period=rp, grouping=grouping, method=method,
                 dist=dist, return_period_size=return_period_size,
-                levels=levels,
+                levels=levels, interp=interp,
             ).drop(columns=drop_cols, errors="ignore")
             for rp in return_periods
         }
@@ -2406,9 +2491,7 @@ class ProfileEVA:
 
         owns_figure = ax is None
         if ax is None:
-            if subplot_columns is None:
-                subplot_columns = 3
-            fig, ax_arr = _get_n_axes(len(columns), max_cols=subplot_columns)
+            fig, ax_arr = get_n_axes(len(columns), max_cols=ncols)
         else:
             fig = None
             ax_arr = np.array(ax).ravel()
@@ -2489,11 +2572,11 @@ class ProfileEVA:
         nothing to do with the marginal extreme-value fit at any single
         level.
 
-        Month filtering mirrors `groupby_month`'s own month-name
-        resolution (full or abbreviated name, case-insensitive) rather
-        than reimplementing a separate convention -- built directly here
-        instead of calling `groupby_month` itself, since that groups
-        into all 12 months and Turkstra only ever wants one.
+        Month filtering mirrors the package's own month-name resolution
+        (full or abbreviated name, case-insensitive) rather than
+        reimplementing a separate convention -- built directly here
+        instead of going through `groupby_with_metadata`, since that
+        groups into all 12 months and Turkstra only ever wants one.
         """
         df = self._pts._profile_var_as_dataframe(self.var, self.level_dim)
         if month is None:
@@ -2789,6 +2872,7 @@ class ProfileEVA:
         dist: str | None = None,
         return_period_size: str = "365.2425D",
         levels: list[float] | None = None,
+        interp: str = "nearest",
         cmap: str = "viridis",
         fmt_legend: str = ".1f",
         legend_ncols: int = 2,
@@ -2858,7 +2942,7 @@ class ProfileEVA:
         table = self.table_turkstra(
             basis=basis, percentile=percentile, month=month,
             return_period=return_period, method=method, dist=dist,
-            return_period_size=return_period_size, levels=levels,
+            return_period_size=return_period_size, levels=levels, interp=interp,
         )
         anchor_columns = [c for c in table.columns if c != "Worst case"]
 

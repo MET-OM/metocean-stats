@@ -73,13 +73,13 @@ All directional outputs honour this declaration without silent conversion.
 
 from __future__ import annotations
 import itertools
+import warnings
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
-import matplotlib.cm as mcm
 import matplotlib.patches as mpatches
 from tqdm import tqdm
 
@@ -314,10 +314,6 @@ class SpectralTimeSeries:
         self.depth          = depth
         self.name           = name
 
-        title = f"SpectralTimeSeries: {name}" if name else "SpectralTimeSeries"
-        print(title)
-        print("=" * len(title))
-
         # ------------------------------------------------------------------ #
         # PHASE 1 -- Identify                                                  #
         # ------------------------------------------------------------------ #
@@ -343,21 +339,9 @@ class SpectralTimeSeries:
             if dim_map[_ROLE_DIR] is not None else None
         )
 
-        print("\nRecognised variables:")
-        for slot, var_name in var_map.items():
-            if var_name is not None:
-                label = _SPECTRAL_SIGNATURES_BY_SLOT[slot]
-                print(f"  '{var_name}'  ->  {label} ({slot}), dims {ds[var_name].dims}")
-        for role in (_ROLE_FREQ, _ROLE_DIR):
-            dim_name = dim_map[role]
-            if dim_name is not None:
-                unit_str = f", unit = {dir_unit}" if role == _ROLE_DIR else ""
-                print(f"  '{dim_name}'  ->  {role} dimension{unit_str}")
-
         # ------------------------------------------------------------------ #
         # PHASE 2 -- Standardize (always, immediately, no opt-out)           #
         # ------------------------------------------------------------------ #
-        print("\nStandardizing:")
         ds = self._standardize(ds, var_map, dim_map, dir_unit)
 
         # ------------------------------------------------------------------ #
@@ -378,12 +362,6 @@ class SpectralTimeSeries:
         # unit/role detection above can still see the dataset's own hints)  #
         # ------------------------------------------------------------------ #
         self._apply_default_attrs(self.ds, var_map, dim_map)
-
-        print()
-        self._print_variable_table()
-        print(f"\ndir_convention : {self.dir_convention}")
-        print(f"depth          : {self.depth} m" if self.depth is not None else "depth          : not set")
-        print(f"input          : {self._input_summary()}")
 
     # ---------------------------------------------------------------------- #
     # PHASE 1 helpers -- Identify (read-only, never renames, never mutates)  #
@@ -565,6 +543,7 @@ class SpectralTimeSeries:
         freq_dim = dim_map[_ROLE_FREQ]
         dir_dim  = dim_map[_ROLE_DIR]
         time_dim = dim_map[_ROLE_TIME]
+        notes: list[str] = []
 
         # -------------------------------------------------------------- #
         # 1. Unfixable checks -- raise before touching anything.          #
@@ -594,7 +573,6 @@ class SpectralTimeSeries:
 
         if unfixable:
             msg = "\n".join(f"  ERROR: {m}" for m in unfixable)
-            print(msg)
             raise ValueError(
                 "Cannot safely standardize -- the following issue(s) require "
                 "manual inspection of the source dataset:\n" + msg
@@ -607,16 +585,16 @@ class SpectralTimeSeries:
             old_vals = ds.coords[dir_dim].values.astype(float)
             new_vals = old_vals * _RAD_TO_DEG
             ds = ds.assign_coords({dir_dim: new_vals})
-            print(
-                f"  '{dir_dim}' coordinate converted radians -> degrees "
+            notes.append(
+                f"'{dir_dim}' coordinate converted radians -> degrees "
                 f"(×{_RAD_TO_DEG:.6g})"
             )
             for slot in ("S", "D"):
                 var_name = var_map.get(slot)
                 if var_name is not None and dir_dim in ds[var_name].dims:
                     ds[var_name] = ds[var_name] / _RAD_TO_DEG
-                    print(
-                        f"  '{var_name}' density rescaled ÷{_RAD_TO_DEG:.6g} "
+                    notes.append(
+                        f"'{var_name}' density rescaled ÷{_RAD_TO_DEG:.6g} "
                         "to conserve variance under the unit change"
                     )
 
@@ -638,15 +616,15 @@ class SpectralTimeSeries:
             non_ascending = np.any(diffs <= np.timedelta64(0)) if np.issubdtype(diffs.dtype, np.timedelta64) else np.any(diffs <= 0)
             if non_ascending:
                 ds = ds.sortby(time_dim)
-                print(f"  sorted '{time_dim}' ascending")
+                notes.append(f"sorted '{time_dim}' ascending")
 
         if freq_dim is not None and np.any(np.diff(ds.coords[freq_dim].values) <= 0):
             ds = ds.sortby(freq_dim)
-            print(f"  sorted '{freq_dim}' ascending")
+            notes.append(f"sorted '{freq_dim}' ascending")
 
         if dir_dim is not None and np.any(np.diff(ds.coords[dir_dim].values) <= 0):
             ds = ds.sortby(dir_dim)
-            print(f"  sorted '{dir_dim}' ascending")
+            notes.append(f"sorted '{dir_dim}' ascending")
 
         # -------------------------------------------------------------- #
         # 4 & 5. Per-variable dimension order and non-negativity.         #
@@ -662,16 +640,24 @@ class SpectralTimeSeries:
             if da.dims != expected_dims:
                 da = da.transpose(*expected_dims)
                 ds[var_name] = da
-                print(f"  '{var_name}' transposed to {expected_dims}")
+                notes.append(f"'{var_name}' transposed to {expected_dims}")
 
             n_neg = int((da.values < 0).sum())
             if n_neg:
                 pct = 100 * n_neg / da.values.size
                 ds[var_name] = da.clip(min=0)
-                print(
-                    f"  '{var_name}' clipped {n_neg} negative value(s) "
+                notes.append(
+                    f"'{var_name}' clipped {n_neg} negative value(s) "
                     f"({pct:.2f}%) to zero"
                 )
+
+        if notes:
+            warnings.warn(
+                "Standardized on construction:\n"
+                + "\n".join(f"  - {n}" for n in notes),
+                UserWarning,
+                stacklevel=3,
+            )
 
         return ds
 
@@ -1433,7 +1419,6 @@ class SpectralTimeSeries:
             })
             self.ds[out_name] = da
 
-        print(f"integrate(): computed {len(results)} parameter(s): {sorted(results)}")
         return self
 
 
@@ -1539,9 +1524,9 @@ class SpectralTimeSeries:
         Resolve ``by`` into a dict of group_label -> boolean mask over the
         time axis (length == len(self.time)). Mirrors the ``by`` vocabulary
         and labelling conventions of the plain ``TimeSeries`` module's
-        ``groupby_month`` / ``groupby_season`` / ``groupby_sector``,
-        adapted to produce index masks against ``self.time`` / ``self.ds``
-        rather than grouping a DataFrame directly.
+        shared ``groupby_with_metadata`` primitive, adapted to produce
+        index masks against ``self.time`` / ``self.ds`` rather than
+        grouping a DataFrame directly.
 
         Supported ``by`` values:
           "month", "season", "year", "week", "day", "hour"  -- calendar groups
@@ -1559,7 +1544,10 @@ class SpectralTimeSeries:
                                                                   north-centred
                                                                   sector
                                                                   convention as
-                                                                  ``groupby_sector``.
+                                                                  the TimeSeries
+                                                                  module's
+                                                                  direction
+                                                                  grouping.
         """
         t = self.time
 
@@ -1601,9 +1589,10 @@ class SpectralTimeSeries:
         finite = np.isfinite(vals)
 
         if circular_by:
-            # Same north-centred sector convention as groupby_sector: an
-            # int `sectors` gives that many equally-sized sectors with the
-            # first centred on 0°; a list gives explicit sector edges.
+            # Same north-centred sector convention as the TimeSeries
+            # module's direction grouping: an int `sectors` gives that
+            # many equally-sized sectors with the first centred on 0°;
+            # a list gives explicit sector edges.
             edges = sectors if hasattr(sectors, "__len__") else np.linspace(
                 0, 360, (sectors or 12) + 1
             )
@@ -1723,7 +1712,7 @@ class SpectralTimeSeries:
         sectors : int or list of float, optional
             Only used when ``circular_by=True``. If int, that many
             equally-sized sectors with the first centred on 0°/360° (same
-            convention as the TimeSeries module's ``groupby_sector``); if
+            convention as the TimeSeries module's direction grouping); if
             a list, explicit sector edges. Default 12 (30° sectors).
         seasons : dict, optional
             Custom season->months mapping, only used when ``by="season"``.
@@ -1735,8 +1724,8 @@ class SpectralTimeSeries:
             If True, ``by`` is treated as a variable that wraps at 360°
             (e.g. a wave/wind direction) and binned into sectors using
             ``sectors`` instead of ``step``, with labels like "345-15°"
-            (north-centred), matching the TimeSeries module's
-            ``groupby_sector`` convention.
+            (north-centred), matching the TimeSeries module's direction
+            grouping convention.
 
         Returns
         -------
@@ -2678,7 +2667,7 @@ class SpectralTimeSeries:
         >>> sts.plot(time=slice("2020-01-01", "2020-01-03"),
         ...          col="time", col_wrap=4)                    # doctest: +SKIP
         """
-        from .plots import plot_spectra
+        from .plotting import plot_spectra
         return plot_spectra(
             self, var=var, time=time, row=row, col=col, col_wrap=col_wrap,
             radius=radius, plot_type=plot_type, cmap=cmap, vmax=vmax,
@@ -2777,7 +2766,7 @@ class SpectralTimeSeries:
         pdir = float(agg["pdir"].values) if "pdir" in agg else None
 
         fig = plt.figure(figsize=(7.5, 6))
-        cmap = mcm.ocean_r
+        cmap = plt.get_cmap("ocean_r")
         accent = "#0463d7"
         alpha = 0.22
 
@@ -2802,7 +2791,7 @@ class SpectralTimeSeries:
             )
 
         self._plot_summary_text(fig, hs, agg_desc)
-        fig.suptitle(title or "Spectrum overview", fontsize=16, x=0.02, ha="left", y=0.99)
+        ax_main.set_title(title or "Spectrum overview", loc="left")
 
         if output_file is not None:
             fig.savefig(output_file, dpi=200, bbox_inches=None, pad_inches=0)
@@ -2916,8 +2905,8 @@ class SpectralTimeSeries:
         cbar_ax.set_xlim(-0.5, 0.5)
         cbar_ax.set_xticks([])
         cbar_ax.yaxis.tick_right()
-        cbar_ax.tick_params(axis="y", labelsize=12)
-        cbar_ax.text(0, -1, r"H$_{m_0}$ [m]", ha="center", va="top", fontsize=12)
+        cbar_ax.tick_params(axis="y")
+        cbar_ax.text(0, -1, r"H$_{m_0}$ [m]", ha="center", va="top")
 
     def _plot_direction_arrows(
         self, fig, agg, pdir,
@@ -2949,13 +2938,13 @@ class SpectralTimeSeries:
         arrow_dir = (wind_dir + 180.0) % 360.0 if wdir_from else wind_dir
         draw(arrow_dir, color, style="line")
         ax.text(0.02, 0.02, f"wind ({'from' if wdir_from else 'to'} {wind_dir:.0f}\u00b0)",
-                fontsize=7, color=color, transform=ax.transAxes)
+                color=color, transform=ax.transAxes)
 
         if partition_method is not None:
             method_fn = getattr(self, f"partition_{partition_method}", None)
             if method_fn is None:
                 ax.text(0.02, 0.10, f"(unknown partition_method '{partition_method}')",
-                        fontsize=7, color="gray", transform=ax.transAxes)
+                        color="gray", transform=ax.transAxes)
                 return
             try:
                 kwargs = dict(partition_kwargs)
@@ -2981,7 +2970,7 @@ class SpectralTimeSeries:
                 # point of it -- don't let a partition failure take down
                 # the whole overview plot.
                 ax.text(0.02, 0.10, f"(partition arrows unavailable: {exc})",
-                        fontsize=7, color="gray", transform=ax.transAxes)
+                        color="gray", transform=ax.transAxes)
         elif pdir is not None:
             draw(pdir, "black", style="arrow")
 
@@ -2996,7 +2985,7 @@ class SpectralTimeSeries:
         label = rf"$\mathbf{{Aggregation:}}$ {agg_desc}"
         if hs is not None:
             label += "\n" + rf"$\mathbf{{H_{{m_0}}:}}$ {hs:.1f} m"
-        fig.text(0.02, 0.02, label, fontsize=11, transform=fig.transFigure)
+        fig.text(0.02, 0.02, label, transform=fig.transFigure)
 
 
 
@@ -3854,8 +3843,8 @@ class SpectralTimeSeriesCollection:
         cmap: str = "viridis",
         vmax: float | None = None,
         dir_letters: bool = False,
-        panel_size: float = 3.0,
         ncols: int | None = None,
+        figsize: "tuple[float, float] | None" = None,
     ) -> "tuple[plt.Figure, np.ndarray]":
         """
         Plot the spectrum at `time` from every member, side by side, one
@@ -3876,25 +3865,28 @@ class SpectralTimeSeriesCollection:
             dimension.
         ncols : int, optional
             Panels per row. Defaults to one row of all members.
+        figsize : tuple[float, float], optional
+            Figure size in inches. Defaults to matplotlib's rcParams
+            ``figure.figsize``.
         (other parameters as in plotting.plot_spectra())
 
         Returns
         -------
         (matplotlib.figure.Figure, np.ndarray of Axes)
         """
-        from .plots import _draw_one_panel
+        from .plotting import _draw_one_panel
 
         panels = []
         for label, member in self.members.items():
             time_dim = member.dim_map[_ROLE_TIME]
             spec_var = member.var_map["S"] or member.var_map["E"] or member.var_map["D"]
             if spec_var is None or time_dim not in member.ds[spec_var].dims:
-                print(f"  skipped '{label}': no time-varying spectrum present")
+                warnings.warn(f"skipped '{label}': no time-varying spectrum present", UserWarning, stacklevel=2)
                 continue
             try:
                 da = member.ds[spec_var].sel({time_dim: time})
             except (KeyError, ValueError):
-                print(f"  skipped '{label}': no data at time={time!r}")
+                warnings.warn(f"skipped '{label}': no data at time={time!r}", UserWarning, stacklevel=2)
                 continue
             panels.append((label, member, da))
 
@@ -3905,7 +3897,7 @@ class SpectralTimeSeriesCollection:
         nrows = int(np.ceil(len(panels) / ncols))
         has_dir = any(m.dim_map[_ROLE_DIR] in da.dims for _, m, da in panels)
         fig_kw = dict(subplot_kw=dict(projection="polar")) if has_dir else {}
-        fig, axes = plt.subplots(nrows, ncols, figsize=(panel_size * ncols, panel_size * nrows), **fig_kw)
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize, **fig_kw)
         axes_flat = np.atleast_1d(axes).ravel()
 
         vmax_shared = vmax if vmax is not None else max(float(np.nanmax(da.values)) for _, _, da in panels)
@@ -3916,7 +3908,7 @@ class SpectralTimeSeriesCollection:
             dir_dim  = member.dim_map[_ROLE_DIR]  if member.dim_map[_ROLE_DIR]  in da.dims else None
             mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmax_shared, dir_letters)
             last_mesh = mesh if mesh is not None else last_mesh
-            ax.set_title(label, fontsize=9)
+            ax.set_title(label)
 
         for ax in axes_flat[len(panels):]:
             ax.set_visible(False)

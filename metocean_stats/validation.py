@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 from .timeseries import TimeSeries, Variable
-from .plots import plot_rose
+from .plotting import plot_rose
 from .utils import infer_step, bin_edges
 
 def _fmt_timedelta(td: pd.Timedelta) -> str:
@@ -123,7 +123,7 @@ class TimeSeriesValidation:
     def __init__(
         self,
         sources: dict[str, Source],
-        variables: dict[str, list[Variable]] | None = None,
+        variables: dict[str, Variable | list[Variable]] | None = None,
     ):
         # ------------------------------------------------------------------ #
         # Validate sources argument type                                       #
@@ -134,10 +134,18 @@ class TimeSeriesValidation:
                 f"or DataFrames, got {type(sources).__name__}."
             )
 
-        if len(sources) < 2:
+        if len(sources) < 1:
             raise ValueError(
-                f"'sources' must contain at least two entries to enable "
-                f"comparison, got {len(sources)}."
+                f"'sources' must contain at least one entry, got {len(sources)}."
+            )
+        if len(sources) < 2:
+            warnings.warn(
+                "TimeSeriesValidation was given a single source. This class is "
+                "meant for comparing multiple sources; for analysis of a single "
+                "timeseries, use TimeSeries (from metocean_stats import TimeSeries) "
+                "instead. Proceeding anyway.",
+                UserWarning,
+                stacklevel=2,
             )
 
         # ------------------------------------------------------------------ #
@@ -246,10 +254,12 @@ class TimeSeriesValidation:
                     UserWarning,
                     stacklevel=2,
                 )
+            if isinstance(varlist, Variable):
+                varlist = variables[key] = [varlist]
             if not isinstance(varlist, list):
                 raise TypeError(
-                    f"'variables[{key!r}]' must be a list of Variable objects, "
-                    f"got {type(varlist).__name__}."
+                    f"'variables[{key!r}]' must be a Variable or list of Variable "
+                    f"objects, got {type(varlist).__name__}."
                 )
             for i, v in enumerate(varlist):
                 if not isinstance(v, Variable):
@@ -319,11 +329,6 @@ class TimeSeriesValidation:
                 self._data[key].index = df.index.astype(f"datetime64[ns, {df.index.tz}]")
             else:
                 self._data[key].index = df.index.astype("datetime64[ns]")
-
-        # ------------------------------------------------------------------ #
-        # Print initialisation summary                                         #
-        # ------------------------------------------------------------------ #
-        self.summary()
 
 
     def summary(self) -> None:
@@ -512,15 +517,6 @@ class TimeSeriesValidation:
         self._align_method    = method
         self._align_tolerance = tolerance
 
-        n_ref   = len(self._data[reference])
-        n_align = len(self.aligned)
-        coverage = 100 * n_align / n_ref if n_ref > 0 else 0.0
-
-        print(
-            f"Alignment complete. Reference: '{reference}' ({n_ref} timestamps). "
-            f"Collocations retained: {n_align} ({coverage:.1f}% coverage)."
-        )
-
     def _do_align(
         self,
         reference: str,
@@ -635,33 +631,33 @@ class TimeSeriesValidation:
     # Variable metadata helpers                                                #
     # ---------------------------------------------------------------------- #
 
-    def get_variable(self, source: str, col: str) -> Variable:
+    def get_variable(self, source: str, var: str) -> Variable:
         """
-        Return the Variable metadata for a (source, col) pair.
+        Return the Variable metadata for a (source, var) pair.
 
         Parameters
         ----------
         source : str
             Source key, must be present in self.sources.
-        col : str
-            Column name within that source.
+        var : str
+            Variable (column) name within that source.
 
         Raises
         ------
         KeyError
-            If source or col is not found.
+            If source or var is not found.
         """
         if source not in self._variables:
             raise KeyError(
                 f"Source '{source}' not found. "
                 f"Valid keys are: {list(self.sources.keys())}."
             )
-        if col not in self._variables[source]:
+        if var not in self._variables[source]:
             raise KeyError(
-                f"Column '{col}' not found in source '{source}'. "
-                f"Available columns: {sorted(self._variables[source].keys())}."
+                f"Variable '{var}' not found in source '{source}'. "
+                f"Available variables: {sorted(self._variables[source].keys())}."
             )
-        return self._variables[source][col]
+        return self._variables[source][var]
 
     def _get_aligned(self, ref: tuple[str, str]) -> tuple[pd.Series, Variable]:
         """
@@ -1036,10 +1032,13 @@ class TimeSeriesValidation:
         n_dir_bins:     int         = 16,
         mag_bins:       "list[float] | None" = None,
         mag_step:       "float | None" = None,
+        mag_max:        "float | None" = None,
         cmap:           str         = "viridis",
         calm_threshold: float       = 0.0,
         r_max:          "float | None" = None,
         r_ticks:        "list[float] | None" = None,
+        r_step:         "float | None" = None,
+        r_label_angle:  "float | None" = None,
         figsize:        "tuple[float, float] | None" = None,
         ax:             "plt.Axes | None" = None,
     ) -> "plt.Axes":
@@ -1070,10 +1069,15 @@ class TimeSeriesValidation:
             calls to make several rose plots directly comparable.
         mag_step : float, optional
             Force a specific bin step size when ``mag_bins`` is not given
-            (e.g. ``2.0`` for 0-2-4-6 ... bins up to the 99th percentile,
-            with an open-ended top bin added automatically). If neither
-            ``mag_bins`` nor ``mag_step`` is given, a step is chosen
+            (e.g. ``2.0`` for 0-2-4-6 ... bins up to ``mag_max`` or the 99th
+            percentile, with an open-ended top bin added automatically). If
+            neither ``mag_bins`` nor ``mag_step`` is given, a step is chosen
             automatically, targeting ~7 bins.
+        mag_max : float, optional
+            Explicit top edge for auto-derived magnitude bins (ignored if
+            ``mag_bins`` is given). Defaults to the 99th percentile. Set
+            together with ``mag_step`` to force identical magnitude bins
+            across multiple calls.
         cmap : str, default "viridis"
             Colormap for magnitude classes.
         calm_threshold : float, default 0.0
@@ -1085,8 +1089,16 @@ class TimeSeriesValidation:
             same value across multiple calls for a shared radial scale.
         r_ticks : list[float], optional
             Explicit radial tick values in percent, e.g. ``[0, 5, 10, 15]``.
-            If None, ticks are chosen automatically. Pass the same values
-            across multiple calls for directly comparable panels.
+            If None, ticks are chosen automatically (spaced by ``r_step`` if
+            given). Pass the same values across multiple calls for directly
+            comparable panels.
+        r_step : float, optional
+            Percent step between radial ticks, used only when ``r_ticks`` is
+            not given. Set together with ``r_max`` to force identical radial
+            scales across multiple calls.
+        r_label_angle : float, optional
+            Angle (degrees) at which the percentage tick labels are placed,
+            e.g. ``90`` to move them out of the way of the data.
         figsize : tuple[float, float], optional
             Figure size in inches, used only when creating a new figure (i.e.
             when ``ax`` is None). If None, falls back to rcParams. Ignored if
@@ -1140,9 +1152,12 @@ class TimeSeriesValidation:
             n_dir_bins=n_dir_bins,
             mag_bins=mag_bins,
             mag_step=mag_step,
+            mag_max=mag_max,
             cmap=cmap,
             r_max=r_max,
             r_ticks=r_ticks,
+            r_step=r_step,
+            r_label_angle=r_label_angle,
             calm_threshold=calm_threshold,
             title=f"{src.capitalize()} {mag_var.name}",
             legend=True,

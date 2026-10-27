@@ -207,12 +207,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             axes = np.array(axes).ravel()
         return virocon.plot_dependence_functions(self,self.semantics,axes=axes)
 
-    def plot_histograms_of_interval_distributions(self,plot_pdf=True,max_cols=4):
+    def plot_histograms_of_interval_distributions(self,plot_pdf=True,ncols=3):
         """
         Plot histograms for the estimated distribution in each data interval.
         """        
         return virocon.plot_histograms_of_interval_distributions(self,
-            self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
+            self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=ncols)
 
     def plot_isodensity_contours(
             self,
