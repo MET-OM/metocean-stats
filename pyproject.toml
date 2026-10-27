@@ -26,16 +26,20 @@ dependencies = [
   "matplotlib>=3.5",
   "pandas",
   "scipy",
-  "windrose",
   "wavespectra",
   "seaborn>=0.12.2",
-  "pyextremes",
+  "cmocean",
+  "pyextremes>=2.4",
   "cartopy",
   "netcdf4",
   "pydap",
   "virocon>=2.4",
   "tqdm",
+  "lmoments3",
 ]
+
+[project.optional-dependencies]
+notebook = ["notebook"]
 
 [project.urls]
 Homepage = "https://github.com/MET-OM/metocean-stats"
