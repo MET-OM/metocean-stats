@@ -27,11 +27,12 @@ def convert_latexTab_to_csv(inputFileName, outputFileName):
 def Tp_correction(Tp):
     """
     This function will correct the Tp from ocean model which are vertical straight lines in Hs-Tp distribution
-    """   
-    np.random.seed(1)
+    """
+    Tp = np.array(Tp, dtype=float)  # copy -- never mutate the caller's array
+    rng = np.random.RandomState(1)  # local generator -- don't perturb global np.random state
     new_Tp=1+np.log(Tp/3.244)/0.09525
     index = np.where(Tp>=3.2) # indexes of Tp
-    r = np.random.uniform(low=-0.5, high=0.5, size=len(Tp[index])) 
+    r = rng.uniform(low=-0.5, high=0.5, size=len(Tp[index]))
     Tp[index]=np.round(3.244*np.exp(0.09525*(new_Tp[index]-1-r)),1)
     return Tp 
 

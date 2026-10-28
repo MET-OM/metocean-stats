@@ -620,7 +620,7 @@ def joint_distribution_Hs_Tp(data,var_hs='hs',var_tp='tp',periods=[1,10,100,1000
         periods_adj = np.array([x * 6 for x in periods])
     else:
         periods_adj = periods
-    df  = data
+    df  = data.copy()
     # max_y = max(periods)
     # period = np.array(periods)
     pd.options.mode.chained_assignment = None  # default='warn'
