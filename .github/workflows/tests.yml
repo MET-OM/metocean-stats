@@ -1,0 +1,73 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ v* ]
+  pull_request:
+
+jobs:
+  tests:
+    name: pytests (${{ matrix.os }} - ${{ matrix.python-version }}, Miniforge3)
+    runs-on: ${{ matrix.os }}-latest
+    defaults:
+      run:
+        shell: bash -l {0}   
+    strategy:
+      matrix:
+        os: ["ubuntu", "windows"]
+        python-version: [ "3.11" ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          miniforge-variant: Miniforge3
+          environment-file: environment.yml   
+          activate-environment: test          
+          python-version: ${{ matrix.python-version }}
+          channels: conda-forge
+          channel-priority: strict
+          auto-update-conda: true
+
+      - name: Install package (PEP 517)
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e . 
+
+      - name: Run tests
+        run: pytest -vs --log-cli-level=debug
+
+      - name: Build sdist+wheel (only once)
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu'
+        run: |
+          python -m pip install -U build
+          python -m build    # creates dist/*.tar.gz and dist/*.whl
+
+      - name: Upload wheels
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: dist
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [ tests ]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: dist
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          python -m pip install -U pip twine
+          twine upload --skip-existing dist/*

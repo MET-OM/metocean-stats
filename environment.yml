@@ -1,0 +1,31 @@
+name: metocean-stats
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - pip
+  - python-build
+  - wheel
+  - setuptools>=80
+  - setuptools_scm>=8
+  - pytest
+  - numpy>=1.17
+  - xarray
+  - matplotlib>=3.5
+  - pandas
+  - scipy
+  - wavespectra
+  - seaborn>=0.12.2
+  - cmocean
+  - pyextremes>=2.4
+  - cartopy
+  - netcdf4
+  - pydap
+  - virocon>=2.4
+  - tqdm
+  - lmoments3
+  - windrose
+  - requests
+  - python-docx
+  # for the optional "notebook" extra in pyproject.toml
+  - notebook

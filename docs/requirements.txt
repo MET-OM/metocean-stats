@@ -1,0 +1,6 @@
+sphinx>=1.9.0
+sphinx-rtd-theme
+sphinx-autoapi
+sphinx-gallery>=0.17.0
+sphinx-csv-filter
+livereload

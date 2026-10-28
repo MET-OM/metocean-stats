@@ -39,7 +39,6 @@ dependencies = [
   "windrose",
   "requests",
   "python-docx",
-  "windrose",
 ]
 
 [project.optional-dependencies]
