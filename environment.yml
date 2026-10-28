@@ -9,7 +9,7 @@ dependencies:
   - setuptools>=80
   - setuptools_scm>=8
   - pytest
-  - numpy>=1.17
+  - numpy>=2.0
   - xarray
   - matplotlib>=3.5
   - pandas
