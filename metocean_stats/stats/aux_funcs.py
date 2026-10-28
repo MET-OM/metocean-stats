@@ -536,7 +536,7 @@ def depth_of_wave_influence(Hs, Tp, ref_depth,spectrum='JONSWAP', theshold=0.01)
     depth_list = np.arange(0,ref_depth+0.5,0.5)
     for depth in depth_list[::-1]:
         S_u = spec_funcs.velocity_spectrum(f, E, depth=depth, ref_depth=ref_depth)
-        M0 = np.trapz(S_u, x = f)
+        M0 = np.trapezoid(S_u, x = f)
         Us = 2 * np.sqrt(M0)
         if Us>theshold:
             return depth

@@ -381,8 +381,8 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     
     # Compute u/v wind components if wind_direction is available
     if 'wind_direction' in filtered_data:
-        filtered_data['u'] =  filtered_data['wind_speed'] * xr.ufuncs.sin(np.deg2rad((450 - filtered_data['wind_direction'])%360))
-        filtered_data['v'] =  filtered_data['wind_speed'] * xr.ufuncs.cos(np.deg2rad((450 - filtered_data['wind_direction'])%360))
+        filtered_data['u'] =  filtered_data['wind_speed'] * np.sin(np.deg2rad((450 - filtered_data['wind_direction'])%360))
+        filtered_data['v'] =  filtered_data['wind_speed'] * np.cos(np.deg2rad((450 - filtered_data['wind_direction'])%360))
 
     # Normalize and wrap directional spectral data to 0-360°.
     spec, dirc = spec_funcs.wrap_directional_spectrum(filtered_data, var=var)                
