@@ -797,7 +797,9 @@ def plot_joint_distribution_Hs_Tp(
         return ax
 
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-    df = data
+    df = data.copy()
+    df.loc[:,'hs'] = df[var_hs].values
+    df.loc[:,'tp'] = aux_funcs.Tp_correction(df[var_tp].values)
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
     
@@ -815,16 +817,16 @@ def plot_joint_distribution_Hs_Tp(
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     t_steepness, h_steepness = aux_funcs.DNV_steepness(df,h,t,periods,interval)
-    percentile05 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5,periods,interval)
-    percentile50 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50,periods,interval)
-    percentile95 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95,periods,interval)
+    percentile05 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,5,periods,interval)
+    percentile50 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,50,periods,interval)
+    percentile95 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,95,periods,interval)
     
     fig, ax = plt.subplots(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
     if density_plot is False: 
-        plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+        plt.scatter(df.tp.values,df[var_hs].values,c='red',label='data',s=3)
     else:
-        #plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+        #plt.scatter(df.tp.values,df[var_hs].values,c='red',label='data',s=3)
         plt.hist2d(df['tp'].values, df['hs'].values,bins=50, cmap='hot',cmin=1)
         plt.colorbar()
 
