@@ -28,7 +28,7 @@ def plot_return_levels(data, var, rl, output_file):
     
     method = rl.attrs['method']
 
-    color = plt.cm.rainbow(np.linspace(0, 1, len(rl)))
+    color = plt.get_cmap('rainbow')(np.linspace(0, 1, len(rl)))
     fig, ax = plt.subplots(figsize=(12,6))
     data[var].plot(color='lightgrey')
     for i in range(len(rl.index)):
@@ -731,7 +731,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
     fig, ax = plt.subplots(figsize=(8,6))
     #custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
     #ax.set_prop_cycle(custom_cycler)
-    cmap = plt.cm.Blues
+    cmap = plt.get_cmap('Blues')
     ii = np.linspace(0.2,1,len(window)-1)
 
     for i in range(len(window)-1):

@@ -1,4 +1,5 @@
 import virocon
+import warnings
 import numpy as np
 from scipy.signal import find_peaks
 
@@ -160,7 +161,7 @@ class LoNoWeDistribution(Distribution):
 
         peaks, _ = find_peaks(-d_pdf)
         if not peaks.size: 
-            print('Warning: No optimal shifting point found.')
+            warnings.warn("No optimal shifting point found.", UserWarning, stacklevel=2)
             peaks = [np.argmin(d_pdf)]
 
         self.shifting_point = np.squeeze(data[peaks[-1]])
