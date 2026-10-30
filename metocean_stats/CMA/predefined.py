@@ -78,9 +78,9 @@ def get_DNVGL_Hs_Tz():
         "distribution": virocon.LogNormalDistribution(),
         "conditional_on": 0,
         "parameters": {
-            "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x \exp(a3)$"), 
+            "mu": virocon.DependenceFunction(_power3, bounds_mu, latex=r"$a1 + a2 * x \exp(a3)$"), 
             # "mu": virocon.DependenceFunction(_power3, bounds_mu, latex="$a1 + a2 * x^a3$"), 
-            "sigma": virocon.DependenceFunction(_exp3, bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$")
+            "sigma": virocon.DependenceFunction(_exp3, bounds_sigma, latex=r"$b1 + b2 * \exp(b3 * x)$")
             },
     }
 
@@ -108,14 +108,14 @@ def get_mixed_dnvgl_virocon_hs_tp():
         return np.log(a1 + a2 * np.sqrt(x))
     bounds_mu = [(0, None), (0, None)]
     mu_dep = virocon.DependenceFunction(
-        _lnsquare2, bounds=bounds_mu, latex="$\ln(a1 + a2 \sqrt{x})$"
+        _lnsquare2, bounds=bounds_mu, latex=r"$\ln(a1 + a2 \sqrt{x})$"
         )
 
     def _exp3(x, b1,b2,b3):
         return b1 + b2 * np.exp(b3 * x)
     bounds_sigma = [(0, None), (0, None), (None, None)]
     sigma_dep = virocon.DependenceFunction(
-        _exp3, bounds=bounds_sigma, latex="$b1 + b2 * \exp(b3 * x)$"
+        _exp3, bounds=bounds_sigma, latex=r"$b1 + b2 * \exp(b3 * x)$"
         )
 
     dist_description_hs = {
@@ -164,8 +164,8 @@ def get_virocon_V_Hs_Tz():
     logistics_bounds = [(None, None), (0, None), (None, 0), (0, None)]
 
     power3 = virocon.DependenceFunction(_power3, bounds, latex="$a + b * x^c$")
-    exp3 = virocon.DependenceFunction(_exp3, bounds, latex="$a + b * \exp(c * x)$")
-    logistics4 = virocon.DependenceFunction(_logistics4, logistics_bounds,weights=lambda x, y: y,latex="$a + b / (1 + \exp[c * (x -d)])$")
+    exp3 = virocon.DependenceFunction(_exp3, bounds, latex=r"$a + b * \exp(c * x)$")
+    logistics4 = virocon.DependenceFunction(_logistics4, logistics_bounds,weights=lambda x, y: y,latex=r"$a + b / (1 + \exp[c * (x -d)])$")
     alpha3 = virocon.DependenceFunction(_alpha3, bounds, d_of_x=logistics4,weights=lambda x, y: y,latex="$(a + b * x^c) / 2.0445^{1 / F()}$")
 
     dist_description_0 = {
@@ -258,7 +258,7 @@ def get_LiGaoMoan_U_hs_tp():
         "conditional_on": 1,
         "parameters": {
             "mu":   virocon.DependenceFunction(_mu,bounds, latex="$e1 + e2 * x^{e3}$"),
-            "sigma":virocon.DependenceFunction(_sigma,   sigma_bounds, latex="$f1 + f2 * \exp(f3 * x)$")},
+            "sigma":virocon.DependenceFunction(_sigma,   sigma_bounds, latex=r"$f1 + f2 * \exp(f3 * x)$")},
     }
 
     dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
@@ -303,10 +303,10 @@ def get_cheynet_wind_misalignment():
         "parameters": {
             #"mu": virocon.DependenceFunction(_mu,   bounds, latex="$e1 + e2 * x^e3$"),
             "mu":virocon.DependenceFunction(
-                _logistics4, logistics_bounds,latex="$a + b / (1 + \exp[c * (x -d)])$"),
+                _logistics4, logistics_bounds,latex=r"$a + b / (1 + \exp[c * (x -d)])$"),
             #"sigma": virocon.DependenceFunction(_sigma, bounds, latex="$f1 + f2 * x^f3$"),
             "sigma": virocon.DependenceFunction(
-                _logistics4, logistics_bounds,latex="$a + b / (1 + \exp[c * (x -d)])$")
+                _logistics4, logistics_bounds,latex=r"$a + b / (1 + \exp[c * (x -d)])$")
         },
     }
 
@@ -351,7 +351,7 @@ def get_vonmises_wind_misalignment():
         "conditional_on": 0,
         "parameters": {
             "mu":virocon.DependenceFunction(_linear,latex="$g1+g2 * x$"),
-            "kappa":virocon.DependenceFunction(_kappa,logistics_bounds,latex="$h1 + h2 / (1 + \exp[h3 * (x - h4)])$"),
+            "kappa":virocon.DependenceFunction(_kappa,logistics_bounds,latex=r"$h1 + h2 / (1 + \exp[h3 * (x - h4)])$"),
         },
     }
 
@@ -417,7 +417,7 @@ def get_cT_Hs_Tp():
         "conditional_on": 1,
         "parameters": {
             "mu":   virocon.DependenceFunction(_mu, bounds_mu, latex="$l1 + l2 * x^{l3}$"),
-            "sigma":virocon.DependenceFunction(_sigma, bounds_sigma, latex="$m1 + m2 * \exp(m3 * x)$")},
+            "sigma":virocon.DependenceFunction(_sigma, bounds_sigma, latex=r"$m1 + m2 * \exp(m3 * x)$")},
     }
 
     dist_descriptions = [dist_description_0,dist_description_1,dist_description_2]
