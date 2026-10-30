@@ -1,3 +1,9 @@
+"""
+Shared helpers for grouping, binning, figure layout and vector conversion.
+"""
+
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -32,24 +38,24 @@ def _decimals_for_step(step: float) -> int:
 
 def bin_range_labels(edges, unit: str = "", wrap: float = None, fmt: str = "{:.10g}") -> list[str]:
     """
-    Format consecutive bin edges as "lo-hiunit" range labels, e.g. "0-2 m"
-    or "30-60°" -- the single labelling convention shared by every
-    range-based (non-categorical) binning in the package, whether the bins
-    come from a plain variable (e.g. Hs) or a cyclic one (direction).
+    Format consecutive bin edges as "lo-hi" range labels.
 
     Parameters
     ----------
     edges : array-like
-        Bin edges, length n+1 for n bins (edges[i] and edges[i+1] are the
-        low/high bound of bin i).
+        Bin edges. For n bins, n + 1 values.
     unit : str, optional
-        Suffix appended after each label, e.g. " m" or "°". Include any
-        separating space yourself; none is added automatically.
+        Suffix appended to each label, e.g. " m". Include any separating space.
     wrap : float, optional
-        If given (e.g. 360), edges are wrapped with ``% wrap`` before
-        formatting -- for cyclic axes like compass direction.
+        If given, edges are reduced modulo `wrap` before formatting. Use 360
+        for direction.
     fmt : str, default "{:.10g}"
-        Format spec applied to each edge value.
+        Format applied to each edge value.
+
+    Returns
+    -------
+    list of str
+        One label per bin.
     """
     edges = np.asarray(edges, dtype=float)
     los, his = edges[:-1], edges[1:]
@@ -89,56 +95,56 @@ def groupby_with_metadata(
         observed: bool = False,
         ) -> dict[str, list]:
     """
-    The package's single shared grouping primitive -- every class's
-    `_get_groups` (and the EVA/CMA classes' own direct grouping) delegates
-    here. Groups `data` by `by`, returning the groups alongside bin-edge
-    metadata computed directly from the actual bin boundaries used at
-    grouping time -- not reconstructed later by parsing a label string
-    back into numbers, which breaks down for things like direction's
-    wrap-around sector.
+    Group a DataFrame by a calendar period, direction sector, or value bin.
 
-    Grouping only ever returns groups and their bin geometry -- never
-    units or Variable metadata, which stay the calling class's job (it
-    knows the Variable; this function never does). Labels are therefore
-    always bare, e.g. "0-2" or "345", not "0-2 m" or "345°".
+    Each group carries the geometry of its bin, computed from the boundaries
+    used for grouping. Labels are bare (e.g. "0-2" or "345"). Units are the
+    caller's responsibility.
 
     Parameters
     ----------
-    by : {"month", "season", "direction", "year", "week", "day", "hour"}
-        or a column name in `data` (binned by value, step controlled by
-        `step`).
+    data : pandas.DataFrame
+        Input data. Calendar groupings use its DatetimeIndex.
+    by : {"month", "season", "direction", "year", "week", "day", "hour"} or str
+        Grouping. Any other string is a column of `data`, binned by value.
     var : str, optional
-        Column to pull out of each group. Groups are DataFrames if not given.
-    var_dir, sectors, seasons, step
-        Direction column name/sector count/season map/bin step, used only
-        by the matching `by` value.
+        Column returned for each group. If None, each group is a DataFrame.
+    var_dir : str, optional
+        Direction column in degrees. Required when ``by="direction"``.
+    sectors : int or list of float, default 12
+        Number of equal direction sectors centred on north, or explicit sector
+        edges.
+    seasons : dict of str to list of int, optional
+        Season names mapped to month numbers. Default DJF, MAM, JJA, SON.
+    step : float, optional
+        Bin width when ``by`` is a column. Inferred if None.
     observed : bool, default False
-        Mirrors pandas' own `groupby(observed=...)`. False (the default)
-        means every category in the bin's full domain is represented,
-        even if empty (empty Series/DataFrame in "data"): all 12 months,
-        all 4 seasons, weeks 1-53, days 1-366, hours 0-23, every sector,
-        every variable bin between the data's min and max. True drops
-        categories with no observations. Consistent across every `by`
-        -- except "year", which has no fixed category domain to begin
-        with: `observed=False` there means every year in
-        [data.index.year.min(), data.index.year.max()], `observed=True`
-        means only years actually present.
+        If False, every category of the full domain is returned, empty ones
+        included: 12 months, 4 seasons, weeks 1-53, days 1-366, hours 0-23,
+        every sector, and every bin between the data minimum and maximum. If
+        True, empty categories are dropped. For ``by="year"``, False gives
+        every year from the data minimum to maximum, and True gives only the
+        years present.
 
     Returns
     -------
-    dict[str, list], one list per key below, all the same length (one
-    entry per bin, in the same order) -- so a caller picks out only the
-    keys it needs, and more keys can be added later without breaking any
-    existing caller:
+    dict of list
+        One list per key, all of equal length and in the same order:
 
-    - "data" : the grouped Series/DataFrame for that bin.
-    - "label", "left_label", "center_label", "right_label" : display text.
-    - "left_tick", "center_tick", "right_tick" : float tick positions, or
-      None for a bin with no meaningful numeric position (season). The
-      direction axis's ticks are the *unwrapped* sector edges (e.g. the
-      north sector is -15..15, not the wrapped 345..15) so they stay
-      monotonic across every sector; its labels still show the wrapped,
-      human-readable 0-360 form (e.g. "345").
+        ``"data"``
+            Group values: a Series if `var` is given, otherwise a DataFrame.
+        ``"label"``, ``"left_label"``, ``"center_label"``, ``"right_label"``
+            Display text for each bin.
+        ``"left_tick"``, ``"center_tick"``, ``"right_tick"``
+            Numeric bin edges and centre, or None for a categorical bin such as
+            a season. Direction ticks are unwrapped, so they stay monotonic:
+            the north sector runs from -15 to 15.
+
+    Raises
+    ------
+    ValueError
+        If ``by="direction"`` is given without `var_dir`, or if `by` is
+        neither a grouping nor a column of `data`.
     """
     if by == "month":
         result = _empty_grouped_result()
@@ -268,15 +274,29 @@ def groupby_with_metadata(
 
 def get_n_axes(n_intervals: int, max_cols: int = 4, sharex=None, sharey=None):
     """
-    Lay out `n_intervals` panels in a single figure as squarely as
-    possible (up to `max_cols` columns, then widening rows), via one
-    `plt.subplots()` call. Shared by every class that plots one subplot
-    per group (EVA, CMA, ProfileEVA).
+    Create a figure with a grid of at least `n_intervals` axes.
+
+    The grid is as square as possible, with at most `max_cols` columns.
+
+    Parameters
+    ----------
+    n_intervals : int
+        Number of panels. Must be positive.
+    max_cols : int, default 4
+        Maximum number of columns.
+    sharex, sharey : bool or str, optional
+        Passed to `matplotlib.pyplot.subplots`.
 
     Returns
     -------
-    (fig, axes) : tuple[plt.Figure, np.ndarray]
-        `axes` is always a flat 1-D array, length nrows*ncols (>= n_intervals).
+    fig : matplotlib.figure.Figure
+    axes : numpy.ndarray
+        Flat array of length ``nrows * ncols``, at least `n_intervals`.
+
+    Raises
+    ------
+    ValueError
+        If `n_intervals` is not positive.
     """
     import matplotlib.pyplot as plt
 
@@ -304,19 +324,30 @@ def get_n_axes(n_intervals: int, max_cols: int = 4, sharex=None, sharey=None):
 
 def resolve_axes_grid(n_panels: int, ax=None, ncols: int = 3, nfigs: int = 1):
     """
-    Resolve the axes to plot `n_panels` group-subplots on: either validate
-    caller-supplied `ax`, or create one or more new figures via
-    `get_n_axes`, splitting panels evenly across `nfigs` figures when more
-    than one is requested. Shared "one subplot per group, across one or
-    more figures" layout used by EVA/CMA's per-group plot methods.
+    Return axes for `n_panels` panels, either the supplied ones or new figures.
+
+    Parameters
+    ----------
+    n_panels : int
+        Number of panels to draw.
+    ax : matplotlib.axes.Axes or array-like, optional
+        Existing axes to use. If given, no figure is created.
+    ncols : int, default 3
+        Maximum number of columns per figure.
+    nfigs : int, default 1
+        Number of figures to split the panels across. Ignored if `ax` is given.
 
     Returns
     -------
-    (figures, axes) : tuple[np.ndarray, np.ndarray]
-        `figures` is every newly-created Figure (empty if `ax` was
-        supplied -- nothing to adjust() in that case, since the caller
-        owns those figures). `axes` is a flat array of at least
-        `n_panels` Axes.
+    figures : numpy.ndarray
+        New figures. Empty if `ax` was given.
+    axes : numpy.ndarray
+        Flat array of at least `n_panels` axes.
+
+    Raises
+    ------
+    ValueError
+        If `ax` provides fewer than `n_panels` axes.
     """
     if ax is not None:
         axes = np.asarray(ax).ravel()
@@ -337,7 +368,20 @@ def resolve_axes_grid(n_panels: int, ax=None, ncols: int = 3, nfigs: int = 1):
 
 
 def infer_step(s: pd.Series, target: int = 10) -> float:
-    """Infer a round step size from the data range, snapped to a nice value."""
+    """Infer a round step size from the data range, snapped to a nice value.
+
+    Parameters
+    ----------
+    s : pandas.Series
+        Data to infer the step from.
+    target : int, default 10
+        Approximate number of bins across the data range.
+
+    Returns
+    -------
+    float
+        Step size from the set 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, scaled by a power of ten.
+    """
     NICE_STEPS = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10]
     raw        = (s.max() - s.min()) / target
     magnitude  = 10 ** np.floor(np.log10(raw))
@@ -347,9 +391,23 @@ def infer_step(s: pd.Series, target: int = 10) -> float:
 
 def bin_edges(s: pd.Series, step: float) -> np.ndarray:
     """
-    Compute bin edges for a series snapped to a given step size.
-    Starts from zero if all values are non-negative, otherwise
-    fits outer edges to the data range.
+    Compute bin edges for a series at a given step.
+
+    Edges start at zero when all values are non-negative, and otherwise at
+    the nearest step below the minimum. The upper edge is the nearest step
+    at or above the maximum.
+
+    Parameters
+    ----------
+    s : pandas.Series
+        Data to bin.
+    step : float
+        Bin width.
+
+    Returns
+    -------
+    numpy.ndarray
+        Evenly spaced edges.
     """
     lo = 0.0 if s.min() >= 0 else np.floor(s.min() / step) * step
     hi = np.ceil(s.max() / step) * step
@@ -357,30 +415,139 @@ def bin_edges(s: pd.Series, step: float) -> np.ndarray:
     return np.linspace(lo, hi, n)
 
 
-def aggregate_statistics(series: pd.Series, func: list[str]) -> dict:
+_STAT_ALIASES = {
+    "count": "count",
+    "min": "min",
+    "minimum": "min",
+    "max": "max",
+    "maximum": "max",
+    "mean": "mean",
+    "std": "std",
+    "median": "median",
+}
+
+# Sort position of each non-percentile kind, chosen so a mixed list of stats
+# comes out "count, %/density, min, ...percentiles/median/mean/std by value...,
+# max" regardless of the order they were given in.
+_KIND_SORT_GROUP = {"count": -2, "percent_of_total": -1, "min": 0, "max": 1}
+_KIND_SORT_VALUE = {"min": 0.0, "median": 50.0, "mean": 50.5, "std": 50.6}
+
+_PERCENT_RE = re.compile(r"^(\d+(?:\.\d+)?)%$")
+_P_RE = re.compile(r"^p(\d+(?:\.\d+)?)$")
+
+
+def _parse_stat(name: str) -> tuple[str, float | None]:
     """
-    Apply a list of statistic names to a series and return a dict of results.
-    Accepts: "min", "mean", "max", "std", "count", and percentiles as "p90", "P90", "90%" etc.
+    Parse one statistic token into (kind, percentile).
+
+    `kind` is one of "count", "min", "max", "mean", "std", "median",
+    "percentile", or "percent_of_total" (``"%"`` or ``"density"``).
+    `percentile` is the matched percentile (0-100) for kind "percentile",
+    otherwise None. Matching is case-insensitive.
     """
+    key = name.strip().lower()
+
+    if key in ("%", "density"):
+        return "percent_of_total", None
+    if key in _STAT_ALIASES:
+        return _STAT_ALIASES[key], None
+
+    m = _PERCENT_RE.match(key) or _P_RE.match(key)
+    if m:
+        value = float(m.group(1))
+        if not (0.0 <= value <= 100.0):
+            raise ValueError(
+                f"Percentile in '{name}' must be between 0 and 100, got {value}."
+            )
+        return "percentile", value
+
+    raise ValueError(
+        f"Unrecognised statistic '{name}'. Expected one of 'count', 'min' "
+        "('minimum'), 'max' ('maximum'), 'mean', 'std', 'median', '%' "
+        "('density'), or a percentile such as 'P90' or '90%' "
+        "(case-insensitive)."
+    )
+
+
+def _stat_sort_key(parsed: tuple[str, float | None]) -> tuple[float, float]:
+    kind, pct = parsed
+    group = _KIND_SORT_GROUP.get(kind, 0)
+    value = pct if kind == "percentile" else _KIND_SORT_VALUE.get(kind, 0.0)
+    return (group, value)
+
+
+def aggregate_statistics(
+        series: pd.Series,
+        stats: list[str],
+        total: int | None = None,
+    ) -> dict:
+    """
+    Compute named statistics of a series.
+
+    Parameters
+    ----------
+    series : pandas.Series
+        Data to summarise.
+    stats : list of str
+        Statistic names, case-insensitive:
+
+        - ``"count"``: number of valid (non-NaN) values.
+        - ``"min"`` / ``"minimum"``, ``"max"`` / ``"maximum"``.
+        - ``"mean"``, ``"std"``, ``"median"``.
+        - A percentile, given as ``"P<value>"`` or ``"<value>%"`` (e.g.
+          ``"P90"``, ``"p05"``, ``"P99.9"``, ``"95%"``, ``"0.01%"``).
+          ``"P90"`` and ``"90%"`` are equivalent. A bare number with
+          neither a leading ``P`` nor a trailing ``%`` is rejected, since
+          it would be ambiguous between a fraction and a percentage.
+        - ``"%"`` / ``"density"``: `series`'s count as a percentage of
+          `total`. Requires `total` to be given.
+    total : int, optional
+        Denominator for ``"%"`` / ``"density"``. Required only if `stats`
+        includes one of those tokens.
+
+    Returns
+    -------
+    dict
+        Maps each entry of `stats` to its value, in a standardised,
+        sorted order (count, then "%"/density, then min/percentiles/
+        median/mean/std ordered by position in the distribution, then
+        max) regardless of the order `stats` was given in. Keys are
+        exactly the strings given in `stats`, so the display format
+        (e.g. ``"P90"`` vs ``"p90"`` vs ``"90%"``) is preserved.
+
+    Raises
+    ------
+    ValueError
+        If a name is not recognised, a percentile is out of [0, 100], or
+        ``"%"``/``"density"`` is requested without `total`.
+    """
+    parsed = {name: _parse_stat(name) for name in stats}
+    ordered_names = sorted(parsed, key=lambda name: _stat_sort_key(parsed[name]))
+
     result = {}
-    for f in func:
-        fl = f.lower().strip("%")
-        if fl == "min":
-            result[f] = series.min()
-        elif fl == "mean":
-            result[f] = series.mean()
-        elif fl == "max":
-            result[f] = series.max()
-        elif fl == "std":
-            result[f] = series.std()
-        elif fl == "count":
-            result[f] = series.count()
-        elif fl.startswith("p") and fl[1:].isdigit():
-            result[f] = series.quantile(int(fl[1:]) / 100)
-        elif fl.isdigit():
-            result[f] = series.quantile(int(fl) / 100)
-        else:
-            raise ValueError(f"Unknown aggregation function: '{f}'")
+    for name in ordered_names:
+        kind, pct = parsed[name]
+        if kind == "count":
+            result[name] = series.count()
+        elif kind == "min":
+            result[name] = series.min()
+        elif kind == "max":
+            result[name] = series.max()
+        elif kind == "mean":
+            result[name] = series.mean()
+        elif kind == "std":
+            result[name] = series.std()
+        elif kind == "median":
+            result[name] = series.median()
+        elif kind == "percentile":
+            result[name] = series.quantile(pct / 100.0)
+        elif kind == "percent_of_total":
+            if total is None:
+                raise ValueError(
+                    f"'{name}' requires `total` to be given (count of "
+                    "`series` as a percentage of `total`)."
+                )
+            result[name] = 100 * series.count() / total if total else np.nan
     return result
 
 
@@ -391,10 +558,27 @@ def table_to_latex(
         column_fmt: str = None,
     ):
     """
-    Script to write a pandas dataframe to a latex .tex file.
-    Allows setting a per-column float format.
-    The top left cell will be the index name, if set,
-    otherwise the column name, if set, otherwise empty.
+    Write a DataFrame to a LaTeX tabular file.
+
+    The top-left cell is the index name if set, otherwise the column name if
+    set, otherwise empty.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        Table to write.
+    filename : str
+        Output path. ``.tex`` is appended if missing.
+    float_format : str or sequence of str
+        printf-style format for values. A sequence needs one entry for the
+        index followed by one per column.
+    column_fmt : str, optional
+        Format applied to numeric column headers.
+
+    Raises
+    ------
+    ValueError
+        If `float_format` is a sequence of the wrong length.
     """
     if not filename.endswith(".tex"): filename += ".tex"
 
@@ -447,19 +631,24 @@ def table_to_latex(
 
 
 def dirmag_to_uv(wind_direction, wind_speed, going_to=True):
-    '''
-    Get wind x (east) and y (north) component 
-    from speed and direction (degrees, default: going to).
+    """
+    Convert speed and direction to eastward and northward components.
 
     Parameters
-    ---------
-    wind_direction : np.ndarray
-        Wind direction (degrees)
-    wind_speed : np.ndarray
-        Wind Speed (degrees)
-    going_to : bool, default True (oceanographic)
-        Controls direction convention, False gives "from" direction.
-    '''
+    ----------
+    wind_direction : numpy.ndarray
+        Direction in degrees.
+    wind_speed : numpy.ndarray
+        Speed, in any unit. The components are returned in the same unit.
+    going_to : bool, default True
+        Direction convention. True is oceanographic ("going to"), False is
+        meteorological ("coming from").
+
+    Returns
+    -------
+    u, v : numpy.ndarray
+        Eastward and northward components.
+    """
     
     wind_direction = np.radians(wind_direction)
     
@@ -471,19 +660,26 @@ def dirmag_to_uv(wind_direction, wind_speed, going_to=True):
     return u,v
 
 def uv_to_dirmag(u, v, going_to=True):
-    '''
-    Get direction (degrees, default: going to) and magnitude 
-    from u (east) and v (north) components.
+    """
+    Convert eastward and northward components to direction and magnitude.
 
     Parameters
-    ---------
-    u : np.ndarray
-        Eastwards velocity
-    v : np.ndarray
-        Northwards velocity
+    ----------
+    u : numpy.ndarray
+        Eastward component.
+    v : numpy.ndarray
+        Northward component.
     going_to : bool, default True
-        Controls direction convention, False gives "from" direction.
-    '''
+        Direction convention. True is oceanographic ("going to"), False is
+        meteorological ("coming from").
+
+    Returns
+    -------
+    direction : numpy.ndarray
+        Direction in degrees, in [0, 360).
+    magnitude : numpy.ndarray
+        Magnitude, in the units of `u` and `v`.
+    """
     direction = np.degrees(np.arctan2(u,v))%360
     
     if not going_to:

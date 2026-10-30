@@ -1,3 +1,7 @@
+"""
+Weather window analysis: feasibility of staged operations over a time series.
+"""
+
 import warnings
 import itertools
 import typing
@@ -12,139 +16,124 @@ from ..utils import aggregate_statistics, groupby_with_metadata
 
 class WeatherWindow:
     """
-    Weather window analysis module.
-    
-    A weather window is a sequence of stages that must be completed in order.
-    Each stage has a duration (fixed or flexible) and optional criteria.
-    
-    Example
-    -------
-    >>> # Simple: constant criteria for 24 timesteps
-    >>> ts.WW.fit(stages=[{"duration": 24, "criteria": {"hs": 2.0, "ws": 12.0}}])
-    >>>
-    >>> # Staged: varying criteria
-    >>> ts.WW.fit(stages=[
+    Find feasible start times for a sequence of operational stages.
+
+    Each stage has a fixed or flexible duration and optional threshold criteria.
+    A start time is feasible if every stage can be completed in order from it,
+    with each timestep meeting that stage's criteria.
+
+    Examples
+    --------
+    >>> from metocean_stats.WW import WeatherWindow
+    >>> ww = WeatherWindow(df, timestep=1, direction="dir")
+    >>> ww.fit(stages=[{"duration": 24, "criteria": {"hs": 2.0, "ws": 12.0}}])
+    >>> ww.fit(stages=[
     ...     {"duration": 12, "criteria": {"hs": 4.0}},
     ...     {"duration": 12, "criteria": {"hs": 6.0}},
     ... ])
-    >>>
-    >>> # Flexible: with pause/safe state
-    >>> ts.WW.fit(stages=[
-    ...     {"duration": 12, "criteria": {"hs": 4.0}},
-    ...     {"duration": (0, 24)},  # flexible pause, no criteria
-    ...     {"duration": 12, "criteria": {"hs": (2.0, 4.0)}},  # lower and upper bounds
-    ... ])
     """
-        
-    def __init__(self, data, variables, timestep, direction=None):
+
+    def __init__(self, data, timestep, direction=None):
         """
-        Initialize WeatherWindow analyzer.
-        
         Parameters
         ----------
-        data : pd.DataFrame
-            Time series data with DatetimeIndex.
-        variables : dict or list
-            Variable objects or names.
+        data : pandas.DataFrame
+            Time series with a DatetimeIndex.
         direction : str, optional
-            Direction variable (degrees). Used for directional statistics.
-        timestep : int, float, str, or pd.Timedelta
-            Time resolution of the data.
-            - int/float: interpreted as hours
-            - str: pandas-compatible timedelta string (e.g., '1h', '3H', '30min')
-            - pd.Timedelta: used directly
+            Column of ``data`` holding the direction in degrees.
+        timestep : int, float, str or pandas.Timedelta
+            Sampling interval. Numbers are hours. Strings are parsed by pandas.
+
+        Raises
+        ------
+        ValueError
+            If ``direction`` is not a column of ``data``.
+        TypeError
+            If ``timestep`` is not one of the accepted types.
         """
         if direction and direction not in data.columns:
             raise ValueError(f"Direction var {direction} is not a column of the data.")
         
+        #: Input time series with a DatetimeIndex.
         self.data = data
-        self.variables = variables
+        #: Column of ``data`` holding the direction in degrees, or None.
         self.direction = direction
         
         # Standardize timestep to pd.Timedelta
         if isinstance(timestep, pd.Timedelta):
-            self.timestep = timestep
+            delta = timestep
         elif isinstance(timestep, (int, float)):
-            self.timestep = pd.Timedelta(hours=timestep)
+            delta = pd.Timedelta(hours=timestep)
         elif isinstance(timestep, str):
-            self.timestep = pd.Timedelta(timestep)
+            delta = pd.Timedelta(timestep)
         else:
             raise TypeError(
                 f"timestep must be int, float, str, or pd.Timedelta, "
                 f"got {type(timestep).__name__}"
             )
         
+        #: Sampling interval of ``data``.
+        self.timestep = delta
+
         # State (populated by .fit())
-        self.stages = None           # List of standardized stage definitions
-        self.result = None           # DataFrame with all data + computed metrics
+        #: Standardized stages, set by `fit`. None before fitting.
+        self.stages = None
+        #: Input data with the metrics added by `fit`. None before fitting.
+        self.result = None
 
     def fit(self, stages: list[dict]):
         """
-        Find all feasible weather windows for the given staged operation.
-        
+        Find all start times at which the staged operation can be completed.
+
         Parameters
         ----------
-        stages : list[dict]
-            Ordered list of operation stages. Each stage is a dict with:
-            
-            - "duration" : int or tuple[int, int]
-                Number of timesteps required (fixed) or range (min, max) for
-                flexible pauses.
-                
-            - "criteria" : dict[str, float or tuple], optional
-                Variable name → threshold(s) mapping during this stage.
-                
-                Single value = upper limit (must be ≤ value)
-                Tuple (lower, upper) = must be within range [lower, upper]
-                Use None, NaN, or ±inf for unbounded limits
-                
-                Examples:
-                {"hs": 2.0}           # Hs must be ≤ 2.0
-                {"hs": (1.0, 3.0)}    # Hs must be in [1.0, 3.0]
-                {"hs": (2.0, None)}   # Hs must be ≥ 2.0 (no upper limit)
-                {"hs": (None, 4.0)}   # Hs must be ≤ 4.0 (explicit)
-                
-                If omitted, no criteria (always satisfied).
-        
+        stages : list of dict
+            Ordered stages. Each dict has:
+
+            ``"duration"`` : int or tuple of int
+                Fixed number of timesteps, or ``(min, max)`` for a flexible stage.
+            ``"criteria"`` : dict, optional
+                Maps column names to limits. A scalar is an upper bound. A
+                ``(lower, upper)`` tuple sets both bounds. ``None``, NaN or inf
+                leaves a bound open. Omitted means no criteria.
+
         Returns
         -------
-        self
-            For method chaining.
-        
+        WeatherWindow
+            ``self``, to allow chaining.
+
+        Raises
+        ------
+        TypeError
+            If ``stages`` or a stage has the wrong type.
+        ValueError
+            If a duration or criteria entry is invalid, or a criteria column
+            is missing from ``data``.
+
+        Warns
+        -----
+        UserWarning
+            If ``data`` has gaps larger than ``timestep``.
+
         Notes
         -----
-        After fitting, results are available as:
-        - `self.result`: DataFrame with original data plus computed metrics:
-            - `can_start`: Boolean indicating feasible start times
-            - `duration`: Operation duration in timesteps
-            - `waiting_time`: Time until next window in timesteps
-            - `characteristic_duration`: waiting_time + duration
-        
+        Adds ``can_start``, ``duration``, ``waiting_time`` and
+        ``characteristic_duration`` to ``result``. ``characteristic_duration``
+        is ``waiting_time`` plus the duration of the next feasible window.
+        Times in ``result`` are in timesteps.
+
         Examples
         --------
-        >>> # Single stage, 24 timesteps, Hs ≤ 2m and Ws ≤ 12 m/s
         >>> ww.fit(stages=[{"duration": 24, "criteria": {"hs": 2.0, "ws": 12.0}}])
-        >>>
-        >>> # Two stages with different criteria
         >>> ww.fit(stages=[
         ...     {"duration": 12, "criteria": {"hs": 4.0}},
         ...     {"duration": 12, "criteria": {"hs": 6.0}},
         ... ])
-        >>>
-        >>> # Range criteria: Hs must be between 1m and 3m
-        >>> ww.fit(stages=[
-        ...     {"duration": 12, "criteria": {"hs": (1.0, 3.0)}},
-        ... ])
-        >>>
-        >>> # Lower bound only: Tp must be at least 5 seconds
-        >>> ww.fit(stages=[
-        ...     {"duration": 12, "criteria": {"tp": (5.0, None)}},
-        ... ])
-        >>>
-        >>> # Flexible pause: wait 0-24 timesteps with no criteria
+        >>> ww.fit(stages=[{"duration": 12, "criteria": {"hs": (1.0, 3.0)}}])
+        >>> ww.fit(stages=[{"duration": 12, "criteria": {"tp": (5.0, None)}}])
         >>> ww.fit(stages=[
         ...     {"duration": 12, "criteria": {"hs": 4.0}},
-        ...     {"duration": (0, 24)},  # no criteria during pause
+        ...     {"duration": (0, 24)},
         ...     {"duration": 12, "criteria": {"hs": 4.0}},
         ... ])
         """
@@ -471,6 +460,7 @@ class WeatherWindow:
                 can_start[t] = False
  
         # Expose as dict keyed by timestamp for O(1) lookup in plot_timeseries
+        #: Maps each feasible start timestamp to its per-stage durations, in timesteps.
         self.stage_durations = {
             self.data.index[t]: stage_durations_arr[t]
             for t in range(n)
@@ -613,52 +603,46 @@ class WeatherWindow:
         self,
         by: typing.Literal["month", "season", "direction", "year"] | str = "month",
         metric: typing.Literal["waiting_time", "duration", "characteristic_duration"] = "waiting_time",
-        func: list[str] = None,
+        stats: list[str] = None,
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
     ) -> pd.DataFrame:
         """
-        Aggregated statistics for weather window metrics grouped by month, season, direction, or year.
-        
+        Aggregate a weather window metric over groups.
+
         Parameters
         ----------
         by : {"month", "season", "direction", "year"} or str
-            Grouping strategy. Can also be a column name in self.result.
-            Defaults to "month".
+            Grouping. Any other string is a column of ``result``, binned by value.
         metric : {"waiting_time", "duration", "characteristic_duration"}
-            Which metric to analyze:
-            - 'waiting_time': Time until next feasible window (in timesteps)
-            - 'duration': Operation duration if starting now (in timesteps)
-            - 'characteristic_duration': waiting_time + duration (total timesteps)
-        func : list[str], optional
-            Aggregation functions to apply. Accepts: "min", "mean", "max", "std", 
-            "count", "%", and percentiles as "p90", "P90", "90%" etc.
-            Defaults to ["min", "mean", "max", "std", "count", "%"].
+            Metric to aggregate, in timesteps.
+        stats : list of str, optional
+            Statistics, as accepted by `utils.aggregate_statistics`: "min"/
+            "minimum", "mean", "max"/"maximum", "std", "median", "count",
+            "%"/"density" (percentage of all rows of ``result`` in each
+            group), or a percentile such as "P90" or "90%". Defaults to
+            ``["min", "mean", "max", "std", "count", "%"]``.
         sectors : int, optional
-            Number of directional sectors (only used when by="direction").
-            Defaults to 12.
-        seasons : dict[str, list[int]], optional
-            Custom season definitions mapping season names to month lists 
-            (only used when by="season").
-            Defaults to {"DJF": [12,1,2], "MAM": [3,4,5], "JJA": [6,7,8], "SON": [9,10,11]}.
+            Direction sectors when ``by="direction"``. Default 12.
+        seasons : dict of str to list of int, optional
+            Season names mapped to month numbers when ``by="season"``.
+            Default DJF, MAM, JJA, SON.
         step : float, optional
-            Bin width for variable grouping (only used when by is a column name).
-            If not provided, is inferred automatically.
-        
+            Bin width when ``by`` is a column. Inferred if None.
+
         Returns
         -------
-        pd.DataFrame
-            Statistics aggregated by groups (columns) and statistics/percentiles (rows).
-            Includes an "All" column with statistics across all data.
-        
+        pandas.DataFrame
+            Groups as rows, with an ``"All"`` row, statistics as columns.
+
         Raises
         ------
         RuntimeError
-            If .fit() hasn't been called.
+            If `fit` has not been called.
         ValueError
-            If `by` is not recognized or metric is invalid.
-        
+            If ``metric`` is invalid, or ``by`` is neither a grouping nor a column.
+
         Examples
         --------
         >>> ww.fit(stages=[{"duration": 12, "criteria": {"hs": 4.0}}])
@@ -688,7 +672,7 @@ class WeatherWindow:
                 f"got {metric}"
             )
         
-        func = func or ["min", "mean", "max", "std", "count", "%"]
+        stats = stats or ["min", "mean", "max", "std", "count", "%"]
         
         # Get groups
         groups = self._get_groups(
@@ -703,16 +687,9 @@ class WeatherWindow:
         # Aggregation
         n_total = len(self.result)
 
-        include_ratio = "%" in func
-        func = [f for f in func if f != "%"]
-        def _agg_row(s: pd.Series) -> dict:
-            result = aggregate_statistics(s, func=func)
-            # Handle "%" function if present
-            if include_ratio:
-                result["%"] = 100 * len(s) / n_total
-            return result
-        
-        df = pd.DataFrame({label: _agg_row(s) for label, s in groups.items()}).T
+        df = pd.DataFrame({
+            label: aggregate_statistics(s, stats, total=n_total) for label, s in groups.items()
+        }).T
         df.index.name = by
         df.columns.name = metric
         return df
@@ -818,28 +795,36 @@ class WeatherWindow:
         xlim: tuple = None,
     ):
         """
-        Plot the frequency of weather window starts at multiple climatological scales.
-        For each frequency, groups data by year and that period (hour-of-day, day-of-year, etc.),
-        takes .any() within each (year, period) bin, then means across years — giving the
-        fraction of years in which at least one window started in that period.
+        Plot the fraction of years with at least one window start, per period.
+
+        For each frequency, start flags are reduced with ``any`` per (year,
+        period) pair, then averaged over years.
 
         Parameters
         ----------
-        freqs : list[str], optional
-            List of frequencies to plot. Options: "h"/"hour", "D"/"day", "W"/"week", "M"/"month".
-            Defaults to ["M", "W", "D", "h"].
+        freqs : list of str, optional
+            Periods to plot: "h"/"hour", "D"/"day", "W"/"week", "M"/"month".
+            Default ``["M", "W", "D", "h"]``.
         ax : matplotlib.axes.Axes, optional
-            Axes to plot on. If None, creates a new figure.
-        xlim : tuple[str,str], optional
-            Limit the plot by providing month-day strings, for example ("06-01","07-31").
+            Axes to draw on. A new figure is created if None.
+        xlim : tuple of str, optional
+            Month-day limits, e.g. ``("06-01", "07-31")``.
 
         Returns
         -------
         matplotlib.axes.Axes
-            The axes with the plot.
+
+        Raises
+        ------
+        RuntimeError
+            If `fit` has not been called.
+        ValueError
+            If a frequency is unknown, or "h" is requested for a timestep of
+            one day or more.
 
         Examples
         --------
+        >>> import matplotlib.pyplot as plt
         >>> ww.fit(stages=[{"duration": 12, "criteria": {"hs": 4.0}}])
         >>> fig, ax = plt.subplots(figsize=(15, 6))
         >>> ww.plot_operability(freqs=["M", "W", "D", "h"], ax=ax)
@@ -953,7 +938,7 @@ class WeatherWindow:
         self,
         by: typing.Literal["month", "season", "direction", "year"] | str = "month",
         metric: typing.Literal["waiting_time", "duration", "characteristic_duration"] = "characteristic_duration",
-        func: list[str] = None,
+        stats: list[str] = None,
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
@@ -964,48 +949,48 @@ class WeatherWindow:
         show_table: bool = True,
     ):
         """
-        Line plot of aggregated weather window statistics grouped by month,
-        season, direction, year, or any column — mirroring the flexibility
-        of :meth:`statistics`.
+        Plot statistics of a weather window metric per group.
 
-        Each line represents one statistic (e.g. mean, p90, max). The x-axis
-        shows the categories defined by ``by`` (e.g. months Jan–Dec). An
-        optional summary table is attached directly below the plot via
-        ``ax.table()``, so it always matches the plot width exactly.
+        One line per statistic over the categories of ``by``. An optional
+        summary table is drawn below the axes.
 
         Parameters
         ----------
         by : {"month", "season", "direction", "year"} or str
-            Grouping strategy — passed directly to :meth:`statistics`.
+            Grouping, as in `statistics`.
         metric : {"waiting_time", "duration", "characteristic_duration"}
-            Which metric to plot. Defaults to ``"characteristic_duration"``.
-        func : list[str], optional
-            Statistics to compute. Accepts: "min", "mean", "max", "std",
-            "count", "%" and percentile strings like "p50", "p90", "90%" etc.
-            "count" and "%" are included in the table but omitted from the
-            line plot (no time unit). Defaults to ["mean", "max", "p50", "p90"].
+            Metric to plot. Default "characteristic_duration".
+        stats : list of str, optional
+            Statistics to compute, as accepted by `statistics`. "count" and
+            "%"/"density" appear in the table only. Default
+            ``["P50", "mean", "P90", "P95", "P99"]``.
         sectors : int, optional
-            Number of directional sectors (only used when ``by="direction"``).
-        seasons : dict[str, list[int]], optional
-            Custom season definitions (only used when ``by="season"``).
+            Direction sectors when ``by="direction"``.
+        seasons : dict of str to list of int, optional
+            Season definitions when ``by="season"``.
         step : float, optional
-            Bin width for variable grouping (only used when ``by`` is a column name).
-        unit : {"hours", "days"}
-            Display unit for the y-axis and table. Raw values are in timesteps.
-            Defaults to ``"hours"``.
+            Bin width when ``by`` is a column.
+        unit : {"hours", "days"}, optional
+            Unit of time-based values. Default "hours".
         ax : matplotlib.axes.Axes, optional
-            Axes to draw on. A new figure is created when ``None``.
-        figsize : tuple, optional
-            Figure size. Defaults are chosen automatically.
+            Axes to draw on. A new figure is created if None.
+        figsize : tuple of float, optional
+            Figure size in inches.
         colormap : str, optional
-            Matplotlib colormap name for line colours. Defaults to ``"tab10"``.
+            Matplotlib colormap for the lines. Default "tab10".
         show_table : bool, optional
-            Attach a summary table below the plot via ``ax.table()``.
-            Defaults to ``True``.
+            Draw the summary table below the axes. Default True.
 
         Returns
         -------
         matplotlib.axes.Axes
+
+        Raises
+        ------
+        RuntimeError
+            If `fit` has not been called.
+        ValueError
+            If ``unit`` or ``metric`` is invalid.
 
         Examples
         --------
@@ -1025,7 +1010,7 @@ class WeatherWindow:
         >>> ww.plot_statistics(
         ...     by="year",
         ...     metric="duration",
-        ...     func=["mean", "p50", "p90", "max"],
+        ...     stats=["mean", "P50", "P90", "max"],
         ... )
         """
         self._require_fit()
@@ -1033,7 +1018,7 @@ class WeatherWindow:
         # ------------------------------------------------------------------
         # Defaults
         # ------------------------------------------------------------------
-        func        = func        or ["p50", "mean", "P90", "P95", "P99"]
+        stats = stats or ["P50", "mean", "P90", "P95", "P99"]
 
         # ------------------------------------------------------------------
         # Unit conversion
@@ -1061,7 +1046,7 @@ class WeatherWindow:
         stats_df = self.statistics(
             by=by,
             metric=metric,
-            func=func,
+            stats=stats,
             sectors=sectors,
             seasons=seasons,
             step=step,
@@ -1077,7 +1062,7 @@ class WeatherWindow:
         plot_df   = stats_df.loc[cat_rows]
 
         # Columns that have a time unit → plotted as lines
-        NON_TIME_COLS = {"count", "%", "std"}
+        NON_TIME_COLS = {"count", "%", "density", "std"}
         line_cols  = [c for c in plot_df.columns if str(c).lower() not in NON_TIME_COLS]
 
         # Scale time columns
@@ -1131,7 +1116,7 @@ class WeatherWindow:
                 rl = str(row_label).lower()
                 if rl == "count":
                     return f"{int(val)}"
-                if rl == "%":
+                if rl in ("%", "density"):
                     return f"{val:.1f}%"
                 return f"{val:.1f}"
 
@@ -1172,32 +1157,6 @@ class WeatherWindow:
         return ax
 
     def __repr__(self) -> str:
-        """
-        Concise summary of the WeatherWindow object.
-
-        Shows setup info always; adds stage definitions and key results
-        once :meth:`fit` has been called.
-
-        Examples
-        --------
-        >>> ww = WeatherWindow(data, variables, timestep=1)
-        >>> ww                          # before fit — shows setup only
-        WeatherWindow | 8760 records  2015-01-01 → 2015-12-31  Δt=1h
-
-        >>> ww.fit(stages=[...])
-        >>> ww                          # after fit — full summary
-        WeatherWindow | 8760 records  2015-01-01 → 2015-12-31  Δt=1h
-        Stages
-          #0  duration: 12h       Hs ≤ 2.0,  Ws ≤ 12.0
-          #1  duration: 12h       Hs ≤ 4.0
-        Results
-          Feasible windows  : 1 423  (16.2% of evaluated timestamps)
-          Median wait       : 18h
-          Mean wait         : 34h
-          P90 wait          : 96h
-          Duration          : 24h (fixed)
-          Data coverage     : 97.3%
-        """
         ts_hours = self.timestep / pd.Timedelta(hours=1)
 
         # ---- header (always shown) ----
@@ -1286,72 +1245,59 @@ class WeatherWindow:
         step_row: float = None,
         step_col: float = None,
         metric: typing.Literal["availability", "waiting_time", "duration", "characteristic_duration"] = "availability",
-        func: str = None,
+        stat: str = None,
         margins: bool = True,
         sectors: int = None,
         seasons_row: dict[str, list[int]] = None,
         seasons_col: dict[str, list[int]] = None,
     ) -> pd.DataFrame:
         """
-        2D table of a weather-window metric grouped by two axes.
-
-        Each axis can be a grouping keyword ("month", "season", "direction",
-        "year") or any column name in ``self.result`` (binned by value).
+        Tabulate a weather window metric over two grouping axes.
 
         Parameters
         ----------
         row : str
-            Row axis — grouping keyword or column name. Defaults to
-            ``"direction"``.
+            Grouping keyword ("month", "season", "direction", "year") or a
+            column of ``result``, binned by value. Default "direction".
         col : str
-            Column axis — grouping keyword or column name. Defaults to
-            ``"month"``.
+            Same options as ``row``. Default "month". Must differ from ``row``.
         step_row : float, optional
-            Bin width for row axis when ``row`` is a column name.
+            Bin width when ``row`` is a column.
         step_col : float, optional
-            Bin width for col axis when ``col`` is a column name.
+            Bin width when ``col`` is a column.
         metric : {"availability", "waiting_time", "duration", "characteristic_duration"}
-            Which quantity to tabulate.
-
-            - ``"availability"`` (default): percentage of timestamps in each
-              bin where a window can start. ``func`` is ignored; the result is
-              always a ratio.
-            - ``"waiting_time"``, ``"duration"``, ``"characteristic_duration"``:
-              aggregated value of that column (in timesteps) per bin, using
-              ``func``.
-        func : str, optional
-            Aggregation function applied to continuous metrics. Accepts
-            ``"min"``, ``"mean"``, ``"max"``, ``"std"``, and percentile
-            strings such as ``"p50"``, ``"p90"``, ``"90%"``.
-            Ignored when ``metric="availability"``.
-            Defaults to ``"mean"``.
-        margins : bool
-            Append an ``"All"`` row and column with marginal values.
-            Defaults to ``True``.
+            "availability" gives the percentage of timesteps in each cell where
+            a window can start. Other metrics give ``stat`` of that metric, in
+            timesteps.
+        stat : str, optional
+            Aggregation for non-availability metrics, as accepted by
+            `utils.aggregate_statistics`: "min"/"minimum", "mean",
+            "max"/"maximum", "std", "median", or a percentile such as "P50"
+            or "90%". Default "mean". For availability, only ``"count"``
+            changes the result (window counts).
+        margins : bool, optional
+            Append an "All" row and column. Default True.
         sectors : int, optional
-            Number of directional sectors. Used when ``row`` or ``col`` is
-            ``"direction"``. Defaults to 12.
-        seasons_row : dict[str, list[int]], optional
-            Custom season definitions for the row axis.
-        seasons_col : dict[str, list[int]], optional
-            Custom season definitions for the col axis.
+            Direction sectors when a direction axis is used. Default 12.
+        seasons_row : dict of str to list of int, optional
+            Season definitions for ``row``.
+        seasons_col : dict of str to list of int, optional
+            Season definitions for ``col``.
 
         Returns
         -------
-        pd.DataFrame
-            Row groups as index, column groups as columns.
-            - ``metric="availability"``: values are availability % rounded to
-              1 decimal, or integer counts when ``func="count"``.
-            - other metrics: values are aggregated in timesteps, rounded to
-              1 decimal.
+        pandas.DataFrame
+            Row groups as index, column groups as columns. Availability is
+            rounded to one decimal, or integer counts for ``stat="count"``.
+            Other metrics are rounded to one decimal.
 
         Raises
         ------
         RuntimeError
-            If :meth:`fit` has not been called.
+            If `fit` has not been called.
         ValueError
-            If ``row == col``, ``metric`` is invalid, or a direction axis is
-            requested without a direction variable set.
+            If ``metric`` is invalid, ``row`` equals ``col``, or a direction
+            axis is requested without a direction column.
 
         Examples
         --------
@@ -1363,17 +1309,17 @@ class WeatherWindow:
         >>> # Mean waiting time by month x year
         >>> ww.availability_table(
         ...     row="month", col="year",
-        ...     metric="waiting_time", func="mean",
+        ...     metric="waiting_time", stat="mean",
         ... )
 
         >>> # P90 characteristic duration by season x direction
         >>> ww.availability_table(
         ...     row="season", col="direction",
-        ...     metric="characteristic_duration", func="p90",
+        ...     metric="characteristic_duration", stat="p90",
         ... )
 
         >>> # Raw window counts instead of availability
-        >>> ww.availability_table(metric="availability", func="count")
+        >>> ww.availability_table(metric="availability", stat="count")
         """
         self._require_fit()
 
@@ -1394,41 +1340,14 @@ class WeatherWindow:
             )
 
         # Default aggregation function
-        if func is None:
-            func = "mean"
+        if stat is None:
+            stat = "mean"
 
         # ------------------------------------------------------------------
-        # Parse func into a callable that operates on a pd.Series
+        # Fail fast on an unrecognised `stat`, consistent with the shared parser.
         # ------------------------------------------------------------------
-        def _parse_func(f):
-            """Return a (label, callable) pair for an aggregation function string."""
-            fl = f.strip().lower()
-            if fl == "min":
-                return lambda s: s.min()
-            if fl in ("mean", "average", "avg"):
-                return lambda s: s.mean()
-            if fl == "max":
-                return lambda s: s.max()
-            if fl == "std":
-                return lambda s: s.std()
-            if fl == "count":
-                return lambda s: int(s.count())
-            # Percentile: p90, P90, 90%, 0.9 etc.
-            for pattern, factor in (
-                (r"^p(\d+(?:\.\d+)?)$",    1.0),
-                (r"^(\d+(?:\.\d+)?)%$",    1.0),
-            ):
-                import re
-                m = re.match(pattern, fl)
-                if m:
-                    q = float(m.group(1)) / 100.0 * factor
-                    return lambda s, q=q: s.quantile(q)
-            raise ValueError(
-                f"Unrecognised func {f!r}. Use 'min', 'mean', 'max', 'std', "
-                f"'count', or a percentile string like 'p90' or '90%'."
-            )
-
-        agg_fn = _parse_func(func)
+        aggregate_statistics(pd.Series([1.0, 2.0]), [stat])
+        agg_fn = lambda s: aggregate_statistics(s, [stat])[stat]
 
         # ------------------------------------------------------------------
         # Get groups for each axis
@@ -1462,7 +1381,7 @@ class WeatherWindow:
             s = core.reindex(shared_idx).dropna()
 
             if metric == "availability":
-                if func == "count":
+                if stat == "count":
                     return int(s.sum())
                 n = len(s)
                 if n == 0:
@@ -1505,7 +1424,7 @@ class WeatherWindow:
             # Bottom-right corner: aggregate over everything
             df.loc["All", "All"] = _cell(all_idx, all_idx)
 
-            if metric == "availability" and func == "count":
+            if metric == "availability" and stat == "count":
                 df = df.astype(int)
 
         df.index.name   = row
@@ -1526,53 +1445,47 @@ class WeatherWindow:
         xlim: tuple[str, str] = None,
     ):
         """
-        Temporal raster plot with years on the y-axis and date-within-year
-        on the x-axis.
+        Plot a year-by-day raster of window feasibility.
 
-        Green bars mark timestamps where a window can start, red where it
-        cannot, and grey where the result is unknown (typically the tail of
-        the record where insufficient data remain to evaluate the full
-        operation duration).
+        Rows are years and columns are days of the year. Each cell is coloured
+        by whether a window can start (open), cannot (closed), or the result is
+        unknown (end of record, too little data to evaluate the operation).
 
         Parameters
         ----------
-        years : list[int], optional
-            Years to include, one row each. Defaults to all years in the
-            record.
+        years : list of int, optional
+            Years to include. Default all years in the record.
         ax : matplotlib.axes.Axes, optional
-            Axes to draw on. A new figure is created when ``None``.
-        figsize : tuple, optional
-            Figure size. Defaults to ``(14, n_years * 0.5 + 2)``.
+            Axes to draw on. A new figure is created if None.
+        figsize : tuple of float, optional
+            Figure size in inches. Default ``(14, n_years * 0.5 + 2)``.
         color_open : str, optional
-            Colour for feasible timestamps. Defaults to green.
+            Colour of feasible timestamps. Default "#2ecc71".
         color_closed : str, optional
-            Colour for infeasible timestamps. Defaults to red.
+            Colour of infeasible timestamps. Default "#e74c3c".
         color_unknown : str, optional
-            Colour for unevaluated timestamps. Defaults to light grey.
+            Colour of unevaluated timestamps. Default "#bdc3c7".
         show_pct : bool, optional
-            Annotate each year row with its availability percentage.
-            Defaults to ``True``.
+            Annotate each year with its availability percentage. Default True.
         bar_height : float, optional
-            The fraction of space filled by each bar. Default 0.9.
-        xlim : tuple[str, str], optional
-            Restrict the x-axis to a date range given as ``("MM-DD", "MM-DD")``,
-            e.g. ``("06-01", "07-31")`` for June–July only.
+            Fraction of each row filled by a bar. Default 0.9.
+        xlim : tuple of str, optional
+            Date range as ``("MM-DD", "MM-DD")``, e.g. ``("06-01", "07-31")``.
 
         Returns
         -------
         matplotlib.axes.Axes
 
+        Raises
+        ------
+        RuntimeError
+            If `fit` has not been called.
+
         Examples
         --------
         >>> ww.fit(stages=[{"duration": 12, "criteria": {"hs": 2.0}}])
-
-        >>> # All years
         >>> ww.plot_temporal_raster()
-
-        >>> # Subset of years
         >>> ww.plot_temporal_raster(years=[2019, 2020, 2021])
-
-        >>> # Summer window only
         >>> ww.plot_temporal_raster(xlim=("05-01", "09-30"))
         """
         self._require_fit()
@@ -1738,64 +1651,48 @@ class WeatherWindow:
         threshold_color: str = "tomato",
     ):
         """
-        Diagnostic time series plot for a user-defined date window.
+        Plot criteria variables, feasibility and waiting times over a date range.
 
-        Produces stacked subplots:
-
-        1. One subplot per criteria variable (e.g. Hs, Ws), with threshold
-           lines drawn for each stage that constrains that variable.
-        2. ``can_start`` -- step plot showing feasible start times.
-        3. ``waiting_time``, ``duration``, ``characteristic_duration``.
-
-        If ``start_times`` is provided, each submitted timestamp is overlaid
-        on every criteria subplot as a stepped threshold line -- drawn at the
-        active limit during constrained stages, and broken (NaN gap) during
-        free/pause stages. Static threshold lines are suppressed when any
-        valid start_times are provided.
-
-        If ``xlim`` is not set but ``start_times`` are provided, the x-axis
-        is automatically set to one day before the earliest window start and
-        one day after the end of the latest window.
+        Stacked subplots: one per criteria variable with its threshold lines,
+        then ``can_start``, then ``waiting_time``, ``duration`` and
+        ``characteristic_duration``.
 
         Parameters
         ----------
-        xlim : tuple[str, str], optional
-            Date range as ``("YYYY-MM-DD HH", "YYYY-MM-DD HH")``.
-            Defaults to the first month of the record, or -- when start_times
-            are provided -- one day either side of the window span.
-        unit : {"hours", "days"}
-            Display unit for time-based metrics. Defaults to ``"hours"``.
-        start_times : list[str or pd.Timestamp], optional
-            One or more window start timestamps to overlay. For each, a
-            stepped threshold line is drawn per criteria variable showing
-            the active limit across all stages. Static threshold lines are
-            suppressed when any valid start_times are provided.
-            Non-feasible timestamps trigger a warning and are skipped.
-        figsize : tuple, optional
-            Figure size. Defaults to ``(14, 2.5 * n_subplots)``.
+        xlim : tuple of str, optional
+            ``("YYYY-MM-DD HH", "YYYY-MM-DD HH")``. Default is the first month
+            of the record, or one day either side of the window span when
+            ``start_times`` is given.
+        unit : {"hours", "days"}, optional
+            Unit of time-based values. Default "hours".
+        start_times : list of str or pandas.Timestamp, optional
+            Feasible window starts to overlay as stepped limit lines on each
+            criteria subplot. Static threshold lines are hidden when given.
+            Infeasible starts raise a warning and are skipped.
+        figsize : tuple of float, optional
+            Figure size in inches. Default ``(14, 2.5 * n_subplots)``.
         criteria_color : str, optional
-            Line colour for criteria variable time series. Defaults to
-            ``"steelblue"``.
+            Colour of the criteria time series. Default "steelblue".
         threshold_color : str, optional
-            Colour for static threshold lines (shown only when no valid
-            start_times are provided). Defaults to ``"tomato"``.
+            Colour of the static threshold lines. Default "tomato".
 
         Returns
         -------
-        list[matplotlib.axes.Axes]
+        list of matplotlib.axes.Axes
+
+        Raises
+        ------
+        RuntimeError
+            If `fit` has not been called.
 
         Examples
         --------
         >>> ww.fit(stages=[
-        ...     {"duration": 6,      "criteria": {"hs": 3.0}},
+        ...     {"duration": 6, "criteria": {"hs": 3.0}},
         ...     {"duration": (0, 12)},
-        ...     {"duration": 6,      "criteria": {"hs": 3.0}},
+        ...     {"duration": 6, "criteria": {"hs": 3.0}},
         ... ])
-
-        >>> # Default: first month, no overlays
         >>> ww.plot_timeseries()
-
-        >>> # Overlay two specific windows -- xlim set automatically
         >>> ww.plot_timeseries(
         ...     start_times=["1960-01-19 23:00", "1960-01-20 06:00"],
         ... )

@@ -1,46 +1,32 @@
 """
 TimeSeriesValidation
 --------------------
-Validation module for comparing metocean data from multiple sources —
-model output, satellite retrievals, in-situ measurements, or any
-combination thereof.
+Validation module for comparing metocean data from several sources, such as
+model output, satellite retrievals and in-situ measurements.
 
 Design principles
 -----------------
-- ``sources`` is a dict of named DataFrames (or TimeSeries objects).
-  There is no hardcoded "model vs obs" binary — any source can be
-  compared against any other.
-- Variable metadata (units, symbols, names) is optional. If a source
-  is a TimeSeries, metadata is pulled from it automatically. For plain
-  DataFrames, column names are used as fallback.
-- Distributional comparisons (A) do not require temporal alignment and
-  work on the raw source data.
-- Time-based comparisons (B) require an explicit call to ``.align()``,
-  which populates ``self.aligned``. Any method that requires alignment
-  will raise a clear error if called before ``.align()``.
+- ``sources`` is a dict of named DataFrames or TimeSeries objects. There is no
+  fixed "model vs observation" split: any source can be compared with any other.
+- Variable metadata (units, symbols, names) is optional. For TimeSeries sources
+  it is taken from the object. For DataFrames, column names are used as fallback.
+- Distributional methods (``plot_rose``, and ``plot_timeseries`` with
+  ``aligned=False``) work on the raw source data and need no alignment.
+- Time-based methods (``plot_scatter``, ``error_metrics``) need an explicit call
+  to ``.align()``, which populates ``self.aligned``. They raise a clear error if
+  called before ``.align()``.
 
 Example usage
 -------------
->>> tsv = TimeSeriesValidation(
-...     sources={
-...         "model": ts,        # TimeSeries
-...         "sat":   sat_df,    # pd.DataFrame
-...         "buoy":  buoy_df,   # pd.DataFrame
-...     },
-...     variables={
-...         "sat":  [Variable("hs", "Significant wave height", "H_s", "m")],
-...         "buoy": [Variable("hs", "Significant wave height", "H_s", "m")],
-...     },
-... )
->>>
->>> # Distributional comparison — no alignment needed
->>> tsv.plot_cdf(var=("model", "hs"), ref=("sat", "hs"))
->>> tsv.summary_table(vars=[("model", "hs"), ("sat", "hs"), ("buoy", "hs")])
->>>
->>> # Time-based comparison — alignment required first
+>>> import numpy as np
+>>> import pandas as pd
+>>> idx = pd.date_range("2020-01-01", periods=72, freq="h")
+>>> model = pd.DataFrame({"hs": np.linspace(1.0, 3.0, 72)}, index=idx)
+>>> buoy = pd.DataFrame({"hs": np.linspace(1.1, 2.8, 72)}, index=idx)
+>>> tsv = TimeSeriesValidation(sources={"model": model, "buoy": buoy})
+>>> tsv.summary()
 >>> tsv.align(reference="model", method="nearest", tolerance="30min")
->>> tsv.plot_scatter(x=("model", "hs"), y=("sat", "hs"))
->>> tsv.rmse(x=("model", "hs"), y=("buoy", "hs"))
+>>> tsv.error_metrics(x=("buoy", "hs"), y=("model", "hs"), by="month")
 """
 
 from __future__ import annotations
@@ -92,6 +78,7 @@ class TimeSeriesValidation:
         At least two sources are required.
 
         Each value may be either:
+
         - A ``TimeSeries`` object: Variable metadata is extracted automatically.
         - A ``pd.DataFrame``: Index must be (or be convertible to) a
           DatetimeIndex. Variable metadata falls back to column names unless
@@ -110,9 +97,10 @@ class TimeSeriesValidation:
     Notes
     -----
     Temporal alignment is not performed on construction. Call ``.align()``
-    explicitly before using any method that compares sources in time (scatter
-    plots, correlation, RMSE, etc.). Methods that only require distributional
-    data (CDFs, summary tables, roses) work without alignment.
+    explicitly before using any method that compares sources in time
+    (``plot_scatter``, ``error_metrics``). Methods that only require
+    distributional data (``plot_rose``, ``plot_timeseries`` with
+    ``aligned=False``) work without alignment.
 
     The ``(source_key, column_name)`` tuple is the standard way to identify
     a variable across the API::
@@ -429,12 +417,12 @@ class TimeSeriesValidation:
         method : {"nearest", "interpolate", "resample"}, default "nearest"
             Alignment strategy:
 
-            - ``"nearest"``     — each reference timestamp is matched to the
+            - ``"nearest"``: each reference timestamp is matched to the
               nearest observation within ``tolerance``. Suitable for satellite
               vs model.
-            - ``"interpolate"`` — source values are linearly interpolated to
+            - ``"interpolate"``: source values are linearly interpolated to
               reference timestamps. Suitable for dense buoy vs coarser model.
-            - ``"resample"``    — both reference and all sources are resampled
+            - ``"resample"``: both reference and all sources are resampled
               to ``resample_freq`` before alignment. Requires ``resample_freq``.
 
         tolerance : str, default "30min"
@@ -777,50 +765,56 @@ class TimeSeriesValidation:
         ax: "plt.Axes | None" = None,
     ) -> "plt.Axes":
         """
-        Scatter plot between two aligned sources rendered as a 2-D histogram
-        (heatmap), with a 1:1 reference line, a quantile-quantile line, key
-        performance metrics in a text box, and a logarithmic colorbar.
+        Scatter plot of two aligned sources, drawn as a 2-D histogram.
+
+        The plot has a 1:1 reference line, a quantile-quantile (Q-Q) overlay,
+        a metrics box and a logarithmic colorbar.
 
         Parameters
         ----------
         x : tuple[str, str]
-            (source_key, column_name) for the x-axis (typically model / reference).
+            (source_key, column_name) for the x-axis, typically the reference.
         y : tuple[str, str]
-            (source_key, column_name) for the y-axis (typically observation / other).
+            (source_key, column_name) for the y-axis, typically the comparison.
         bin_size : float, optional
-            Edge length of each square histogram bin in the units of the variable.
-            Defaults to a "nice" value derived from the data range:
-            the nearest value in {0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0} such
-            that the axis spans roughly 40–80 bins.
-        cmap : str, default "plasma"
-            Any matplotlib colormap name. Applied on a log scale.
+            Edge length of the square histogram bins, in the units of the
+            variable. If None, the value from {0.05, 0.1, 0.25, 0.5, 1, 2, 5,
+            10, 25, 50} that gives the number of bins closest to 150 across the
+            axis range is used.
+        cmap : str, default "viridis"
+            Matplotlib colormap name, applied on a logarithmic scale.
         figsize : tuple[float, float], default (7, 7)
-            Figure size in inches. Ignored when ``ax`` is supplied.
-        ax : plt.Axes, optional
-            Existing axes to draw on. If None, a new figure is created.
+            Figure size in inches. Ignored when `ax` is supplied.
+        ax : matplotlib.axes.Axes, optional
+            Axes to draw on. A new figure is created if None.
 
         Returns
         -------
-        ax : plt.Axes
+        matplotlib.axes.Axes
 
         Raises
         ------
         RuntimeError
-            If ``.align()`` has not been called.
+            If `align` has not been called.
         KeyError
-            If either variable reference is not found in the aligned data.
+            If a variable reference is not found in the aligned data.
+        ValueError
+            If fewer than two complete pairs are available.
 
         Notes
         -----
-        - Requires temporal alignment (``.align()`` must be called first).
-        - The histogram is built from paired, non-NaN observations only.
-        - The Q-Q line connects the matching quantiles of x and y (p = 2 % … 98 %
-        in 2 % steps), drawn as a thin line so it stays readable over the bins.
-        - A dummy ``Patch`` in the median colormap colour is added to the legend
-        so that the data label appears even though the histogram is not a
-        standard Line2D artist.
-        - The colorbar label states the bin size, e.g.
-        "entries per 0.25 × 0.25 m bin".
+        Only pairs where both values are non-NaN are used. The axes run from
+        zero to 1.05 times the largest value. The metrics use `x` as the
+        reference:
+
+        - Bias: mean of ``y - x``.
+        - MAE and RMSE: mean absolute and root-mean-square of ``y - x``.
+        - SI: RMSE divided by the mean of `x`.
+        - R: Pearson correlation coefficient.
+
+        The Q-Q points pair the quantiles of `x` and `y` at log-spaced
+        percentile levels, which gives more detail in the tails. The colorbar
+        label gives the bin size, for example "entries per 0.25 x 0.25 m bin".
         """
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -870,7 +864,7 @@ class TimeSeriesValidation:
 
         if bin_size is None:
             span = axis_max - axis_min
-            # Pick the nice value that gives closest to 60 bins across the axis
+            # Pick the nice value that gives closest to 150 bins across the axis
             bin_size = min(_NICE, key=lambda b: abs(span / b - 150))
 
         # ------------------------------------------------------------------ #
@@ -1045,7 +1039,7 @@ class TimeSeriesValidation:
         """
         Rose plot for a single (magnitude, direction) pair.
 
-        The single-rose drawing logic lives in ``utils.plot_rose``; this
+        The single-rose drawing logic lives in ``plotting.plot_rose``; this
         method is responsible only for retrieving the data and dispatching.
 
         Parameters
@@ -1059,7 +1053,7 @@ class TimeSeriesValidation:
             Directions must be in meteorological convention (from-direction,
             degrees clockwise from North).
         n_dir_bins : int, default 16
-            Number of directional sectors passed to ``utils.plot_rose``.
+            Number of directional sectors passed to ``plotting.plot_rose``.
         mag_bins : list[float], optional
             Explicit *inner* magnitude bin edges, e.g. ``[0, 2, 4, 6, 8]``.
             These are automatically extended with open-ended outer bins, so
@@ -1117,10 +1111,10 @@ class TimeSeriesValidation:
           targeting ~7 bins, unless ``mag_bins`` or ``mag_step`` is given.
           Regardless of the source, an open-ended top bin (and, if relevant,
           bottom bin) is always added so observations beyond the given range
-          are still counted -- not silently dropped.
+          are still counted and not silently dropped.
         - If ``ax`` is supplied, it must already have a polar projection
-        (``subplot_kw={"projection": "polar"}``); this method does not
-        re-project an existing axes.
+          (``subplot_kw={"projection": "polar"}``); this method does not
+          re-project an existing axes.
         """
 
         # ------------------------------------------------------------------ #
@@ -1213,8 +1207,13 @@ class TimeSeriesValidation:
                 tsv.plot_timeseries([("model", "ws")], ax=axes[1])
                 tsv.plot_timeseries([("model", "tp")], ax=axes[2])
 
-        figsize : tuple[float, float], default (12, 4)
-            Figure size in inches.  Ignored when ``ax`` is supplied.
+        figsize : tuple[float, float], optional
+            Figure size in inches. Ignored when ``ax`` is supplied. If None,
+            the matplotlib default is used.
+        plot_kw : dict, optional
+            Keyword arguments passed to every `matplotlib.axes.Axes.plot` call,
+            such as ``{"color": "k"}``. These override the default line width of
+            0.8.
 
         Returns
         -------
@@ -1363,7 +1362,7 @@ class TimeSeriesValidation:
     ) -> "pd.DataFrame":
         """
         Compute pairwise error metrics between two aligned sources, grouped by
-        month, season, year, or an arbitrary aligned variable — mirroring the
+        month, season, year, or an arbitrary aligned variable, mirroring the
         ``TimeSeries.statistics`` interface.
 
         Requires ``.align()`` to have been called first.
@@ -1377,37 +1376,38 @@ class TimeSeriesValidation:
         by : {"month", "season", "year"} or tuple[str, str], default "month"
             Grouping strategy:
 
-            - ``"month"``  — calendar months (Jan … Dec).
-            - ``"season"`` — meteorological seasons, or custom via ``seasons``.
-            - ``"year"``   — calendar years present in the aligned record.
-            - ``(source_key, column_name)`` — bin by an arbitrary aligned
-            variable (e.g. ``("model", "hs")``). Bin edges are derived
-            automatically via ``infer_step``, or set explicitly with
-            ``step``.
+            - ``"month"``: calendar months, Jan to Dec.
+            - ``"season"``: meteorological seasons, or custom via ``seasons``.
+            - ``"year"``: calendar years present in the aligned record.
+            - ``(source_key, column_name)``: bin by an arbitrary aligned
+              variable (e.g. ``("model", "hs")``). Bin edges are derived
+              automatically via ``infer_step``, or set explicitly with
+              ``step``.
 
         func : list[str], optional
             Error metrics to compute per group. Defaults to
             ``["bias", "mae", "rmse", "si", "r", "count", "%"]``.
             Available tokens:
 
-            - ``"bias"``  — mean signed error (y − x)
-            - ``"mae"``   — mean absolute error
-            - ``"rmse"``  — root mean square error
-            - ``"si"``    — scatter index (RMSE / mean(x))
-            - ``"r"``     — Pearson correlation coefficient
-            - ``"count"`` — number of collocated pairs in the group
-            - ``"%"``     — group count as % of total collocated pairs
+            - ``"bias"``: mean signed error, ``y - x``
+            - ``"mae"``: mean absolute error
+            - ``"rmse"``: root mean square error
+            - ``"si"``: scatter index (RMSE / mean(x))
+            - ``"r"``: Pearson correlation coefficient
+            - ``"count"``: number of collocated pairs in the group
+            - ``"%"``: group count as % of total collocated pairs
 
         circular : bool, default False
             If True, treat the variable as a circular quantity (e.g. wave or
             wind direction in degrees). Differences are computed as::
 
-                diff = ((y − x) + 180) % 360 − 180
+                diff = ((y - x) + 180) % 360 - 180
 
-            which wraps all differences into [−180°, 180°], so that e.g.
-            350° vs 10° gives −20° rather than 340°. Note that ``"si"`` and
-            ``"r"`` are suppressed when ``circular=True`` since they are not
-            meaningful for angular errors.
+            which wraps all differences into [-180, 180] degrees, so that e.g.
+            350 vs 10 gives -20 rather than 340. The default ``func`` omits
+            ``"si"`` and ``"r"`` when ``circular=True``, since they are not
+            meaningful for angular errors. Pass them in ``func`` to compute them
+            anyway.
         seasons : dict[str, list[int]], optional
             Custom season map, e.g.
             ``{"Winter": [12, 1, 2], "Summer": [6, 7, 8]}``.
@@ -1419,39 +1419,29 @@ class TimeSeriesValidation:
         Returns
         -------
         pd.DataFrame
-            Groups as columns (always includes an ``"All"`` column),
-            metrics as rows.
+            One row per group, including an ``"All"`` row, and one column per
+            metric.
 
         Raises
         ------
         RuntimeError
             If ``.align()`` has not been called.
         KeyError
-            If either variable reference is not found in the aligned data.
-        TypeError
-            If ``by`` is a tuple but does not resolve to an aligned column.
+            If a variable reference, or a tuple ``by``, is not found in the
+            aligned data.
+        ValueError
+            If there are no collocated pairs, or ``by`` or a metric is not
+            supported.
 
         Examples
         --------
+        Using the object from the module example:
+
         >>> tsv.align(reference="model")
         >>> tsv.error_metrics(x=("buoy", "hs"), y=("model", "hs"), by="month")
         >>> tsv.error_metrics(
         ...     x=("buoy", "hs"), y=("model", "hs"),
-        ...     by="season",
-        ...     seasons={"Winter": [12, 1, 2], "Summer": [6, 7, 8]},
-        ...     func=["bias", "rmse", "r"],
-        ... )
-        >>> # Group by model Hs bins — e.g. to see how bias varies with sea state
-        >>> tsv.error_metrics(
-        ...     x=("buoy", "hs"), y=("model", "hs"),
-        ...     by=("model", "hs"),
-        ...     step=0.5,
-        ... )
-        >>> # Directional comparison
-        >>> tsv.error_metrics(
-        ...     x=("buoy", "mdir"), y=("model", "mdir"),
-        ...     by="month",
-        ...     circular=True,
+        ...     by=("model", "hs"), step=0.5,
         ... )
         """
         import numpy as np

@@ -1,3 +1,11 @@
+"""
+Bivariate extreme value analysis with joint probability models.
+
+`BivariateEVA` fits a joint model to two variables for all data, for each
+calendar month and, if a direction variable is given, for each directional
+sector. It then tabulates return values and plots isodensity contours.
+"""
+
 import typing
 import warnings
 
@@ -13,8 +21,31 @@ from ..utils import groupby_with_metadata, get_n_axes, resolve_axes_grid
 
 
 class BivariateEVA:
+    """
+    Joint extreme value analysis of two variables.
+
+    Fits a joint probability model to all data, to each calendar month and,
+    if a direction variable is given, to each directional sector. Return
+    values are then tabulated and plotted as isodensity contours.
+
+    Typical workflow: `fit`, then `table_return_values`, then the table and
+    plot methods.
+    """
+
+    #: Full time series of the two variables, plus the direction if given.
+    data_omni:pd.DataFrame
+    #: Monthly subsets, keyed by month label.
+    data_monthly:dict[str,pd.DataFrame]
+    #: Directional sector subsets, keyed by sector label. Empty if no
+    #: direction variable was given.
+    data_sectors:dict[str,pd.DataFrame]
+    #: Joint model fitted to all data.
     model_omni:JointProbabilityModel
+    #: Joint models keyed by month label. Months that failed to fit are
+    #: absent.
     models_monthly:dict[str,JointProbabilityModel]
+    #: Joint models keyed by sector label. Sectors that failed to fit are
+    #: absent.
     models_sectors:dict[str,JointProbabilityModel]
 
     def __init__(
@@ -27,27 +58,23 @@ class BivariateEVA:
         model=predefined.get_DNVGL_Hs_Tz
         ):
         """
-        Initialize multivariate extreme value analysis module.
-
-        Can be constructed directly (independent of TimeSeries) - only
-        `data`, `var1` and `var2` are strictly required.
+        Group the data into omni, monthly and sector subsets.
 
         Parameters
         ----------
-        data : pd.DataFrame
-            Input data, indexed by a datetime-compatible index. Must
-            contain var1, var2, and var_dir if given.
+        data : pandas.DataFrame
+            Data indexed by a datetime-compatible index. Must contain `var1`,
+            `var2`, and `var_dir` if given.
         var1, var2 : str
-            Column names of the two variables entering the joint model.
+            Column names of the two variables in the joint model.
         var_dir : str, optional
-            Column name of a directional variable (0-360 deg). If None,
-            sector-based analysis is unavailable, but omni and monthly
-            analysis work as usual.
+            Column name of a directional variable in degrees (0-360). If
+            None, sector-based analysis is unavailable; omni and monthly
+            analysis are unaffected.
         sectors : int, default 12
-            Number of directional sectors. Ignored if var_dir is None.
-        model : callable
-            A predefined model factory, or any callable accepted by
-            JointProbabilityModel.
+            Number of directional sectors. Ignored if `var_dir` is None.
+        model : callable, default predefined.get_DNVGL_Hs_Tz
+            Model description passed to `JointProbabilityModel`.
         """
 
         # Direction is optional - sector-based analysis is only
@@ -93,15 +120,47 @@ class BivariateEVA:
                 "groupings remain fully available."
             )
 
+    def _rve_var1_columns(self,RVE:pd.DataFrame) -> tuple[list,list]:
+        """
+        Pick out the marginal (var1) return-value columns of an RVE table,
+        and the return-period label (e.g. "10-year") for each one.
+
+        `table_return_values` lays out columns as one var1 column and one
+        var2 column per return period. Methods that condition on var1's
+        return value (isodensity contours, dependent percentiles) must use
+        only the var1 half; mixing in the var2 columns would treat a Tp
+        return value as if it were an Hs point.
+        """
+        suffix = f" {self.var1_symbol}"
+        var1_cols = [c for c in RVE.columns if c.endswith(suffix)]
+        if not var1_cols:
+            raise ValueError(
+                f"Could not find any '{self.var1_symbol}' columns in RVE. "
+                f"Available columns: {list(RVE.columns)}."
+            )
+        rp_labels = [c[:-len(suffix)] for c in var1_cols]
+        return var1_cols, rp_labels
+
     def fit(
             self,
             sector_errors:typing.Literal["ignore","raise"] = "ignore",
             month_errors:typing.Literal["ignore","raise"] = "ignore"):
         """
-        Fit the joint model to the omni, monthly, and (if a direction
-        variable was provided) sector-split data. Sector models are
-        skipped entirely - self.models_sectors is left as an empty dict -
-        when no direction variable is available.
+        Fit the joint model to the omni, monthly and sector subsets.
+
+        Parameters
+        ----------
+        sector_errors : {"ignore", "raise"}, default "ignore"
+            With "ignore", a failed sector fit is reported as a warning and the
+            sector is skipped. With "raise", the error is re-raised.
+        month_errors : {"ignore", "raise"}, default "ignore"
+            As `sector_errors`, applied to monthly fits.
+
+        Notes
+        -----
+        The omni fit is not wrapped and always raises on failure. Sector
+        models are skipped entirely, leaving `models_sectors` as an empty dict,
+        when no direction variable was given.
         """
 
         n_sectors = len(self.data_sectors)
@@ -155,6 +214,7 @@ class BivariateEVA:
             data:pd.DataFrame = None,
             **kwargs,
         ):
+        """Draw isodensity contours for one subset, or its data if the model is missing."""
         if ax is None: fig,ax = plt.subplots()
 
         if model is None:
@@ -184,9 +244,38 @@ class BivariateEVA:
             title_N_points=True
             ):
         """
-        grouping : str
-            One of [omni, sectors, monthly]. "sectors" requires that a
-            direction variable was provided at construction.
+        Plot isodensity contours of the return values per subset.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        RVE : pandas.DataFrame
+            Return values from `table_return_values`, one row per subset.
+        ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
+            Axes to draw on. "omni" needs a single axes. The other groupings
+            need one axes per subset. Created if None.
+        contour_kwargs : dict, optional
+            Passed to the model's contour plot. Defaults to
+            ``{"cmap": "viridis"}``.
+        nfigs : int, default 2
+            Number of figures to split the subset panels over, used only if
+            `ax` is None.
+        ncols : int, default 2
+            Number of subplot columns, used only if `ax` is None.
+        title_N_points : bool, default True
+            Add the number of observations to the subplot titles.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+            A single axes for "omni", otherwise the axes array.
+
+        Notes
+        -----
+        The omni row of `RVE` is looked up as "Omni", "Yearly" or "Annual",
+        in that order. Subsets whose model failed to fit are plotted with
+        their data only and marked "(failed to fit)".
         """
         if grouping == "sectors":
             self._require_direction("plot_isodensity_contours(grouping='sectors')")
@@ -196,7 +285,7 @@ class BivariateEVA:
         if grouping == "omni":
             if ax is None:
                 fig,ax = plt.subplots()
-            elif not isinstance(ax,plt.axes):
+            elif not isinstance(ax,plt.Axes):
                 raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
 
             if "Omni" in RVE.index: rve = RVE.loc["Omni"]
@@ -246,6 +335,29 @@ class BivariateEVA:
             replace_cols=True,
             **kwargs,
             ):
+        """
+        Tables of isodensity contour points per subset.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable. The
+            omni model is added as "Yearly" for monthly and "Omni" for sectors.
+        RVE : pandas.DataFrame
+            Return values from `table_return_values`, one row per subset.
+        range_interval : float, default 0.5
+            Passed to the model's contour table method.
+        replace_cols : bool, default True
+            Rename the index and columns for display.
+        **kwargs
+            Passed to the model's contour table method.
+
+        Returns
+        -------
+        dict of pandas.DataFrame
+            One table per subset. A subset whose model failed to fit gets a
+            single NaN row labelled "(failed to fit)".
+        """
         if grouping == "sectors":
             self._require_direction("table_isodensity_contours(grouping='sectors')")
 
@@ -260,6 +372,8 @@ class BivariateEVA:
 
         models = models | {("Yearly" if grouping == "monthly" else "Omni"): self.model_omni}
 
+        var1_cols, rp_labels = self._rve_var1_columns(RVE)
+
         tables = {}
         template_cols = None
         for subset in all_keys:
@@ -267,18 +381,18 @@ class BivariateEVA:
             if model is None:
                 tables[subset] = None  # filled in with a blank row below
                 continue
-            rve = RVE.loc[subset]
+            rve = RVE.loc[subset,var1_cols]
             table = model.table_isodensity_contour(
-                points=rve,range_interval=range_interval,**kwargs)
+                points=rve.values,range_interval=range_interval,**kwargs)
             if replace_cols:
                 table.index.name = f"${self.var1_symbol}$"
-                if 2*RVE.shape[1] == table.shape[1]-1:
+                if 2*len(var1_cols) == table.shape[1]-1:
                     table = table.set_index(table.columns[0])
-                if 2*RVE.shape[1] != table.shape[1]:
-                    raise ValueError(f"Expected {RVE.shape[1]} columns, "
+                if 2*len(var1_cols) != table.shape[1]:
+                    raise ValueError(f"Expected {len(var1_cols)} columns, "
                         f"2 per return value, but got {table.shape[1]}")
                 table.columns = [f"{rp.replace('year','yr')} ${self.var2_symbol}$$_{lh}$"
-                                for rp in RVE.columns for lh in ["L","H"]]
+                                for rp in rp_labels for lh in ["L","H"]]
             tables[subset] = table
             if template_cols is None:
                 template_cols = table.columns
@@ -300,6 +414,23 @@ class BivariateEVA:
             grouping:typing.Literal["monthly","sectors"],
             RVE:pd.DataFrame,
     ):
+        """
+        Conditional return values of the secondary variable per subset.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable. The
+            omni model is added as "Yearly" for monthly and "Omni" for sectors.
+        RVE : pandas.DataFrame
+            Return values from `table_return_values`, one row per subset.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per subset. Subsets without a fitted model keep the
+            primary variable values and have NaN for the secondary variable.
+        """
         if grouping == "sectors":
             self._require_direction("table_conditional_return_values(grouping='sectors')")
 
@@ -312,23 +443,23 @@ class BivariateEVA:
         else:
             raise ValueError(f"models should be monthly or sectors, got {grouping}")
 
-        return_periods = RVE.columns
+        var1_cols, rp_labels = self._rve_var1_columns(RVE)
 
         table = {}
         for subset in all_keys:
             model = models.get(subset)
-            main = RVE.loc[subset]
+            main = RVE.loc[subset,var1_cols]
             row = {}
             if model is None:
                 # Primary variable's return values come directly from RVE,
                 # independent of the fit - keep those. Only the dependent
                 # variable (which requires the fitted model) is blanked.
-                for rp,var1 in zip(return_periods,main):
+                for rp,var1 in zip(rp_labels,main):
                     row[f"{rp.replace('year','yr')} ${self.var1_symbol}$"] = var1
                     row[f"{rp.replace('year','yr')} ${self.var2_symbol}$"] = np.nan
             else:
-                cond = model.get_dependent_given_marginal(main)
-                for rp,var1,var2 in zip(return_periods,main,cond):
+                cond = model.get_dependent_given_marginal(main.values)
+                for rp,var1,var2 in zip(rp_labels,main,cond):
                     row[f"{rp.replace('year','yr')} ${self.var1_symbol}$"] = var1
                     row[f"{rp.replace('year','yr')} ${self.var2_symbol}$"] = var2
             table[subset] = row
@@ -341,6 +472,29 @@ class BivariateEVA:
             state_duration:float = None,
             contour_method:str = "IFORM",
     ):
+        """
+        Return values of both variables per subset.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable. The
+            omni model is added as "Yearly" for monthly and "Omni" for sectors.
+        return_periods : list of float
+            Return periods, in years.
+        state_duration : float, optional
+            Duration of one sea state, in hours. Defaults to the mean data
+            interval. A warning is issued if it differs from the mean data
+            interval by more than 10 minutes.
+        contour_method : str, default "IFORM"
+            Contour method passed to ``get_contour_maximum``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per subset. Columns are ``"{rp}-year {symbol}"`` for each
+            return period and variable. Subsets without a fitted model are NaN.
+        """
         if grouping == "sectors":
             self._require_direction("table_return_values(grouping='sectors')")
 
@@ -373,8 +527,8 @@ class BivariateEVA:
             for rp in return_periods:
                 hstp = model.get_contour_maximum(
                     rp,state_duration=state_duration,contour_method=contour_method)
-                row[f"{rp}-year {self.var1_symbol}"] = hstp["hs"]
-                row[f"{rp}-year {self.var2_symbol}"] = hstp["tp"]
+                row[f"{rp}-year {self.var1_symbol}"] = hstp[self.var1]
+                row[f"{rp}-year {self.var2_symbol}"] = hstp[self.var2]
             table[subset] = row
 
         return pd.DataFrame.from_dict(table,orient="index")
@@ -383,6 +537,20 @@ class BivariateEVA:
             self,
             grouping:typing.Literal["monthly","sectors"],
     ):
+        """
+        Fitted model parameters per subset.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable. The
+            omni model is added as "Yearly" for monthly and "Omni" for sectors.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per subset. Subsets without a fitted model are NaN.
+        """
         if grouping == "sectors":
             self._require_direction("table_model_parameters(grouping='sectors')")
 
@@ -418,6 +586,25 @@ class BivariateEVA:
             ncols:int = 4,
             title_N_points=False,
     ):
+        """
+        Marginal quantile plots for the omni, monthly or sector models.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Models to plot. "sectors" requires a direction variable.
+        axes : list of matplotlib.axes.Axes, optional
+            Two axes per subset (two in total for "omni"). Created if None.
+        ncols : int, default 4
+            Number of subplot columns, used only if `axes` is None.
+        title_N_points : bool, default False
+            Add the number of observations to the subplot titles.
+
+        Notes
+        -----
+        Subsets whose model failed to fit are left blank and marked
+        "(failed to fit)".
+        """
         if grouping == "sectors":
             self._require_direction("plot_marginal_quantiles(grouping='sectors')")
 
@@ -438,6 +625,7 @@ class BivariateEVA:
             raise ValueError(f"models should be monthly or sectors, got {grouping}")
 
         N_plots = len(all_groups)
+        owns_figure = axes is None
         if axes is None:
             fig,axes = get_n_axes(2*N_plots,max_cols=ncols)
         elif len(axes) < 2*N_plots:
@@ -460,7 +648,8 @@ class BivariateEVA:
             ax[0].set_title(title)
             ax[1].set_title(title)
 
-        fig.subplots_adjust(hspace=0.25)
+        if owns_figure:
+            axes[0].get_figure().subplots_adjust(hspace=0.25)
         return axes
 
     def plot_dependence_functions(
@@ -470,6 +659,25 @@ class BivariateEVA:
         ncols:int = 4,
         title_N_points=False,
     ):
+        """
+        Dependence function plots for the omni, monthly or sector models.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Models to plot. "sectors" requires a direction variable.
+        axes : list of matplotlib.axes.Axes, optional
+            Two axes per subset (two in total for "omni"). Created if None.
+        ncols : int, default 4
+            Number of subplot columns, used only if `axes` is None.
+        title_N_points : bool, default False
+            Add the number of observations to the subplot titles.
+
+        Notes
+        -----
+        Subsets whose model failed to fit are left blank and marked
+        "(failed to fit)".
+        """
         if grouping == "sectors":
             self._require_direction("plot_dependence_functions(grouping='sectors')")
 
@@ -490,6 +698,7 @@ class BivariateEVA:
             raise ValueError(f"models should be monthly or sectors, got {grouping}")
 
         N_plots = len(all_groups)
+        owns_figure = axes is None
         if axes is None:
             fig,axes = get_n_axes(2*N_plots,max_cols=ncols)
         elif len(axes) < 2*N_plots:
@@ -512,5 +721,6 @@ class BivariateEVA:
             ax[0].set_title(title)
             ax[1].set_title(title)
 
-        fig.subplots_adjust(hspace=0.25)
+        if owns_figure:
+            axes[0].get_figure().subplots_adjust(hspace=0.25)
         return axes

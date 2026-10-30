@@ -1,3 +1,7 @@
+"""
+Plotting functions for spectra, wind and wave roses, and scatter diagrams.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -128,14 +132,15 @@ def _global_radial_zoom(
     wastes the high-frequency tail, wind-sea-only data wastes the
     low-frequency end.
 
-    Frequency and period are RECIPROCAL axes, so a cutoff on one is a
-    cutoff on the other end of the other:
-      - radius="frequency": rmin <- lowest valid freq, rmax <- highest
-        valid freq (direct, un-flipped mapping).
-      - radius="period": rmin <- 1/(highest valid freq) [small period,
-        near centre], rmax <- 1/(lowest valid freq) [large period,
-        outer edge] -- flipped, because period grows as frequency
-        shrinks.
+    Frequency and period are reciprocal axes, so a cutoff on one maps
+    to the opposite end of the other:
+
+    - ``radius="frequency"``: ``rmin`` is the lowest valid frequency and
+      ``rmax`` the highest.
+    - ``radius="period"``: ``rmin`` is the reciprocal of the highest valid
+      frequency (small period, near centre) and ``rmax`` the reciprocal of
+      the lowest valid frequency (large period, outer edge). The mapping is
+      flipped because period grows as frequency shrinks.
 
     Values are returned in the DATA's native units (Hz or seconds) --
     any logradius transform is applied later by the caller, exactly
@@ -520,96 +525,70 @@ def plot_spectra(
     normalize: bool = False,
 ):
     """
-    Flexible faceted spectrum plot. Works identically on:
-      - a SpectralTimeSeries -- its own var_map/dim_map is used directly.
-      - the raw xr.Dataset output of .aggregate() / .groupby().aggregate().
- 
-    If row=/col= are both omitted and more than one non-spectral
-    dimension is left after time= selection, every leftover dimension is
-    auto-faceted into a grid. If exactly one of row=/col= is given and
-    dimensions are still left over, those are flattened into extra
-    columns (row= given) or extra rows (col= given). Passing both row=
-    and col= still requires every dimension to be accounted for
-    explicitly.
- 
-    Color scale is logarithmic by default (log_scale=True). `vmax` (and,
-    for log scale, the implied floor `vmin`) are always computed GLOBALLY
-    across every panel that will be drawn -- not per panel -- so panels
-    stay honestly comparable on one shared color scale; passing an
-    explicit `vmin`/`vmax` overrides the computed one but is still
-    applied uniformly to every panel. Colorbar ticks are placed at clean
-    decade values for every plot_type (see _draw_polar_spectrum), not
-    just pcolormesh.
- 
-    When zoom=True (default) and the panel is a 2D polar spectrum, the
-    radial extent is also clipped GLOBALLY across every panel: the
-    radial limits are set to the lowest/highest frequency (equivalently
-    highest/lowest period, for radius="period") at which ANY panel still
-    has data above `vmin`. `rmin`/`rmax` (native units -- Hz or seconds)
-    override the auto-computed zoom on whichever side(s) are given,
-    exactly like wavespectra's rmin=/rmax=.
- 
-    logradius=True (default) plots the radial axis on a log10 scale.
-    `rmin`/`rmax` are always given in native units either way; the log
-    transform is applied internally.
- 
-    The directional axis is periodically closed for every 2D panel (see
-    _draw_polar_spectrum / _close_direction) so there's no undrawn wedge
-    between the last and first direction bins.
- 
+    Plot a spectrum or spectral aggregate as a grid of panels.
+
+    Accepts a SpectralTimeSeries or an xarray.Dataset, including the output of
+    ``aggregate`` and ``groupby``. Dimensions left after the `time` selection
+    are faceted automatically unless `row` or `col` is given.
+
+    All panels share one colour scale. With ``log_scale=True`` the default
+    limits are ``vmax`` = the maximum over all panels and ``vmin`` = 1e-2 *
+    ``vmax``. With ``zoom=True`` the radial axis is limited to the range of
+    frequencies (or periods) where any panel exceeds `vmin`.
+
     Parameters
     ----------
-    obj : SpectralTimeSeries or xr.Dataset
+    obj : SpectralTimeSeries or xarray.Dataset
+        Source of the spectra.
     var : str, optional
+        Spectral variable. Required when `obj` holds several spectral variables.
     time : optional
-        Selector applied via `.sel()` against the actual time dimension.
-        A partial/date-only string (e.g. "2017-01-01") selects every
-        timestamp on that date, not one -- standard xarray/pandas
-        datetime-string indexing. Pass an exact timestamp (e.g.
-        "2017-01-01T00:00") to select a single step.
+        Selector passed to ``.sel()`` on the time dimension. A date string
+        selects every timestamp on that date. An exact timestamp selects one step.
     row, col : str, optional
+        Dimension to facet across rows or columns.
     col_wrap : int, optional
+        With `row` only, the number of columns after which the grid wraps.
     ncols : int, default 3
+        Number of columns when faceting automatically.
     errors : {"ignore", "raise"}, default "raise"
-        Governs auto-facet/flatten panel-count warnings/errors (not the
-        fully-explicit row=+col= case). "raise": warn above
-        _AUTO_FACET_WARN_THRESHOLD (25), raise above
-        _AUTO_FACET_RAISE_THRESHOLD (100). "ignore": never warn/raise.
+        Panel-count checks for automatic faceting. "raise" warns above 25
+        panels and raises above 100. "ignore" never warns or raises.
     radius : {"frequency", "period"}, default "frequency"
+        Radial coordinate of polar panels.
     plot_type : {"pcolormesh", "contour", "contourf"}, default "pcolormesh"
-        "contour" draws unfilled level lines; "contourf" is the filled
-        version (wavespectra's default kind).
-    cmap : str, default "Blues"
-    vmin : float, optional
-        Shared colour scale floor across all panels, and (when
-        zoom=True) the threshold used to decide the radial zoom extent.
-        Computed as 1e-2 * vmax if omitted.
-    vmax : float, optional
-        Shared colour scale ceiling across all panels. Computed as the
-        global max across every panel to be drawn if omitted.
+        "contour" draws level lines only. "contourf" draws filled levels.
+    cmap : str or matplotlib colormap, default cmocean.cm.thermal
+        Colormap.
+    vmin, vmax : float, optional
+        Shared colour limits. `vmin` also sets the threshold for radial zoom.
     log_scale : bool, default True
-        Color on a log scale (LogNorm). Set False for a linear scale.
+        Logarithmic colour scale. False gives a linear scale.
     dir_letters : bool, default False
+        Label polar directions N, NE, ... instead of degrees.
     panel_size : float, default 3.0
+        Size of each panel in inches.
+    figsize : tuple of float, optional
+        Figure size in inches.
     zoom : bool, default True
-        Zoom the radial (frequency/period) axis of 2D polar panels in on
-        the region where data exceeds `vmin`, computed globally across
-        all panels. Has no effect on 1D panels. Set False to always show
-        the full frequency/period range. Ignored on whichever side(s)
-        rmin/rmax explicitly set.
+        Limit the radial axis to where data exceeds `vmin`. Ignored on the side
+        set by `rmin` or `rmax`.
     logradius : bool, default True
-        Plot the radial (frequency/period) axis on a log10 scale rather
-        than linear. Has no effect on 1D panels.
+        Logarithmic radial axis. No effect on 1D panels.
     rmin, rmax : float, optional
-        Explicit radial-axis limits in NATIVE units (Hz for
-        radius="frequency", seconds for radius="period"). Each,
-        independently, overrides the auto-computed zoom on that side.
-        Has no effect on 1D panels.
- 
+        Radial limits in native units: Hz, or seconds for ``radius="period"``.
+        Each overrides the automatic zoom on its side. No effect on 1D panels.
+    mask_below_vmin : bool, default False
+        Draw values below `vmin` in white.
+    normalize : bool, default False
+        Divide each panel by its own maximum, so every panel peaks at 1.
+
     Returns
     -------
-    matplotlib.axes.Axes  (single panel)
-    (matplotlib.figure.Figure, np.ndarray of Axes)  (grid)
+    matplotlib.axes.Axes
+        For a single panel.
+    (matplotlib.figure.Figure, numpy.ndarray)
+        For a grid of panels, with the flat array of axes.
     """
 
     is_sts_like = hasattr(obj, "ds") and hasattr(obj, "var_map") and hasattr(obj, "dim_map")
@@ -867,88 +846,63 @@ def plot_rose(
     figsize=None,
 ):
     """
-    Draw a single wind / wave rose onto a polar Axes.
+    Draw a wind or wave rose on a polar axes.
 
     Parameters
     ----------
-    magnitude : np.ndarray
-        1-D array of magnitudes (wind speed, wave height, current speed …).
-    direction : np.ndarray
-        1-D array of directions in degrees, meteorological convention
-        (direction *from*, 0 deg = North, clockwise positive). Same length
-        as ``magnitude``.
-    ax : plt.Axes, optional
-        A polar Axes (created with ``subplot_kw={"projection": "polar"}``).
-        If None, a new figure and polar axes are created automatically.
+    magnitude : numpy.ndarray
+        1-D magnitudes, such as wind speed or wave height.
+    direction : numpy.ndarray
+        1-D directions in degrees, meteorological convention: the direction the
+        wind comes from, 0 at north, clockwise. Same length as `magnitude`.
+    ax : matplotlib.axes.Axes, optional
+        Polar axes, created with ``subplot_kw={"projection": "polar"}``. A new
+        figure is created if None.
     n_dir_bins : int, default 16
-        Number of directional sectors. 16 -> 22.5 deg sectors, 8 -> 45 deg.
+        Number of directional sectors. 16 gives 22.5 degree sectors, 8 gives 45.
     mag_bins : array-like, optional
-        Explicit bin edges spanning the *full* range end-to-end, e.g.
-        ``[0, 2, 4, 6, 8]``. These edges are used exactly as given -- no
-        open-ended bin is added unless data actually falls outside
-        ``[mag_bins[0], mag_bins[-1]]``, in which case a single extra
-        open-ended bin (``<lo`` and/or ``hi<``) is added on whichever side(s)
-        have out-of-range data, so nothing is silently dropped.
+        Magnitude bin edges, used as given. An open-ended bin is added on a side
+        only where data falls outside the edges.
     mag_step : float, optional
-        Force a specific bin step size when ``mag_bins`` is not given,
-        overriding auto-selection while still starting at 0 and extending to
-        ``mag_max`` (or the 99th percentile if ``mag_max`` is None). As with
-        auto-derived bins, an open-ended top bin is added only if data
-        exceeds the resulting range.
+        Bin width when `mag_bins` is not given. Bins start at 0 and end at
+        `mag_max`.
     mag_max : float, optional
-        Explicit top edge for auto-derived bins (ignored if ``mag_bins`` is
-        given). Defaults to the 99th percentile of the data. Set this
-        together with ``mag_step`` to force identical magnitude bins across
-        multiple calls.
-    cmap : str, default "YlOrRd"
-        Matplotlib colormap used to colour magnitude classes (lowest -> highest).
+        Top edge of automatic bins. Defaults to the 99th percentile of the data.
+        Set with `mag_step` to get identical bins across calls.
+    cmap : str, default "viridis"
+        Colormap for magnitude classes, from lowest to highest.
     r_max : float, optional
-        Maximum radial extent as a fraction of total observations (0-1 scale).
-        If None, derived from the data. Pass the same value to multiple calls
-        for a shared radial scale.
+        Radial limit as a fraction of all observations, 0 to 1. Pass the same
+        value to several calls for a shared radial scale.
     r_ticks : array-like, optional
-        Explicit radial tick values, in percent (e.g. ``[0, 5, 10, 15]``).
-        If None, ticks are auto-inferred (or spaced by ``r_step`` if given).
-        Pass the same values across multiple calls (together with a shared
-        ``r_max``) for directly comparable panels.
+        Radial tick values in percent, e.g. ``[0, 5, 10, 15]``.
     r_step : float, optional
-        Percent step between radial ticks, used to auto-generate ``r_ticks``
-        when it is not given explicitly. Ignored if ``r_ticks`` is supplied.
+        Percent step between radial ticks. Ignored if `r_ticks` is given.
     r_label_angle : float, optional
-        Angle (degrees, matplotlib convention) at which the radial
-        (percentage) tick labels are placed, e.g. ``90`` to move them to the
-        right of the plot and away from the data. Defaults to matplotlib's
-        own placement if None.
+        Angle in degrees at which radial tick labels are drawn.
     calm_threshold : float, default 0.0
-        Observations with magnitude <= this value are counted as "calm" and
-        excluded from the directional bins (but noted in the title).
+        Observations at or below this magnitude count as calm. They are excluded
+        from the sectors and noted in the title.
     title : str, default ""
         Axes title.
     legend : bool, default True
-        Whether to draw a magnitude legend below the axes.
+        Draw a magnitude legend below the axes.
     mag_label : str, default "magnitude"
-        Human-readable name for the magnitude variable, used in the legend.
+        Name of the magnitude variable in the legend.
     mag_unit : str, default ""
-        Unit string appended to legend labels, e.g. "m/s" or "m".
-    figsize : tuple[float, float], optional
-        Figure size in inches, used only when ``ax`` is None.
+        Unit appended to legend labels, e.g. "m/s".
+    figsize : tuple of float, optional
+        Figure size in inches. Used only when `ax` is None.
 
     Returns
     -------
-    ax : plt.Axes
+    matplotlib.axes.Axes
 
     Notes
     -----
-    - Directions are passed in meteorological convention directly; the polar
-      axes is configured with N at top, clockwise, so no manual rotation is
-      needed.
-    - The radial axis shows percentage of total observations (including calm).
-    - Bin edges are used exactly as supplied (or as auto-derived). An extra
-      open-ended bin is added on a given side *only if* observations actually
-      fall outside that edge -- e.g. bins=[0,2,4] over data fully within
-      [0,4] produces exactly 2 bins (0-2, 2-4), no "4<" bin. If some data
-      exceeds 4, a "4<" bin is appended to catch it (and analogously for
-      data below the first edge).
+    The radial axis shows the percentage of all observations, including calm.
+    Open-ended bins are added only where data falls outside the edges, so
+    ``mag_bins=[0, 2, 4]`` gives two bins if all data lies within 0 to 4.
     """
     # ------------------------------------------------------------------ #
     # Input coercion and validation                                        #
@@ -1200,15 +1154,16 @@ def plot_scatter_diagram(
     annot_cells : str
         Controls which cells will be annotated with a value:
          - "all": all cells are annotated
-         - "nonzero": all cells with any occurance are annotated
+         - "nonzero": all cells with any occurrence are annotated
          - "rounded": only cells which still have a nonzero value 
-         after applying the cell number formatting are annotated
+           after applying the cell number formatting are annotated
          - "off": no cells are annotated
+
     annot_margin : bool, default True
         Add the marginal distributions of values.
     percent_sign_cells : bool, default False
         Add a percent sign after the cell values, if using density.
-    percent_sign_marginal: bool, default True
+    percent_sign_margin : bool, default True
         Add a percent sign after the marginal values, if using density.
     norm : matplotlib color norm, default LogNorm()
         A colormap norm.
@@ -1220,12 +1175,9 @@ def plot_scatter_diagram(
         will adjust position of the colorbar.
 
     Returns
-    ----------
-    matplotlib axis
-
-    Notes
     -------
-    The function is written by efvik.
+    matplotlib.axes.Axes
+
     """
 
     valid_annot = ["all","nonzero","rounded","off"]

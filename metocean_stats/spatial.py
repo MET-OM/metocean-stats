@@ -7,16 +7,17 @@ explicitly) and feature resolution are all derived from the data added.
 
 Usage
 -----
-    m = Spatial()
-    m.add_bathymetry(depth, lon, lat)
-    m.add_quiver(u, v, lon, lat, subsample=4, reference_length=1.0, reference_units="m/s")
-    m.add_coastline()
-    m.add_point_of_interest(4.5, 60.4, "Station A")
-    fig, ax = m.plot()
+>>> m = Spatial()
+>>> m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], ["Station A", "Station B"])
+>>> fig, ax = m.plot()
+
+Add data layers with the ``add_*`` methods (for example `add_bathymetry`,
+`add_quiver` or `add_coastline`) before calling `plot`.
 
 To draw into an existing axes instead (e.g. one panel of a subplot grid),
-pass it to plot(): `m.plot(ax=ax)`. Extent is then taken from the axes (or
-from an explicit extent= given to Spatial()) rather than computed from data.
+pass it to `plot`: ``m.plot(ax=ax)``. The extent is then taken from the axes,
+or from an explicit ``extent`` given to `Spatial`, rather than computed from
+the data.
 """
 from __future__ import annotations
 
@@ -633,21 +634,51 @@ def _draw_borders(ax, transform, *, resolution, color, linewidth, **kwargs):
     return ax.add_feature(cfeature.BORDERS.with_scale(resolution), edgecolor=color, linewidth=linewidth, **kwargs)
 
 
+def _draw_image_tiles(ax, transform, *, tiler, zoom, interpolation, zorder, **kwargs):
+    # add_image fetches tiles for the axes' current extent, set by plot()
+    # before any queued layer is drawn -- same precondition as coastline/land.
+    return ax.add_image(tiler, zoom, interpolation=interpolation, zorder=zorder, **kwargs)
+
+
 def _draw_gridlines(ax, transform, *, draw_labels, linewidth, color, alpha, linestyle, **kwargs):
     return ax.gridlines(draw_labels=draw_labels, linewidth=linewidth, color=color, alpha=alpha,
                          linestyle=linestyle, **kwargs)
 
 
 class Spatial:
-    """A map for oceanographic/meteorological gridded data.
+    """
+    Map of gridded oceanographic or meteorological data.
 
-    add_* methods only queue up what to draw and expand the tracked data
-    bounds; nothing is plotted and no figure exists until `.plot()` is called.
-    At that point, extent (if not given explicitly), projection (if not given
-    explicitly) and feature resolution are all derived from the data added.
+    The ``add_*`` methods queue layers and track data bounds. Nothing is
+    drawn until `plot` is called. At that point the extent, projection and
+    feature resolution are derived from the data, unless given explicitly.
     """
 
     def __init__(self, projection=None, extent=None, figsize=None, title=None, layout="constrained"):
+        """
+        Parameters
+        ----------
+        projection : str or cartopy.crs.Projection, optional
+            Projection name: "PlateCarree", "Mercator", "NorthPolarStereo",
+            "SouthPolarStereo", "LambertConformal",
+            "LambertAzimuthalEqualArea" or "Orthographic". A cartopy
+            projection instance is also accepted. If None, it is chosen from
+            the extent in `plot`.
+        extent : sequence of 4 float, optional
+            Map extent as ``(lon_min, lon_max, lat_min, lat_max)``. If None,
+            it is derived from the data.
+        figsize : tuple of float, optional
+            Figure size passed to `matplotlib.pyplot.subplots`.
+        title : str, optional
+            Axes title.
+        layout : str, default "constrained"
+            Layout engine passed to `matplotlib.pyplot.subplots`.
+
+        Raises
+        ------
+        ValueError
+            If `extent` does not contain exactly four values.
+        """
         self.projection_spec = projection
 
 
@@ -705,13 +736,20 @@ class Spatial:
         return self
     
     def plot(self, ax=None):
-        """Resolve extent/projection/resolution, draw every queued layer, and
-        return (fig, ax).
+        """
+        Draw all queued layers.
 
-        If `ax` is given, drawing happens on that existing axes instead of a
-        new figure, and its current extent (or an explicit extent= passed to
-        Spatial()) is used as-is - the caller is responsible for extent in
-        that case, same as plain cartopy.
+        Parameters
+        ----------
+        ax : cartopy.mpl.geoaxes.GeoAxes, optional
+            Existing axes to draw on. If None, a new figure is created. An
+            existing axes keeps its current extent, unless `extent` was given
+            to the constructor.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+        ax : cartopy.mpl.geoaxes.GeoAxes
         """
         if ax is not None:
             self.ax = ax
@@ -779,12 +817,38 @@ class Spatial:
         return self.fig, self.ax
     
     def legend(self, **kwargs):
-        """Add a legend. Call after plot()."""
+        """
+        Add a legend to the map. Call after `plot`.
+
+        Parameters
+        ----------
+        **kwargs
+            Passed to `matplotlib.axes.Axes.legend`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         self.ax.legend(**kwargs)
         return self
 
     def savefig(self, path, **kwargs):
-        """Save the figure. Call after plot()."""
+        """
+        Save the figure. Call after `plot`.
+
+        Parameters
+        ----------
+        path : str or path-like
+            Output file name. The format is inferred from the extension.
+        **kwargs
+            Passed to `matplotlib.figure.Figure.savefig`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         self.fig.savefig(path, **kwargs)
         return self
 
@@ -793,14 +857,42 @@ class Spatial:
     def add_quiver(self, u, v, lon, lat, *, color="k", cmap=None, magnitude_color=False,
                     scale=None, width=None, subsample=1, label=None,
                     reference_length=None, reference_units="", **kwargs):
-        """Plot a vector field (e.g. currents, wind) as arrows.
+        """
+        Queue a vector field as arrows.
 
-        color : uniform arrow color (ignored if magnitude_color=True).
-        magnitude_color : color arrows by vector magnitude using `cmap` instead.
-        scale : matplotlib quiver `scale` (smaller = longer arrows); None -> auto.
-        subsample : plot every Nth vector in each dimension.
-        reference_length/reference_units : draw a labeled reference arrow via quiverkey.
-        label : adds an invisible proxy artist so ax.legend() works.
+        Parameters
+        ----------
+        u, v : array-like
+            Eastward and northward components. The shape must match the grid
+            defined by `lon` and `lat`.
+        lon, lat : array-like
+            1D coordinates (meshed onto a grid) or 2D coordinate arrays.
+        color : str, default "k"
+            Arrow colour. Ignored if `magnitude_color` is True.
+        cmap : str or matplotlib.colors.Colormap, optional
+            Colormap used if `magnitude_color` is True.
+        magnitude_color : bool, default False
+            Colour the arrows by vector magnitude.
+        scale : float, optional
+            Passed to `matplotlib.axes.Axes.quiver`. Smaller values give longer
+            arrows. If None, matplotlib chooses.
+        width : float, optional
+            Shaft width, passed to `matplotlib.axes.Axes.quiver`.
+        subsample : int, default 1
+            Plot every Nth vector in each dimension.
+        label : str, optional
+            Legend label. Adds an invisible proxy artist.
+        reference_length : float, optional
+            Length of a reference arrow (quiver key). If None, no key is drawn.
+        reference_units : str, default ""
+            Units shown with the reference arrow.
+        **kwargs
+            Passed to `matplotlib.axes.Axes.quiver`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
         """
         lon2d, lat2d, fields = _check_shapes(lon, lat, u=u, v=v)
         self._update_bounds(lon2d, lat2d)
@@ -815,15 +907,45 @@ class Spatial:
                           density=1.0, linewidth=None, label=None,
                           grid_atol=1e-6, grid_rtol=1e-5,
                           arrow_spacing=None, arrow_size=3, **kwargs):
-        """Plot streamlines of a 2D vector field.
+        """
+        Queue streamlines of a 2D vector field.
 
-        Handles curvilinear grids and correctly crosses poles/the
-        antimeridian (see module docs for details).
+        Parameters
+        ----------
+        u, v, lon, lat : array-like
+            As for `add_quiver`.
+        color : str, default "k"
+            Line colour. Ignored if `color_by_magnitude` is True.
+        cmap : str or matplotlib.colors.Colormap, optional
+            Colormap used if `color_by_magnitude` is True.
+        color_by_magnitude : bool, default False
+            Colour the streamlines by vector magnitude.
+        density : float, default 1.0
+            Streamline density, as in `matplotlib.axes.Axes.streamplot`.
+        linewidth : float, optional
+            Line width. If None, 1.0 is used.
+        label : str, optional
+            Legend label. Adds an invisible proxy artist.
+        grid_atol, grid_rtol : float
+            Unused. Kept for backward compatibility.
+        arrow_spacing : int, optional
+            Place one arrowhead every N points along each streamline. If None,
+            no arrowheads are drawn.
+        arrow_size : float, default 3
+            Scales the arrowhead size.
+        **kwargs
+            Passed to `matplotlib.collections.LineCollection`.
 
-        arrow_spacing: draw a directional arrowhead every N points along each
-                       streamline. Set to None to disable arrows.
-        arrow_size: scales the arrowhead size.
-        grid_atol/grid_rtol: unused, kept for backward compatibility.
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+
+        Notes
+        -----
+        Streamlines are integrated in grid index space and then mapped back to
+        lon/lat. This avoids the artefacts that `streamplot` with a cartopy
+        transform produces near the poles and the antimeridian.
         """
         lon2d, lat2d, fields = _check_shapes(lon, lat, u=u, v=v)
         self._update_bounds(lon2d, lat2d)
@@ -838,16 +960,42 @@ class Spatial:
     def add_contour(self, data, lon, lat, *, levels=None, n_levels=10, cmap=None, colors=None,
                       linewidths=None, clabel=False, clabel_fmt="%.1f", label=None,
                       even_color_spacing=True, **kwargs):
-        """Line contour plot of a scalar field.
+        """
+        Queue line contours of a scalar field.
 
-        levels: explicit contour levels; if None, ~n_levels evenly spaced levels
-        are derived automatically from the data range.
-        even_color_spacing: when True (default) and `cmap` is used (not `colors`),
-        colors are assigned evenly across the levels by *index* rather than by
-        level *value* - so unevenly spaced levels (e.g. [50,100,200,500,1000,
-        2000,5000]) still get visually distinct colors per band instead of the
-        color scale being dominated by the largest level. Set to False to
-        restore plain value-based color scaling.
+        Parameters
+        ----------
+        data, lon, lat : array-like
+            Scalar field and its coordinates. The shape of `data` must match the
+            grid defined by `lon` and `lat`.
+        levels : array-like, optional
+            Contour levels. If None, `n_levels` evenly spaced levels spanning the
+            finite data range are used.
+        n_levels : int, default 10
+            Number of automatic levels. Ignored if `levels` is given.
+        cmap : str or matplotlib.colors.Colormap, optional
+            Colormap for the lines. Ignored if `colors` is given.
+        colors : str or list of str, optional
+            Single colour or one colour per level.
+        linewidths : float, optional
+            Line width.
+        clabel : bool, default False
+            Label the contour lines with their values.
+        clabel_fmt : str, default "%.1f"
+            Format of the contour labels.
+        label : str, optional
+            Legend label. Adds an invisible proxy artist.
+        even_color_spacing : bool, default True
+            If True and `cmap` is used, colours are assigned evenly across the
+            levels by index, not by value. This keeps unevenly spaced levels
+            visually distinct. Set to False for value-based colour scaling.
+        **kwargs
+            Passed to `matplotlib.axes.Axes.contour`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
         """
         lon2d, lat2d, fields = _check_shapes(lon, lat, data=data)
         self._update_bounds(lon2d, lat2d)
@@ -863,14 +1011,40 @@ class Spatial:
     def add_contourf(self, data, lon, lat, *, levels=None, n_levels=10, cmap="viridis",
                        extend="both", label=None, colorbar=False, colorbar_label=None,
                        even_color_spacing=True, **kwargs):
-        """Filled contour plot of a scalar field. Set colorbar=True to attach a colorbar.
+        """
+        Queue filled contours of a scalar field.
 
-        even_color_spacing: when True (default), colors are assigned evenly
-        across the levels by *index* rather than by level *value* - so
-        unevenly spaced levels (e.g. [50,100,200,500,1000,2000,5000]) still
-        get visually distinct bands instead of the color scale being
-        dominated by the largest level. Set to False to restore plain
-        value-based color scaling (matplotlib's default behavior).
+        Parameters
+        ----------
+        data, lon, lat : array-like
+            Scalar field and its coordinates. The shape of `data` must match the
+            grid defined by `lon` and `lat`.
+        levels : array-like, optional
+            Contour levels. If None, `n_levels` evenly spaced levels spanning the
+            finite data range are used.
+        n_levels : int, default 10
+            Number of automatic levels. Ignored if `levels` is given.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap.
+        extend : {"both", "min", "max", "neither"}, default "both"
+            Passed to `matplotlib.axes.Axes.contourf`.
+        label : str, optional
+            Used as the colorbar label if `colorbar_label` is not given.
+        colorbar : bool, default False
+            Attach a colorbar.
+        colorbar_label : str, optional
+            Colorbar label.
+        even_color_spacing : bool, default True
+            If True, colours are assigned evenly across the levels by index, not
+            by value. This keeps unevenly spaced levels visually distinct. Set
+            to False for value-based colour scaling.
+        **kwargs
+            Passed to `matplotlib.axes.Axes.contourf`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
         """
         lon2d, lat2d, fields = _check_shapes(lon, lat, data=data)
         self._update_bounds(lon2d, lat2d)
@@ -885,7 +1059,34 @@ class Spatial:
 
     def add_pcolormesh(self, data, lon, lat, *, cmap="viridis", vmin=None, vmax=None, label=None,
                          colorbar=False, colorbar_label=None, shading="auto", **kwargs):
-        """Pseudocolor plot of a scalar field (fast, no interpolation - good for dense grids)."""
+        """
+        Queue a pseudocolour plot of a scalar field.
+
+        Parameters
+        ----------
+        data, lon, lat : array-like
+            Scalar field and its coordinates. The shape of `data` must match the
+            grid defined by `lon` and `lat`.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap.
+        vmin, vmax : float, optional
+            Colour scale limits.
+        label : str, optional
+            Used as the colorbar label if `colorbar_label` is not given.
+        colorbar : bool, default False
+            Attach a colorbar.
+        colorbar_label : str, optional
+            Colorbar label.
+        shading : str, default "auto"
+            Passed to `matplotlib.axes.Axes.pcolormesh`.
+        **kwargs
+            Passed to `matplotlib.axes.Axes.pcolormesh`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         lon2d, lat2d, fields = _check_shapes(lon, lat, data=data)
         self._update_bounds(lon2d, lat2d)
         z = fields["data"]
@@ -897,11 +1098,35 @@ class Spatial:
     def add_bathymetry(self, depth, lon, lat, *, cmap="Blues", levels=None, n_levels=10,
                          colorbar=True, colorbar_label="Depth (m)", even_color_spacing=True,
                          **kwargs):
-        """Convenience wrapper around add_contourf tailored for bathymetry/topography defaults.
+        """
+        Queue a filled depth or elevation field, with defaults for bathymetry.
 
-        even_color_spacing: see add_contourf - default True, so uneven depth
-        levels (e.g. [50,100,200,500,1000,2000,5000]) still produce visually
-        distinct color bands.
+        A wrapper around `add_contourf`.
+
+        Parameters
+        ----------
+        depth, lon, lat : array-like
+            Depth field and its coordinates. The shape of `depth` must match the
+            grid defined by `lon` and `lat`.
+        cmap : str or matplotlib.colors.Colormap, default "Blues"
+            Colormap.
+        levels : array-like, optional
+            Contour levels. See `add_contourf`.
+        n_levels : int, default 10
+            Number of automatic levels. See `add_contourf`.
+        colorbar : bool, default True
+            Attach a colorbar.
+        colorbar_label : str, default "Depth (m)"
+            Colorbar label.
+        even_color_spacing : bool, default True
+            Passed to `add_contourf`.
+        **kwargs
+            Passed to `add_contourf`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
         """
         return self.add_contourf(
             depth, lon, lat, cmap=cmap, levels=levels, n_levels=n_levels,
@@ -912,28 +1137,51 @@ class Spatial:
     def add_points_of_interest(self, lons, lats, texts=None, *, markers="o", colors="k",
                                  markersizes=6, text_offsets=(0.02, 0.02), text_kwargs=None,
                                  labels=None, **kwargs):
-        """Plot one or more points of interest (e.g. weather stations, platforms).
+        """
+        Queue one or more points of interest, such as stations or platforms.
 
-        Accepts either a single point or many points through the same
-        signature: lons/lats may be a single scalar or a sequence. Every
-        other parameter (texts, markers, colors, markersizes, text_offsets,
-        text_kwargs, labels) may likewise be given either as a single value
-        - applied to every point - or as a sequence matching the number of
-        points (a sequence of length 1 is also broadcast to all points).
+        Parameters
+        ----------
+        lons, lats : float or array-like
+            Point coordinates in degrees. Must have the same length.
+        texts : str or list of str, optional
+            Label text drawn next to each point.
+        markers : str or list of str, default "o"
+            Marker style, passed to `matplotlib.axes.Axes.plot`.
+        colors : str or list of str, default "k"
+            Marker colour.
+        markersizes : float or list of float, default 6
+            Marker size.
+        text_offsets : tuple of float or list of tuple, default (0.02, 0.02)
+            Offset of each label from its point, as ``(dx, dy)`` in degrees.
+        text_kwargs : dict or list of dict, optional
+            Keyword arguments for `matplotlib.axes.Axes.text`.
+        labels : str or list of str, optional
+            Legend labels.
+        **kwargs
+            Passed to `matplotlib.axes.Axes.plot` for every point.
 
-        A plain string (e.g. colors="black") is always treated as one atomic
-        value, never as a sequence to split across points, even though
-        strings technically support len()/indexing.
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If `lons` and `lats` differ in length, or a per-point argument
+            does not have length 1 or the number of points.
+
+        Notes
+        -----
+        Each per-point argument is either a single value, applied to every
+        point, or a sequence with one entry per point. A sequence of length 1
+        is also applied to every point. A string is always a single value.
 
         Examples
         --------
-            m.add_points_of_interest(4.5, 60.4, "Station A")
-            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], ["A", "B"])
-            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], colors="red")  # both red
-            m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], colors=["red", "blue"])
-
-        text_offsets is in degrees (lon, lat); when given per-point it must be
-        a sequence of (dx, dy) pairs, e.g. [(0.02, 0.02), (-0.05, 0.02)].
+        >>> m = Spatial()
+        >>> m.add_points_of_interest([4.5, 5.0], [60.4, 60.6], ["A", "B"], colors=["red", "blue"])
         """
         lons_arr = np.atleast_1d(np.asarray(lons, dtype=float))
         lats_arr = np.atleast_1d(np.asarray(lats, dtype=float))
@@ -972,26 +1220,158 @@ class Spatial:
         )
 
     def add_coastline(self, *, resolution=None, color="black", linewidth=1.0, **kwargs):
-        """Add a coastline overlay. Requires a cartopy GeoAxes.
+        """
+        Queue a coastline overlay.
 
-        resolution: '110m'/'50m'/'10m'. If None, chosen automatically at plot()
-        time based on the map's spatial scale.
+        Parameters
+        ----------
+        resolution : {"110m", "50m", "10m"}, optional
+            Natural Earth resolution. If None, it is chosen in `plot` from the
+            map scale.
+        color : str, default "black"
+            Line colour.
+        linewidth : float, default 1.0
+            Line width.
+        **kwargs
+            Passed to `cartopy.mpl.geoaxes.GeoAxes.coastlines`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
         """
         return self._add_layer(_draw_coastline, resolution=resolution, color=color, linewidth=linewidth, **kwargs)
 
     def add_land(self, *, resolution=None, facecolor="lightgray", edgecolor="none", zorder=0, **kwargs):
-        """Add a filled land polygon feature (useful as a background layer)."""
+        """
+        Queue a filled land polygon, for use as a background.
+
+        Parameters
+        ----------
+        resolution : {"110m", "50m", "10m"}, optional
+            Natural Earth resolution. If None, it is chosen in `plot` from the
+            map scale.
+        facecolor : str, default "lightgray"
+            Fill colour.
+        edgecolor : str, default "none"
+            Outline colour.
+        zorder : int, default 0
+            Drawing order.
+        **kwargs
+            Passed to `cartopy.mpl.geoaxes.GeoAxes.add_feature`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         return self._add_layer(
             _draw_land, resolution=resolution, facecolor=facecolor, edgecolor=edgecolor, zorder=zorder, **kwargs
         )
 
     def add_borders(self, *, resolution=None, color="gray", linewidth=0.5, **kwargs):
-        """Add national/administrative border lines."""
+        """
+        Queue national and administrative borders.
+
+        Parameters
+        ----------
+        resolution : {"110m", "50m", "10m"}, optional
+            Natural Earth resolution. If None, it is chosen in `plot` from the
+            map scale.
+        color : str, default "gray"
+            Line colour.
+        linewidth : float, default 0.5
+            Line width.
+        **kwargs
+            Passed to `cartopy.mpl.geoaxes.GeoAxes.add_feature`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         return self._add_layer(_draw_borders, resolution=resolution, color=color, linewidth=linewidth, **kwargs)
+
+    def add_image_tiles(self, tiler, *, zoom=3, interpolation="spline36", zorder=0, **kwargs):
+        """
+        Queue raster tiles from any cartopy tile source, as a background.
+
+        Parameters
+        ----------
+        tiler : cartopy.io.img_tiles.GoogleWTS
+            Tile source, such as ``cartopy.io.img_tiles.OSM()``.
+        zoom : int, default 3
+            Tile zoom level. Higher values give more detail but fetch many more
+            tiles, so the default is low. Raise it when the extent is known.
+        interpolation : str, default "spline36"
+            Passed to `matplotlib.axes.Axes.imshow`.
+        zorder : int, default 0
+            Drawing order.
+        **kwargs
+            Passed to `cartopy.mpl.geoaxes.GeoAxes.add_image`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+
+        See Also
+        --------
+        add_land_osm : OpenStreetMap tiles with the source fixed.
+        """
+        return self._add_layer(
+            _draw_image_tiles, tiler=tiler, zoom=zoom, interpolation=interpolation,
+            zorder=zorder, **kwargs
+        )
+
+    def add_land_osm(self, *, zoom=3, interpolation="spline36", **kwargs):
+        """
+        Queue OpenStreetMap raster tiles, as a background.
+
+        Calls `add_image_tiles` with ``cartopy.io.img_tiles.OSM()``.
+
+        Parameters
+        ----------
+        zoom : int, default 3
+            Tile zoom level. See `add_image_tiles`.
+        interpolation : str, default "spline36"
+            Passed to `matplotlib.axes.Axes.imshow`.
+        **kwargs
+            Passed to `add_image_tiles`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
+        import cartopy.io.img_tiles as cimgt
+        return self.add_image_tiles(cimgt.OSM(), zoom=zoom, interpolation=interpolation, **kwargs)
 
     def add_gridlines(self, *, draw_labels=True, linewidth=0.5, color="gray", alpha=0.5,
                         linestyle="--", **kwargs):
-        """Add lat/lon gridlines with optional axis labels."""
+        """
+        Queue latitude and longitude gridlines.
+
+        Parameters
+        ----------
+        draw_labels : bool, default True
+            Draw tick labels on the map edges.
+        linewidth : float, default 0.5
+            Line width.
+        color : str, default "gray"
+            Line colour.
+        alpha : float, default 0.5
+            Line transparency.
+        linestyle : str, default "--"
+            Line style.
+        **kwargs
+            Passed to `cartopy.mpl.geoaxes.GeoAxes.gridlines`.
+
+        Returns
+        -------
+        Spatial
+            This instance, for chaining.
+        """
         return self._add_layer(
             _draw_gridlines, draw_labels=draw_labels, linewidth=linewidth, color=color,
             alpha=alpha, linestyle=linestyle, **kwargs,

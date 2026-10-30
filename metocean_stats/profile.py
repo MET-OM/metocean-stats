@@ -1,89 +1,31 @@
 """
 ProfileTimeSeries
-------------------
-Single-point (or single-location) metocean profile data: any number of
-variables that vary across "levels" (height above / depth below a
-reference) and time -- wind speed, temperature, currents, salinity, etc.
+-----------------
+Metocean profile data at a single location: one or more variables that vary
+across levels (height above or depth below a reference) and time, such as
+wind speed, temperature, currents or salinity.
 
-Design
-~~~~~~
-Built from a *single* ``xr.Dataset`` (or ``xr.DataArray``, promoted to a
-one-variable Dataset first). As with ``SpectralTimeSeries``, nothing in
-the user's dataset is renamed, and metadata is optional -- if the input
-already carries useful attrs they are preserved; anything undescribed
-gets a bare placeholder.
+Validation runs in full during construction, in this order:
 
-Unlike ``SpectralTimeSeries``, no dimension-name aliasing is needed: a
-profile variable has only ever got two candidate dims (time and
-"the other one"), so whichever dim isn't time simply *is* a level
-dimension, whatever it happens to be called. Different variables are
-explicitly allowed to carry *different* level dimensions/grids (e.g. a
-wind mast on one set of heights and an ADCP on a different set of
-depths, in the same dataset) -- there is no requirement that profile
-variables share one common grid. What *is* required is that every
-level-like dimension in the dataset agrees on sign convention (see
-Rule 4 below); mixing height-positive-up data with depth-positive-down
-data in one instance is not supported and will raise.
+1. Squeeze: length-1 dimensions are dropped.
+2. Dimensionality: no variable may have more than two dimensions.
+3. Time: every two-dimensional variable must share one datetime dimension,
+   the time dimension.
+4. Level sign: each level dimension must be single-signed (all values >= 0 or
+   all <= 0). Mixed sign conventions are rejected.
+5. Normalization: level values are replaced by their absolute values. Their
+   meaning is recorded from the declared ``level_convention``.
 
-Initialization pipeline (mirrors the identify -> standardize -> describe
-shape used by SpectralTimeSeries, always run in full, never partial):
+Variables are then classified by dimension:
 
-  1. **Squeeze.** Any dimension of length 1 is dropped (``ds.squeeze()``),
-     demoting it to a scalar coordinate. This clears out things like a
-     lingering ``lat``/``lon`` dimension left over from a single-point
-     selection upstream. Nothing else is touched at this stage.
+- ``profile_vars``: time and level.
+- ``scalar_vars``: time only.
+- ``level_only_vars``: level only, with no time axis.
+- ``static_vars``: no dimensions.
 
-  2. **Dimensionality check.** After squeezing, no variable may have more
-     than 2 dimensions. A variable with 3+ dims (e.g. an un-squeezed
-     ``station`` axis) is a structural problem this class does not try
-     to guess its way around, and raises immediately.
-
-  3. **Time identification.** Every 2D variable must share exactly one
-     dimension in common: the time dimension. That shared dimension's
-     coordinate must be (or be cleanly convertible to) ``datetime64``.
-     If 2D variables disagree on which dimension is shared, or the
-     shared dimension isn't datetime-like, this raises -- there is no
-     safe default to fall back on.
-
-  4. **Level sign-convention check.** The "other" dimension of every 2D
-     variable is a level dimension. In addition, any *1D* variable whose
-     single dimension is not the time dimension is also carrying a level
-     dimension (a "level-only" variable, e.g. a static roughness-length
-     profile with no time axis) and is included in this check too. Every
-     level dimension found this way must be single-signed: all its
-     coordinate values must be >= 0, or all must be <= 0 (zero is
-     compatible with either). If different level dimensions disagree in
-     sign with each other, or a single level dimension mixes signs
-     internally, this raises -- it very likely indicates a sigma/s-level
-     (relative, dimensionless) coordinate, a mix of height and depth
-     conventions, or corrupted data, none of which this class will
-     silently guess its way through.
-
-  5. **Level sign normalization.** Once convention is confirmed
-     consistent, every level coordinate's values are replaced by their
-     absolute value, and the *meaning* of that magnitude (pointing up
-     from a reference, or down from a reference) is recorded via the
-     required, user-declared ``level_convention`` parameter
-     ("height" or "depth") -- exactly as ``dir_convention`` records
-     the meaning of a directional value in SpectralTimeSeries, rather
-     than being inferred from the data.
-
-After these checks, every remaining variable is classified by its
-dimension signature into one of three buckets:
-
-    {time, level}  -> profile variable   (any number allowed, each may
-                                           carry its own level dim/grid)
-    {time}         -> scalar variable    (varies only in time)
-    {level}        -> level-only variable (varies only across a level
-                                           dim, no time axis)
-    {}             -> static variable     (0D, kept but otherwise ignored)
-
-As with the other classes in this family, ``self.ds`` is the *only*
-copy of the data. It is never split into a "classified" object plus an
-"auxiliary" leftover, and nothing beyond the squeeze / sign-normalize
-steps above is ever mutated without being explicitly asked for later
-(e.g. interpolation is always an output-time operation on a fresh
-result, never a rewrite of ``self.ds``).
+Different variables may use different level grids. Dimension names are kept.
+The dataset in ``ds`` is the only copy of the data. Interpolation always
+returns a new result.
 """
 
 from __future__ import annotations
@@ -176,110 +118,45 @@ def _apply_variable_attrs(da: xr.DataArray, variable: "Variable") -> None:
 
 class ProfileTimeSeries:
     """
-    Single-source metocean profile data: any number of variables varying
-    across levels (height/depth) and time.
+    Profile of one or more metocean variables over levels and time.
+
+    Built from a single ``xarray.Dataset`` or ``xarray.DataArray``. See the
+    module docstring for the validation steps.
 
     Parameters
     ----------
-    data : xr.Dataset | xr.DataArray
-        Source data. A bare DataArray is promoted to a one-variable
-        Dataset first (using its own ``.name``, or "value" if unnamed),
-        then subjected to the same checks as a Dataset input. Dimension
-        names are never renamed -- whichever dimension isn't the shared
-        time dimension is treated as a level dimension, whatever it is
-        called in the source data. Different variables may use different
-        level dimensions/grids; there is no requirement that profile
-        variables share one common grid. See module docstring for the
-        full initialization pipeline (squeeze -> dimensionality check ->
-        time identification -> level sign check -> sign normalization).
+    data : xr.Dataset or xr.DataArray
+        Source data. A DataArray is converted to a one-variable Dataset,
+        named after its ``name`` or ``"value"``. Dimension names are kept.
+        Variables may use different level dimensions.
     level_convention : {"height", "depth"}
-        Declares what the (now positive) level values mean:
-        "height" - distance above a reference (e.g. sea surface), values
-                   increase upward.
-        "depth"  - distance below a reference (e.g. sea surface or
-                   seabed), values increase downward.
-        This is metadata the class trusts, not something inferred from
-        the data's original sign -- exactly as ``dir_convention`` works
-        in SpectralTimeSeries. Required: mixing height- and
-        depth-convention data in a single instance is not supported.
-    primary : Variable | str
-        The primary profile variable (e.g. wind speed, current speed,
-        temperature) -- the one EVA and other single-variable methods
-        default to when no `var=` is given explicitly. A bare string is
-        promoted to a placeholder Variable(name=symbol=the string,
-        unit=""); pass a full Variable to supply proper name/symbol/unit
-        metadata instead. Must resolve to a profile variable ({time,
-        level} signature) once the dataset has been classified --
-        checked after classification, since which variables qualify as
-        "profile variables" isn't known until then.
-    direction : Variable | str, optional
-        The profile variable to use as the default direction source for
-        direction-based grouping (statistics(by="direction")) and for
-        EVA's sector splitting. Must itself be a profile variable, and
-        must share `primary`'s exact level dimension -- pairing a
-        direction series on one grid with data on another would silently
-        misalign which direction value applies to which level, so this
-        is checked at construction and raises rather than guessing. If
-        not set here, direction-based grouping/EVA-by-sector can still
-        be supplied per-call; if neither is given, those features raise.
-    level_convention : {"height", "depth"}
-        Declares what the (now positive) level values mean:
-        "height" - distance above a reference (e.g. sea surface), values
-                   increase upward.
-        "depth"  - distance below a reference (e.g. sea surface or
-                   seabed), values increase downward.
-        This is metadata the class trusts, not something inferred from
-        the data's original sign -- exactly as ``dir_convention`` works
-        in SpectralTimeSeries. Required: mixing height- and
-        depth-convention data in a single instance is not supported.
+        Meaning of the level values. "height" is distance above a reference,
+        increasing upward. "depth" is distance below a reference, increasing
+        downward. This is declared by the user and not inferred from the
+        data. Mixing the two conventions in one instance is not supported.
+    primary : Variable or str
+        Primary profile variable, used as the default by the statistics,
+        plotting and EVA methods. A string is converted to a placeholder
+        `Variable`. Must be a profile variable.
+    direction : Variable or str, optional
+        Profile variable holding direction, used for direction-based grouping
+        and sector EVA. Must share the level dimension of `primary`.
     name : str, optional
-        Human-readable label for this record (site name, model run,
-        instrument, etc.).
+        Label for this record, such as a site, model run or instrument.
 
-    Attributes
-    ----------
-    ds : xr.Dataset
-        The full source dataset after squeezing size-1 dims and
-        normalizing level signs. All original variable/coordinate names
-        and attrs are preserved except for the deliberate level-sign
-        normalization described above.
-    level_convention : {"height", "depth"}
-    time_dim : str
-        Name of the shared time dimension, whatever it was called in the
-        input.
-    level_dims : list[str]
-        Names of every distinct level dimension found across all
-        profile and level-only variables (may be more than one).
-    profile_vars : list[str]
-        Variables with signature {time, level}.
-    scalar_vars : list[str]
-        Variables with signature {time} only.
-    level_only_vars : list[str]
-        Variables with signature {level} only (no time axis).
-    static_vars : list[str]
-        0D variables, kept but otherwise unexamined.
-    primary : Variable
-        Resolved primary-variable metadata.
-    direction : Variable | None
-        Resolved direction-variable metadata, or None if not given.
-    EVA : ProfileEVA
-        Extreme value analysis broadcast across every level of
-        `primary`'s level dimension -- one `UnivariateEVA` per level,
-        built lazily and cached the first time each level is touched.
-        Only ever scoped to `primary`; EVA on a different profile
-        variable means constructing a new ProfileTimeSeries with that
-        variable as `primary` (cheap -- EVA itself is what's expensive,
-        and it isn't run until you call EVA.get_extremes()/.fit()).
+    Raises
+    ------
+    TypeError
+        If `data` is not an xarray object.
+    ValueError
+        If the data fails a validation step, or `primary` or `direction` is
+        not a suitable profile variable.
 
     Notes
     -----
-    There is no "unstandardized" object you can hold and forget to fix --
-    if construction succeeds, the squeeze/dimensionality/time/sign checks
-    have all passed and level values are already positive magnitudes.
-    Anything this class cannot safely resolve on its own (ambiguous time
-    dimension, mixed level sign convention, >2D variables, a primary/
-    direction pair on mismatched level grids) raises during construction
-    rather than being guessed at.
+    Validation runs in full during construction, so a successfully built
+    instance is consistent. Ambiguous input is rejected rather than guessed
+    at.
     """
 
     def __init__(
@@ -317,7 +194,9 @@ class ProfileTimeSeries:
         primary = _coerce_variable(primary)
         direction = _coerce_variable(direction) if direction is not None else None
 
+        #: Declared level convention, "height" or "depth".
         self.level_convention = level_convention
+        #: Label for this record, or None.
         self.name = name
 
         # ------------------------------------------------------------------ #
@@ -412,14 +291,23 @@ class ProfileTimeSeries:
         # ------------------------------------------------------------------ #
         # Store.                                                             #
         # ------------------------------------------------------------------ #
+        #: The validated dataset, with squeezed dimensions and absolute level values.
         self.ds = ds
+        #: Name of the shared time dimension.
         self.time_dim = time_dim
+        #: Names of all level dimensions.
         self.level_dims = level_dims
+        #: Variables with signature {time, level}.
         self.profile_vars = profile_vars
+        #: Variables with signature {time} only.
         self.scalar_vars = scalar_vars
+        #: Variables with signature {level} only, with no time axis.
         self.level_only_vars = level_only_vars
+        #: 0D variables.
         self.static_vars = static_vars
+        #: Resolved primary-variable metadata.
         self.primary = primary
+        #: Resolved direction-variable metadata, or None.
         self.direction = direction
 
         self.ds.attrs["level_convention"] = level_convention
@@ -454,6 +342,7 @@ class ProfileTimeSeries:
         # Cheap to construct -- no UnivariateEVA is actually built until    #
         # EVA.get_extremes()/.fit() is called for a given level.            #
         # ------------------------------------------------------------------ #
+        #: Extreme value analysis for `primary`, see `ProfileEVA`.
         self.EVA = ProfileEVA(self, primary.col)
 
     # ---------------------------------------------------------------------- #
@@ -861,6 +750,7 @@ class ProfileTimeSeries:
 
     @property
     def time(self) -> pd.DatetimeIndex:
+        """Time coordinate of the dataset."""
         return pd.DatetimeIndex(self.ds.coords[self.time_dim].values)
 
     def levels(self, dim: str | None = None) -> np.ndarray:
@@ -886,11 +776,13 @@ class ProfileTimeSeries:
 
     @property
     def duration(self) -> pd.Timedelta:
+        """Time between the first and last timestamps."""
         t = self.time
         return t[-1] - t[0]
 
     @property
     def timestep(self) -> pd.Timedelta:
+        """Median time between consecutive timestamps."""
         return pd.Series(self.time).diff().median()
 
     # ---------------------------------------------------------------------- #
@@ -1141,12 +1033,13 @@ class ProfileTimeSeries:
         by : {"all", "month", "season", "direction", "year"}
             Grouping strategy. Defaults to "all" (no grouping).
         stat : str | list[str]
-            Statistic(s), passed straight to aggregate_statistics --
-            "mean", "std", "min", "max", "count", or a percentile in any
-            of its accepted spellings ("p90", "P90", "90%", "90").
-            Defaults to ["mean", "P90", "P99"]. Must be a single string
-            (not a list) whenever `by` is not "all". Availability (%) is
-            not one of aggregate_statistics's stats; compute it as
+            Statistic(s), passed straight to `utils.aggregate_statistics`:
+            "count", "min"/"minimum", "max"/"maximum", "mean", "std",
+            "median", or a percentile such as "P90" or "90%". Defaults to
+            ["mean", "P90", "P99"]. Must be a single string (not a list)
+            whenever `by` is not "all". "%"/"density" is not supported
+            here, since this method has no well-defined grand total to
+            compute it against; compute availability as
             100 * count / count("all") from two separate calls if needed.
         direction : str, optional
             Profile variable to use as direction when by="direction".
@@ -1236,8 +1129,8 @@ class ProfileTimeSeries:
 
     def _level_axis_label(self, level_dim: str) -> str:
         """
-        Build the y-axis label for a level dimension: just "Height [m]" or
-        "Depth [m]" depending on `level_convention".
+        Build the y-axis label for a level dimension: just "Height (m)" or
+        "Depth (m)" depending on `level_convention`.
         """
         return f"{self.level_convention.capitalize()} (m)"
 
@@ -1366,7 +1259,7 @@ class ProfileTimeSeries:
         - by="month"/"season"/"direction"/"year": one subplot per group
             (month, season, sector, or year), laid out the same way
             `ProfileEVA.plot_return_values` lays out its per-month/per-
-            sector subplots (via the same `_get_n_axes` grid logic), each
+            sector subplots (via the same `utils.get_n_axes` grid logic), each
             comparing the requested statistic(s) as separate lines within
             that group. `stat` may be a list here too -- unlike
             `statistics()` itself, which restricts `stat` to a single value
@@ -1414,7 +1307,7 @@ class ProfileTimeSeries:
             Axes to draw on. For by="all", a single Axes (a new one is
             created if omitted). For a grouped `by`, an array of Axes --
             one per group, already flattened or in any array shape (a new
-            grid is created via `_get_n_axes` if omitted).
+            grid is created via `utils.get_n_axes` if omitted).
 
         Returns
         -------
@@ -1830,7 +1723,7 @@ class ProfileTimeSeries:
         Every profile variable sharing `primary`'s level dimension is
         sliced at `level` (resolved via `interp`, exactly as every other
         level-resolving method in this class -- see `_resolve_level_axis`).
-        Every scalar (time-only) variable is carried over unchanged. A
+        Scalar (time-only) variables are included by default. A
         profile variable on a *different* level dimension than `primary`
         cannot be sliced at the same `level` meaningfully, so it is only
         included if explicitly requested via `secondary` (which raises a
@@ -1869,12 +1762,12 @@ class ProfileTimeSeries:
         -------
         TimeSeries
         """
-        primary_var = self._variables[primary] if primary else self.primary
         if primary is not None and primary not in self._variables:
             raise ValueError(
                 f"primary='{primary}' is not a known variable. "
                 f"Available: {list(self._variables)}"
             )
+        primary_var = self._variables[primary] if primary else self.primary
         if primary_var.col not in self.profile_vars:
             raise ValueError(
                 f"primary='{primary_var.col}' is not a profile variable. "
@@ -2071,27 +1964,18 @@ class ProfileEVA:
         profile variable in ``pts.profile_vars`` -- checked by
         ``ProfileTimeSeries.__init__`` before this is constructed, since
         that's where ``primary`` itself is validated).
-
-    Attributes
-    ----------
-    var : str
-    level_dim : str
-        The level dimension `var` varies over.
-    levels : np.ndarray
-        Every level value on `level_dim`, in dataset order -- the full
-        set `get_extremes`/`fit` broadcast over when no `levels=` subset
-        is given.
-    models : dict[float, UnivariateEVA]
-        Cache of per-level UnivariateEVA instances, keyed by level value.
-        Empty until `get_extremes` has been called for at least one
-        level.
     """
 
     def __init__(self, pts: "ProfileTimeSeries", var: str):
         self._pts = pts
+        #: Name of the profile variable EVA is run on.
         self.var = var
+        #: The level dimension `var` varies over.
         self.level_dim = [d for d in pts.ds[var].dims if d != pts.time_dim][0]
+        #: Every level value on `level_dim`, in dataset order.
         self.levels = pts.ds.coords[self.level_dim].values
+        #: Cache of per-level UnivariateEVA instances, keyed by level value.
+        #: Empty until `get_extremes` has run.
         self.models: dict[float, UnivariateEVA] = {}
 
         var_meta = pts._variables[var]
@@ -2154,28 +2038,40 @@ class ProfileEVA:
         errors: str = "raise",
         th_percentile: float = 0.98,
         poisson_correction: bool = True,
+        sectors: int = 12,
     ) -> "ProfileEVA":
         """
-        Build (or rebuild) a UnivariateEVA for every level and run its
-        `get_extremes(...)`. All keyword arguments are passed straight
-        through to `UnivariateEVA.get_extremes` unchanged, so every
-        level is extracted with the same threshold/blocking settings --
-        per-level threshold tuning is possible by calling this again for
-        a single level's worth of data via a fresh `ProfileEVA` scoped
-        to it, since the normal case (profile-wide EVA) always fits
-        every level together.
+        Build the UnivariateEVA for every level and run its `get_extremes`.
+
+        Every level is extracted with the same settings. Thresholds left as
+        None are derived per level from `th_percentile`, using that level's
+        own data.
 
         Parameters
         ----------
-        th_omni, th_monthly, th_sectors, block_size, min_last_block, r,
-        extremes_type, errors, th_percentile
-            Passed straight through to `UnivariateEVA.get_extremes`. See
-            that method for details -- thresholds left as None there are
-            derived per level from `th_percentile`, independently for
-            each level's own data.
+        th_omni : float, optional
+            Omni POT threshold. See `UnivariateEVA.get_extremes`.
+        th_monthly : list of float, optional
+            Monthly POT thresholds. See `UnivariateEVA.get_extremes`.
+        th_sectors : list of float, optional
+            Sector POT thresholds. See `UnivariateEVA.get_extremes`.
+        block_size : str, default "365.2425D"
+            AM block length. See `UnivariateEVA.get_extremes`.
+        min_last_block : float, default 0.9
+            Minimum fraction of a final block to keep.
+        r : str, default "48h"
+            POT declustering run length.
+        extremes_type : {"high", "low"}, default "high"
+            Whether to extract maxima or minima.
+        errors : str, default "raise"
+            Passed to `UnivariateEVA.get_extremes`.
+        th_percentile : float, default 0.98
+            Quantile used for the default thresholds.
         poisson_correction : bool, default True
-            Passed straight through to each level's `UnivariateEVA`. See
-            `UnivariateEVA.__init__`/`_poisson_exceedance_probability`.
+            Passed to each level's `UnivariateEVA`.
+        sectors : int, default 12
+            Number of directional sectors, used if a direction variable is
+            set. Ignored otherwise.
 
         Returns
         -------
@@ -2191,7 +2087,7 @@ class ProfileEVA:
                 var_name=self._var_name,
                 var_symbol=self._var_symbol,
                 var_unit=self._var_unit,
-                sectors=getattr(self._pts, "sectors", 12),
+                sectors=sectors,
                 poisson_correction=poisson_correction,
             )
             model.get_extremes(
@@ -2315,7 +2211,8 @@ class ProfileEVA:
         Returns
         -------
         pd.DataFrame
-            Index = level values (name = self.level_dim), columns =
+            Index = level values, named by the level axis label (e.g.
+            "Height (m)"), columns =
             month/sector labels (or a single "Omni" column if
             grouping="omni"). Values are return-value estimates for the
             requested return period, sourced by column from the
@@ -2384,7 +2281,7 @@ class ProfileEVA:
         """
         One subplot per month/sector (laid out the same way
         `UnivariateEVA.plot_return_value_comparison` lays out its
-        per-group subplots, via the same `_get_n_axes` grid logic), each
+        per-group subplots, via the same `utils.get_n_axes` grid logic), each
         showing the vertical profile -- level on the y-axis, return
         value on the x-axis, one line per requested return period.
         "omni" produces a single subplot (no month/sector split), same
@@ -2415,12 +2312,9 @@ class ProfileEVA:
         evaluated at. The plotted return-value lines themselves also carry
         a marker at each computed level, for the same reason.
 
-        A single legend for return periods is drawn only on the first
-        (top-left) subplot rather than repeated on every one, since every
-        subplot shares the same set of return periods/colors and repeating
-        it would be redundant. Only drawn when `ax` is None (i.e. this call
-        owns the figure); if axes were passed in, the caller is left to
-        handle the legend themselves.
+        A legend for the return periods is drawn on the first (top-left)
+        subplot only, since every subplot uses the same return periods and
+        colours.
 
         Parameters
         ----------
@@ -2454,7 +2348,7 @@ class ProfileEVA:
         ax : array of matplotlib.axes.Axes, optional
             Axes to draw on -- one per month/sector, already flattened
             or in any array shape. A new grid is created via the same
-            `_get_n_axes` layout `UnivariateEVA` uses if omitted.
+            `utils.get_n_axes` layout `UnivariateEVA` uses if omitted.
 
         Returns
         -------
@@ -2887,7 +2781,7 @@ class ProfileEVA:
         `plot_return_values`'s one-subplot-per-month/sector grid, since
         Turkstra profiles have no month/sector split of their own (the
         anchor-level columns already are the thing being compared
-        within one plot, the way the old CCA plot did it).
+        within one plot).
 
         Accepts exactly the same basis/percentile/month/return_period/
         method/dist/return_period_size/levels arguments as
@@ -3007,8 +2901,8 @@ class ProfileEVA:
         if level not in self.models:
             raise KeyError(
                 f"No UnivariateEVA for level={level!r} yet -- call "
-                f"get_extremes(levels=[{level!r}]) first. Levels "
-                f"currently available: {list(self.models)}."
+                "get_extremes() first (it always extracts every level at "
+                f"once). Levels currently available: {list(self.models)}."
             )
         return self.models[level]
 

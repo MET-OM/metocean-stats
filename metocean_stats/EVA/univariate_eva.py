@@ -1,3 +1,13 @@
+"""
+Univariate extreme value analysis with pyextremes.
+
+`UnivariateEVA` groups a single variable by calendar month and, if a
+direction variable is given, by directional sector. For each group it
+extracts block maxima (AM) and peaks over threshold (POT) extremes, fits
+the requested distributions (including the initial distribution method,
+IDM), and derives return values and confidence intervals.
+"""
+
 import copy
 import logging
 import warnings
@@ -20,7 +30,10 @@ logging.getLogger("pyextremes").setLevel(logging.WARNING)
 
 def _dist_name_map(dist,abbreviate=True):
     """
-    Mapping from scipy distribution to abbreviations, e.g. genpareto -> gp
+    Return the abbreviation of a scipy distribution name.
+
+    With ``abbreviate=False``, map an abbreviation back to its scipy name.
+    Unknown names are returned unchanged.
     """
     mapping = {
         "expon": "EXP",         # Exponential
@@ -43,8 +56,8 @@ def _dist_param_map(dist,params):
 
 def _dist_fit_method(dist,extreme_method):
     """
-    Return appropriate fitting method (MLE or MM) 
-    for any combination of distributions and extremes.
+    Return the pyextremes fitting method for a distribution and extremes
+    method (``MLE``, ``MOM``, or ``Lmoments``).
     """
     if dist == "exponweib": return "MLE"
     if extreme_method == "IDM": return "MOM"
@@ -53,11 +66,25 @@ def _dist_fit_method(dist,extreme_method):
     return "MLE"
 
 class UnivariateEVA:
+    """
+    Extreme value analysis of a single variable.
+
+    Typical workflow: `get_extremes`, then `fit`, then the plotting and
+    table methods.
+    """
+
+    #: Full time series of the analysed variable.
     data_omni:pd.Series
+    #: Monthly subsets of the variable, keyed by month label.
     data_monthly:dict[str,pd.Series]
+    #: Directional sector subsets, keyed by sector label. Empty if no
+    #: direction variable was given.
     data_sectors:dict[str,pd.Series]
+    #: Omni models, keyed by ``(method, distribution)``.
     models_omni:dict[str,dict[tuple[str,str],pyex.EVA]]
+    #: Monthly models, keyed by month label, then ``(method, distribution)``.
     models_monthly:dict[str,dict[tuple[str,str],pyex.EVA]]
+    #: Sector models, keyed by sector label, then ``(method, distribution)``.
     models_sectors:dict[str,dict[tuple[str,str],pyex.EVA]]
     
     def __init__(self,
@@ -72,39 +99,35 @@ class UnivariateEVA:
                  poisson_correction:bool=True,
                  ):
         """
-        Initialize extreme value analysis module.
-        This module applies pyextremes.EVA to monthly and sectors (and,
-        if a direction variable is supplied, directional sectors).
-
-        Can be constructed directly (independent of TimeSeries) - only
-        `data` and `var` are strictly required.
+        Group the data into omni, monthly and sector subsets.
 
         Parameters
         ----------
-        data : pd.DataFrame
-            Input data, indexed by a datetime-compatible index. Must
-            contain `var`, and `var_dir` if given.
+        data : pandas.DataFrame
+            Data indexed by a datetime-compatible index. Must contain
+            `var`, and `var_dir` if given.
         var : str
             Column name of the variable to analyse.
         var_dir : str, optional
-            Column name of a directional variable (0-360 deg). If None,
-            sector-based analysis is unavailable, but omni and monthly
-            analysis work as usual.
-        var_name, var_symbol, var_unit : str, optional
-            Semantics used for axis labels etc. Fall back to `var`,
-            `var`, and "" respectively if not given.
+            Column name of a directional variable in degrees (0-360). If
+            None, sector-based analysis is unavailable; omni and monthly
+            analysis are unaffected.
+        var_name : str, optional
+            Name used in axis labels. Defaults to `var`.
+        var_symbol : str, optional
+            Symbol used in axis labels. Defaults to `var`.
+        var_unit : str, optional
+            Unit used in axis labels. Defaults to an empty string.
         sectors : int, default 12
-            Number of directional sectors. Ignored if var_dir is None.
+            Number of directional sectors. Ignored if `var_dir` is None.
+        dist_name_map : callable, default _dist_name_map
+            Function mapping scipy distribution names to display names.
+            Also called with ``abbreviate=False`` to map names back.
         poisson_correction : bool, default True
-            Whether return values (AM, POT, and IDM alike) are computed
-            under the Poisson-process interpretation of "return period"
-            (see `_poisson_exceedance_probability`) rather than the naive
-            "expected count of exceedances = 1" definition, which becomes
-            >= 1 (and therefore meaningless) whenever the requested return
-            period isn't large relative to the model's own candidate-event
-            rate -- e.g. any return period close to 1 year for AM, whose
-            rate is always ~1/year. Default for every return-value method
-            on this instance; overridable per call.
+            Use the Poisson interpretation of return periods (see
+            `_poisson_exceedance_probability`) instead of the naive
+            expected-count definition. Applies to all return value
+            methods and can be overridden per call.
         """
 
         # Semantics (fall back to sensible defaults so direct construction
@@ -165,46 +188,31 @@ class UnivariateEVA:
 
     def _poisson_exceedance_probability(self, return_period, rate, poisson_correction=None):
         """
-        Per-candidate exceedance probability for a given nominal return
-        period `return_period` (years) and candidate-event rate `rate`
-        (candidates/year) -- e.g. ~1/year for AM (exactly one candidate,
-        the block maximum, per year), or the empirical/duration-derived
-        rate of threshold exceedances for POT/IDM.
-
-        Two definitions, both ultimately requiring "P(exceed x_T within
-        `return_period` years) is governed by rate `1/return_period`":
-
-        - Naive (poisson_correction=False): expected count of exceedances
-          of x_T within `return_period` years is exactly 1, i.e.
-          ``rate * return_period * P(single candidate > x_T) = 1``, so
-          ``P(single candidate > x_T) = 1/(return_period*rate)``. Breaks
-          down (gives a probability >= 1, and therefore an undefined,
-          typically -inf, return value) whenever ``return_period*rate``
-          is not comfortably above 1.
-        - Poisson (poisson_correction=True, default): per Wikipedia's
-          "return period" article, treat exceedances of x_T as a Poisson
-          process with rate ``mu = 1/return_period``; the probability of
-          at least one exceedance within a 1-year window is then
-          ``1 - exp(-mu) = 1 - exp(-1/return_period)``. Equating this to
-          the probability that at least one of the ``rate`` candidates in
-          that year exceeds x_T (``1 - (1-p)**rate ~= 1 - exp(-rate*p)``
-          for the small ``p`` relevant here) gives
-          ``P(single candidate > x_T) = 1 - exp(-1/(return_period*rate))``.
-          Always a valid probability in (0, 1), and converges to the
-          naive definition as ``return_period*rate`` grows (see the
-          class docstring / Notes for example values), so in practice it
-          only matters when requesting a short return period relative to
-          the candidate rate (as is routinely the case for AM, whose
-          rate is always ~1/year).
+        Exceedance probability of a single candidate event for a return period.
 
         Parameters
         ----------
         return_period : array-like
             Nominal return period(s), in years.
         rate : float
-            Candidate-event rate, in candidates/year.
+            Candidate-event rate, in events per year. This is about 1 per
+            year for AM, and the empirical peak rate for POT and IDM.
         poisson_correction : bool, optional
             Defaults to `self.poisson_correction` if not given.
+
+        Returns
+        -------
+        numpy.ndarray
+            Probability that a single candidate event exceeds the return value.
+
+        Notes
+        -----
+        Without the correction the probability is
+        ``1 / (return_period * rate)``. This is greater than 1 (invalid)
+        whenever ``return_period * rate < 1``. With the correction it is
+        ``1 - exp(-1 / (return_period * rate))``, which always lies in
+        (0, 1) and approaches the uncorrected value for large
+        ``return_period * rate``.
         """
         poisson_correction = self.poisson_correction if poisson_correction is None else poisson_correction
         rt = np.asarray(return_period, dtype=np.float64) * rate
@@ -213,7 +221,7 @@ class UnivariateEVA:
         return 1 / rt
 
     def _extremes_rate_from_duration(self,duration,return_period_size="365.2425D"):
-
+        """Candidate-event rate (events per year) implied by an event duration."""
         duration = pd.to_timedelta(duration)
         return_period_size = pd.to_timedelta(return_period_size)
         return return_period_size / duration
@@ -221,20 +229,41 @@ class UnivariateEVA:
     def _get_return_value(self,model,return_period,return_period_size="365.2425D",
                            duration=None,exposure_fraction=1.0,poisson_correction=None,alpha=None,**kwargs):
         """
-        Return value(s) for `model` at the requested nominal `return_period`
-        (years), computed from the model's own fitted distribution via its
-        candidate-event exceedance probability -- applied identically
-        whether `model` is AM(BM), POT, or IDM (all reduce, at this level,
-        to "invert my fitted distribution at this exceedance probability");
-        only how that probability maps from `return_period` differs, via
-        each model's own candidate rate -- see `_poisson_exceedance_probability`.
+        Return values of a fitted model for nominal return periods.
 
+        Parameters
+        ----------
+        model : pyextremes.EVA
+            Fitted model (AM, POT or IDM).
+        return_period : float or array-like
+            Nominal return period(s), in years.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year, used with `duration`.
         duration : str or pandas.Timedelta, optional
-            Explicit "duration of event", used to override the empirical
-            candidate rate with a physically-derived one (only valid for
-            POT-based models, since AM's rate is fixed by block_size).
-            When None (default), the candidate rate is the model's own
-            empirical rate: `len(model.extremes) / self.N_years`.
+            Event duration used to derive the candidate rate instead of the
+            empirical rate. Only valid for POT-based models (including IDM).
+            If None, the rate is ``len(model.extremes) / self.N_years``.
+        exposure_fraction : float, default 1.0
+            Fraction of the record covered by the model. Only applied when
+            `duration` is given.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        alpha : float, optional
+            Significance level for confidence bounds.
+        **kwargs
+            Passed to ``model.model.get_return_value``, such as ``n_samples``.
+
+        Returns
+        -------
+        tuple
+            ``(value, lower, upper)`` on the data scale. ``lower`` and
+            ``upper`` are None when `alpha` is not given.
+
+        Raises
+        ------
+        ValueError
+            If `duration` is given for an AM model, or `return_period` is
+            not a scalar or 1D array.
         """
         if duration is not None and model.extremes_method != "POT":
             raise ValueError(
@@ -270,16 +299,6 @@ class UnivariateEVA:
             )
         )
 
-    def plot_threshold_diagnostics(
-            self,
-            dist=["genpareto"],
-            alpha=0.95,
-        ):
-        """
-        Plot diagnostics to evaluate threshold stability.
-        """
-        raise NotImplementedError()
-
     def get_extremes(
             self,
             th_omni:float=None,
@@ -293,11 +312,50 @@ class UnivariateEVA:
             th_percentile=0.98,
         ):
         """
-        Get POT and AM extremes of all models.
+        Extract block maxima (AM) and peaks over threshold (POT) extremes.
 
-        Sector-based extremes (th_sectors, self.am_sectors, self.pot_sectors)
-        are only computed if a direction variable was provided at
-        construction; otherwise they are skipped entirely.
+        Parameters
+        ----------
+        th_omni : float, optional
+            POT threshold for the omni data. Defaults to the
+            `th_percentile` quantile.
+        th_monthly : dict or list of float, optional
+            POT thresholds for the months present in the data (see
+            `keys_monthly`; a calendar month with no observations at all is
+            dropped at construction, so this may be fewer than 12), as a
+            dict keyed by month label or a list in month order. Defaults to
+            the `th_percentile` quantile of each month.
+        th_sectors : dict or list of float, optional
+            POT thresholds per sector, in the same format as `th_monthly`.
+            Defaults to the `th_percentile` quantile of each sector. Only
+            allowed if a direction variable was given at construction.
+        block_size : str or pandas.Timedelta, default "365.2425D"
+            Block length for AM extremes.
+        min_last_block : float, default 0.9
+            Minimum fraction of a block that must be covered by data for the
+            last block to be kept.
+        r : str or pandas.Timedelta, default "48h"
+            Declustering run length for POT peaks.
+        extremes_type : {"high", "low"}, default "high"
+            Whether to extract maxima or minima.
+        errors : str, default "raise"
+            Passed to pyextremes for the AM extraction.
+        th_percentile : float, default 0.98
+            Quantile used for the default thresholds.
+
+        Raises
+        ------
+        ValueError
+            If the monthly thresholds do not match the number of months
+            present in the data, or the sector thresholds do not match the
+            number of sectors.
+        AttributeError
+            If `th_sectors` is given without a direction variable.
+
+        Notes
+        -----
+        Sector extremes are only computed if a direction variable was given
+        at construction. Otherwise they are skipped.
         """
 
         if th_omni is None:
@@ -306,8 +364,12 @@ class UnivariateEVA:
             th_monthly = {k:v.quantile(th_percentile)
                           for k,v in self.data_monthly.items()}
 
-        if not len(th_monthly) == 12:
-            raise ValueError(f"Expected 12 monthly thresholds, got {len(th_monthly)}.")
+        if not len(th_monthly) == len(self.data_monthly):
+            raise ValueError(
+                f"Expected {len(self.data_monthly)} monthly thresholds "
+                f"(one per month present in the data: {self.keys_monthly}), "
+                f"got {len(th_monthly)}."
+            )
         if not isinstance(th_monthly,dict):
             th_monthly = {k:t for k,t in zip(self.keys_monthly,th_monthly)}
 
@@ -385,11 +447,29 @@ class UnivariateEVA:
             errors = "raise",
             ):
         """
-        Fit all combinations of distributions, methods and data subsets.
-        Distributions may be given as shorthand (2-3 letters) or scipy names.
+        Fit distributions to the AM, POT and IDM extremes of all subsets.
 
-        Sector models are only fitted if a direction variable was provided
-        at construction; self.models_sectors will be an empty dict otherwise.
+        Parameters
+        ----------
+        AM_dist, POT_dist, IDM_dist : list of str, default []
+            Distributions to fit for each extremes method. Shorthand
+            abbreviations (e.g. "GEV") and scipy names are both accepted.
+        dist_fit_method : callable, default _dist_fit_method
+            Called as ``dist_fit_method(dist, method)``. Returns the
+            pyextremes fitting method.
+        errors : {"raise", "warn"}, default "raise"
+            Applies to omni, monthly and sector fits alike. With "warn", a
+            failed fit is reported as a warning and skipped.
+
+        Raises
+        ------
+        ValueError
+            If `get_extremes` has not been run, or no distributions are given.
+
+        Notes
+        -----
+        Sector models are only fitted if a direction variable was given at
+        construction. `models_sectors` is an empty dict otherwise.
         """
 
         if not self._got_extremes:
@@ -421,22 +501,28 @@ class UnivariateEVA:
         for (method,dist) in pbar:
             pbar.set_description(f"Fitting {dist} to {method}")
             # Omni
-            model = pyex.EVA(self.data_omni)
-            if method == "AM":
-                model.set_extremes(self.am_omni,"BM",self.extremes_type,
-                                   block_size=self.block_size,
-                                   min_last_block=self.min_last_block)
-                model.fit_model(dist_fit_method(dist,method),dist)
-            if method == "POT":
-                model.set_extremes(self.pot_omni,"POT",self.extremes_type,
-                                   threshold=self.th_omni)
-                model.fit_model(dist_fit_method(dist,method),dist)
-            if method == "IDM":
-                model.set_extremes(self.data_omni,"POT",self.extremes_type,
-                                #    block_size=hours_per_entry
-                                   )
-                model.fit_model(dist_fit_method(dist,method),dist)
-            self.models_omni[(method,dist)] = model
+            try:
+                model = pyex.EVA(self.data_omni)
+                if method == "AM":
+                    model.set_extremes(self.am_omni,"BM",self.extremes_type,
+                                       block_size=self.block_size,
+                                       min_last_block=self.min_last_block)
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                if method == "POT":
+                    model.set_extremes(self.pot_omni,"POT",self.extremes_type,
+                                       threshold=self.th_omni)
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                if method == "IDM":
+                    model.set_extremes(self.data_omni,"POT",self.extremes_type,
+                                    #    block_size=hours_per_entry
+                                       )
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                self.models_omni[(method,dist)] = model
+            except Exception as e:
+                if errors == "raise":
+                    raise
+                elif errors == "warn":
+                    warnings.warn(f"Failed to fit {dist} ({method}) for omni: {e}")
 
             # Sectors
             if self._has_direction:
@@ -517,17 +603,40 @@ class UnivariateEVA:
             legend_kwargs = {},
             ):
         """
-        This plots a set of EVA distributions on a axes object.
+        Plot empirical extremes and fitted return value curves on one axes.
 
+        Parameters
+        ----------
+        models : dict
+            Fitted models keyed by ``(method, distribution)``.
+        return_periods : list of float
+            Return periods, in years, used for the table.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
         duration_POT, duration_IDM : str or pandas.Timedelta, optional
-            Explicit "duration of event" used to override the empirical
-            POT / IDM extremes rate (default=None, meaning use the
-            empirical historical spacing between peaks, unchanged from
-            before). Has no effect on AM curves/values, which are always
-            governed by block_size.
+            Event duration overriding the empirical rate for POT and IDM
+            models. Has no effect on AM models.
         poisson_correction : bool, optional
-            Defaults to `self.poisson_correction` if not given. See
-            `_poisson_exceedance_probability`.
+            Defaults to `self.poisson_correction` if not given.
+        ax : matplotlib.axes.Axes, optional
+            Axes to draw on. A new figure is created if None.
+        scatter_kwargs_AM, scatter_kwargs_POT, scatter_kwargs_IDM : dict, optional
+            Keyword arguments for the empirical points.
+        plot_kwargs_AM, plot_kwargs_POT, plot_kwargs_IDM : dict, optional
+            Keyword arguments for the fitted curves. Accepts ``cmap`` and
+            ``linestyle``.
+        table_kwargs : dict, optional
+            Keyword arguments for the return value table. The key
+            ``include`` (default True) shows or hides the table, and
+            ``rp_index`` (default True) puts return periods on the rows.
+        legend_kwargs : dict, optional
+            Keyword arguments for the legend. The key ``standing`` (default
+            False) places the legend in the upper left corner. Otherwise it
+            goes in the lower right corner.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
 
         # Input checks
@@ -684,36 +793,37 @@ class UnivariateEVA:
             **kwargs,
             ):
         """
+        Plot return value curves for every subset in a grouping.
+
         Parameters
         ----------
-        grouping : str or dict of EVA models
-            Str ("omni", "monthly", or "sectors"). "sectors" requires that
-            a direction variable was provided at construction.
-        return_periods : list[float]
-            List of return periods, in years.
-        ax : matplotlib axes or list of axes
-            Axes to plot on. Must correspond to the number of models.
-        ncols : int
-            Only used if axes are not provided. Number of subplot columns.
-        nfigs : int
-            Only used if axes are not provided. Option to divide plots over several figures.
-        kwargs : keyword arguments passed to the return value plots:
-         - duration_POT (str or pandas.Timedelta): Explicit duration of event
-           used to override the empirical POT extremes rate (default=None,
-           meaning use the empirical historical spacing between peaks).
-         - duration_IDM (str or pandas.Timedelta): Same as duration_POT, but
-           for IDM models.
-         - include_table (bool): Include a table of return values above the plot.
-         - scatter_kwargs_AM (dict): Keyword arguments passed to AM scatter.
-         - scatter_kwargs_POT (dict): Keyword arguments passed to POT scatter.
-         - scatter_kwargs_IDM (dict): Keyword arguments passed to IDM scatter.
-         - plot_kwargs_AM (dict): Keyword arguments passed to AM-based distributions.
-         - plot_kwargs_POT (dict): Keyword arguments passed to POT-based distributions.
-         - plot_kwargs_IDM (dict): Keyword arguments passed to IDM-based distributions.
-         - table_kwargs (dict): Keyword arguments passed to matplotlib Table (if used).
-         - legend_kwargs (dict): Keyword arguments passed to matplotlib legend.
-         - poisson_correction (bool): Defaults to `self.poisson_correction` if not
-           given. See `_poisson_exceedance_probability`.
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        return_periods : list of float
+            Return periods, in years.
+        ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
+            Axes to draw on. "omni" needs a single axes. The other groupings
+            need one axes per subset. Created if None.
+        ncols : int, default 3
+            Number of subplot columns, used only if `ax` is None.
+        nfigs : int, default 1
+            Number of figures to split the subset panels over, used only if
+            `ax` is None.
+        **kwargs
+            Passed to the single-subset plotting routine, such as
+            ``duration_POT``, ``duration_IDM``, ``poisson_correction``,
+            ``scatter_kwargs_*``, ``plot_kwargs_*``, ``table_kwargs``, and
+            ``legend_kwargs``. See `_subplot_return_value_comparison`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+            A single axes for "omni", otherwise the axes array.
+
+        Raises
+        ------
+        ValueError
+            If the models are not fitted, or `grouping` is not recognised.
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
@@ -770,16 +880,40 @@ class UnivariateEVA:
             table_flip = False,
             ax=None):
         """
-        Plot return value confidence intervals based on bootstrapping.
+        Plot return value curves with bootstrapped confidence bands on one axes.
 
+        Parameters
+        ----------
+        method : {"AM", "POT", "IDM"}
+            Extremes method of the model.
+        model : pyextremes.EVA
+            Fitted model.
+        return_periods : list of float
+            Return periods, in years, used for the table.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
         duration : str or pandas.Timedelta, optional
-            Explicit "duration of event" used to override the empirical
-            extremes rate (default=None, i.e. unchanged empirical
-            behavior). Only valid when method is "POT" or "IDM"; must be
-            left as None for "AM".
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
         poisson_correction : bool, optional
-            Defaults to `self.poisson_correction` if not given. See
-            `_poisson_exceedance_probability`.
+            Defaults to `self.poisson_correction` if not given.
+        alphas : float or list of float, default [0.99, 0.9]
+            Confidence levels.
+        samples : int, default 300
+            Number of bootstrap samples.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap for the confidence bands.
+        table_scale : float, default 0.07
+            Table height per row, as a fraction of the axes height. Set to 0
+            to omit the table.
+        table_flip : bool, default False
+            Transpose the table.
+        ax : matplotlib.axes.Axes, optional
+            Axes to draw on. A new figure is created if None.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         if not hasattr(alphas,"__len__"): alphas = [alphas]
         alphas = np.sort(alphas)
@@ -861,14 +995,52 @@ class UnivariateEVA:
             samples = 200,
             ):
         """
+        Plot return value confidence bands for every subset in a grouping.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        method : {"AM", "POT", "IDM"}
+            Extremes method to plot.
+        dist : str
+            Distribution, as an abbreviation (e.g. "GEV") or scipy name.
+        return_periods : list of float
+            Return periods, in years.
+        ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
+            Axes to draw on. "omni" needs a single axes. The other groupings
+            need one axes per subset. Created if None.
+        ncols : int, default 3
+            Number of subplot columns, used only if `ax` is None.
+        nfigs : int, default 1
+            Number of figures to split the subset panels over, used only if
+            `ax` is None.
         duration : str or pandas.Timedelta, optional
-            Explicit "duration of event" used to override the empirical
-            extremes rate (default=None, i.e. unchanged empirical
-            behavior). Only valid when method is "POT" or "IDM"; must be
-            left as None for "AM".
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
         poisson_correction : bool, optional
-            Defaults to `self.poisson_correction` if not given. See
-            `_poisson_exceedance_probability`.
+            Defaults to `self.poisson_correction` if not given.
+        alphas : list of float, default [0.99, 0.9]
+            Confidence levels.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap for the confidence bands.
+        table_scale : float, default 0.07
+            Table height per row, as a fraction of the axes height. Set to 0
+            to omit the table.
+        table_flip : bool, default False
+            Transpose the table.
+        samples : int, default 200
+            Number of bootstrap samples.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+            A single axes for "omni", otherwise the axes array.
+
+        Raises
+        ------
+        ValueError
+            If the models are not fitted, or `grouping` is not recognised.
         """
 
         if not self._fitted_models:
@@ -877,7 +1049,7 @@ class UnivariateEVA:
         if grouping == "sectors":
             self._require_direction("plot_return_value_confidence(grouping='sectors')")
 
-        dist = _dist_name_map(dist,False)
+        dist = self.dist_name_map(dist,False)
         if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
         else: titlepos = 1 + table_scale*len(return_periods)
 
@@ -925,17 +1097,26 @@ class UnivariateEVA:
             dist:str,
             ):
         """
-        Return table of monthly/sector fitted distribution parameters.
+        Table of fitted distribution parameters per subset.
 
         Parameters
-        ------------
-        grouping : str
-            One of [monthly, sectors]. "sectors" requires that a direction
-            variable was provided at construction.
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable.
+            The omni model is added as the last row, labelled "Yearly" for
+            monthly and "Omni" for sectors.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
 
-        Notes
+        Returns
         -------
-        Columns will use the default names from pyextremes, such as (a, c, loc, scale).
+        pandas.DataFrame
+            One row per subset. Columns are the fitted parameters, with
+            ``c``, ``loc`` and ``scale`` renamed to Shape, Location and
+            Scale. For POT models, the table also includes peaks per year and
+            the threshold. For IDM models it includes entries per year.
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
@@ -976,19 +1157,39 @@ class UnivariateEVA:
             poisson_correction=None,
             ):
         """
-        Table of return values for a given distribution.
+        Return values per subset for a given distribution.
 
-        grouping : str
-            One of [omni, monthly, sectors]. "sectors" requires that a
-            direction variable was provided at construction.
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable.
+            The omni model is added as the last row, labelled "Yearly" for
+            monthly and "Omni" for sectors.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
+        return_periods : list of float
+            Return periods, in years.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
         duration : str or pandas.Timedelta, optional
-            Explicit "duration of event" used to override the empirical
-            POT/IDM extremes rate (default=None, i.e. unchanged empirical
-            behavior). Only valid when method is "POT" or "IDM"; must be
-            left as None for "AM".
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
         poisson_correction : bool, optional
-            Defaults to `self.poisson_correction` if not given. See
-            `_poisson_exceedance_probability`.
+            Defaults to `self.poisson_correction` if not given.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Return values with one row per subset and one column per return
+            period, named ``"{rp}-year"``.
+
+        Notes
+        -----
+        For "monthly" and "sectors" the table is also stored as
+        `rve_monthly` or `rve_sectors`, together with the model as
+        `rve_monthly_model` or `rve_sectors_model`.
         """
         
         if not self._fitted_models:
@@ -1040,19 +1241,34 @@ class UnivariateEVA:
             table_kwargs = {},
             ):
         """
-        Plot of return values for a given distribution.
+        Plot return values per month or sector for a given distribution.
 
-        grouping : str
-            One of [monthly, sectors]. "sectors" requires that a direction
-            variable was provided at construction.
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
+        return_periods : list of float
+            Return periods, in years. One line is drawn per return period.
         duration : str or pandas.Timedelta, optional
-            Explicit "duration of event" used to override the empirical
-            POT/IDM extremes rate (default=None, i.e. unchanged empirical
-            behavior). Only valid when method is "POT" or "IDM"; must be
-            left as None for "AM".
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
         poisson_correction : bool, optional
-            Defaults to `self.poisson_correction` if not given. See
-            `_poisson_exceedance_probability`.
+            Defaults to `self.poisson_correction` if not given.
+        plot_kwargs : dict, optional
+            Passed to ``pandas.DataFrame.plot.line``.
+        table_kwargs : dict, optional
+            If non-empty, a table of values is drawn above the plot. Set the
+            key ``include`` to False to hide it. Other keys are passed to
+            ``matplotlib.axes.Axes.table``. The key ``float_format`` sets the
+            number format (default ".1f").
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         if grouping == "sectors":
             self._require_direction("plot_return_values_final(grouping='sectors')")
@@ -1076,3 +1292,4 @@ class UnivariateEVA:
         ax.set_ylim([0,ax.get_ylim()[1]])
         ax.grid(True)
         ax.set_ylabel(f"{self.var_name}, {self.var_symbol} ({self.var_unit})")
+        return ax

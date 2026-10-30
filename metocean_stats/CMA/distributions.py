@@ -147,9 +147,6 @@ class LoNoWeDistribution(Distribution):
         self.lognormal._fit_mle(sample)
         self._fit_shifting_point(sample)
 
-    def _fit_lsq(self, data, weights):
-        raise NotImplementedError()
-    
     def _fit_shifting_point(self,sample):
 
         data = np.sort(np.squeeze(sample))

@@ -5,6 +5,7 @@ Core module for single-point metocean statistical analysis.
 
 A TimeSeries wraps a pandas DataFrame with user-supplied metadata about
 variables of interest, and provides a unified interface for:
+
   - Descriptive and directional statistics
   - Extreme value analysis (via UnivariateEVA)
   - Joint/conditional analysis (via BivariateEVA)
@@ -12,46 +13,22 @@ variables of interest, and provides a unified interface for:
   - Seasonality and trends
 
 Out of scope (handled by separate modules):
+
   - Multi-level profiles (wind shear, current profiles)
   - Spatial / map-based analysis
 
 Example usage
 -------------
+>>> import numpy as np
 >>> import pandas as pd
->>> from metocean_stats import TimeSeries, Variable, CMAConfig
->>> from metocean_stats.CMA import predefined
->>>
->>> df = pd.read_csv("hindcast.csv", index_col=0, parse_dates=True)
->>>
->>> hs  = Variable("hs",  "Significant wave height", "H_s",     "m")
->>> tp  = Variable("tp",  "Peak wave period",        "T_p",     "s")
->>> mwd = Variable("mwd", "Mean wave direction",     "\\theta", "°")
->>> ws  = Variable("ws",  "Wind speed",              "U_{10}", "m/s")
->>>
->>> ts = TimeSeries(
-...     df=df,
-...     primary=hs,
-...     direction=mwd,
-...     secondary=[tp, ws],
-...     cma_pairs=[
-...         CMAConfig(vars=("hs", "tp"), model=predefined.get_DNVGL_Hs_Tz),
-...         CMAConfig(vars=("ws", "hs"), model=predefined.get_DNVGL_Hs_U),
-...     ]
-... )
->>>
->>> # Simple statistics
+>>> from metocean_stats import TimeSeries, Variable
+>>> idx = pd.date_range("2000-01-01", periods=24 * 365, freq="h")
+>>> rng = np.random.default_rng(0)
+>>> df = pd.DataFrame({"hs": rng.gamma(2.0, 0.5, len(idx))}, index=idx)
+>>> hs = Variable("hs", "Significant wave height", "H_s", "m")
+>>> ts = TimeSeries(df=df, primary=hs)
 >>> ts.describe()
->>> ts.monthly_stats()
->>> ts.rose()
->>>
->>> # Extreme value analysis
->>> ts.EVA.get_extremes()
->>> ts.EVA.fit(AM_dist=["GEV"], POT_dist=["GP"])
->>> ts.EVA.plot_return_value_comparison("omni", return_periods=[1, 10, 50, 100])
->>>
->>> # Joint analysis
->>> ts.CMA["hs-tp"].fit()
->>> ts.CMA["hs-tp"].plot_isodensity_contours("omni", RVE=rve)
+>>> ts.statistics(by="month")
 """
 
 from __future__ import annotations
@@ -186,7 +163,6 @@ class CMAConfig:
     >>> from metocean_stats.CMA import predefined
     >>> CMAConfig(vars=("hs", "tp"), model=predefined.get_DNVGL_Hs_Tz)
     >>> CMAConfig(vars=("ws", "hs"), model=predefined.get_DNVGL_Hs_U)
-    >>> CMAConfig(vars=("hs", "tp"), model=my_model, key="hs-tp-custom")
     """
     vars: tuple[str, str]
     model: Callable
@@ -220,8 +196,8 @@ class TimeSeries:
     primary : Variable
         Primary metocean variable (e.g. Hs, wind speed).
     direction : Variable, optional
-        Direction variable (0–360°). Many directional methods will raise a
-        error if this is not provided.
+        Direction variable, in degrees (0-360). Many directional methods raise
+        an error if this is not provided.
     secondary : list[Variable], optional
         Secondary variables (e.g. Tp, Tm01, wind speed).
         Available for joint analysis via ts.CMA.
@@ -562,70 +538,6 @@ class TimeSeries:
         return cols
 
     # ---------------------------------------------------------------------- #
-    # Data utilities                                                           #
-    # ---------------------------------------------------------------------- #
-
-    def resample(
-        self,
-        rule: str,
-        how: typing.Literal["mean", "max", "min", "median"] = "mean",
-        inplace: bool = False,
-    ) -> TimeSeries | None:
-        """
-        Resample the time series to a new frequency.
-
-        Parameters
-        ----------
-        rule : str
-            Pandas offset alias, e.g. "1h", "3h", "D".
-        how : str
-            Aggregation method: "mean", "max", "min", or "median".
-        inplace : bool
-            If True, modifies this instance. If False, returns a new TimeSeries.
-        """
-        raise NotImplementedError
-
-    def fill_gaps(
-        self,
-        method: typing.Literal["interpolate", "ffill", "bfill"] = "interpolate",
-        limit: int = None,
-        inplace: bool = False,
-    ) -> TimeSeries | None:
-        """
-        Fill missing values / irregular gaps in the time series.
-
-        Parameters
-        ----------
-        method : str
-            Gap-filling strategy: "interpolate", "ffill", or "bfill".
-        limit : int, optional
-            Maximum number of consecutive NaNs to fill.
-        inplace : bool
-            If True, modifies this instance. If False, returns a new TimeSeries.
-        """
-        raise NotImplementedError
-
-    def trim(
-        self,
-        start: str | pd.Timestamp = None,
-        end: str | pd.Timestamp = None,
-        inplace: bool = False,
-    ) -> TimeSeries | None:
-        """
-        Trim the time series to a given date range.
-
-        Parameters
-        ----------
-        start : str or pd.Timestamp, optional
-            Start of the desired range. Keeps from beginning if None.
-        end : str or pd.Timestamp, optional
-            End of the desired range. Keeps to end if None.
-        inplace : bool
-            If True, modifies this instance. If False, returns a new TimeSeries.
-        """
-        raise NotImplementedError
-
-    # ---------------------------------------------------------------------- #
     # Discrete-value correction                                                #
     # ---------------------------------------------------------------------- #
     @staticmethod
@@ -765,15 +677,6 @@ class TimeSeries:
     # Descriptive statistics                                                   #
     # ---------------------------------------------------------------------- #
 
-    def availability(self) -> pd.DataFrame:
-        """
-        Data availability summary.
-
-        Returns a table with per-variable counts of valid records, NaN records,
-        and percentage availability, plus overall record start/end/duration.
-        """
-        raise NotImplementedError
-
     def describe(self) -> pd.DataFrame:
         """
         Extended descriptive statistics for all columns.
@@ -815,8 +718,7 @@ class TimeSeries:
         self,
         by: typing.Literal["month", "season", "direction", "year"] | str = "month",
         variable: str = None,
-        func: list[str] = None,
-        percentiles: list[float] = None,
+        stats: list[str] = None,
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
@@ -824,18 +726,19 @@ class TimeSeries:
     ) -> pd.DataFrame:
         """
         Aggregated statistics grouped by month, season, direction, or year.
-        Summary statistics are followed by percentile rows.
 
         Parameters
         ----------
         by : {"month", "season", "direction", "year"}
             Grouping strategy. Defaults to "month".
-        func : list[str], optional
-            Aggregation functions.
-            Defaults to ["mean", "std", "min", "max", "count", "availability"].
-        percentiles : list[float], optional
-            Percentiles to append below summary stats.
-            Defaults to [1, 10, 50, 90, 99]. Pass [] to omit.
+        variable : str, optional
+            Column to analyse. Defaults to the primary variable.
+        stats : list[str], optional
+            Statistics to compute, as accepted by `utils.aggregate_statistics`:
+            "count", "min"/"minimum", "max"/"maximum", "mean", "std",
+            "median", a percentile such as "P90" or "90%", or "%"/"density"
+            (percentage of all rows in the group). Defaults to
+            ``["count", "%", "min", "P1", "P10", "mean", "P50", "P90", "P99", "max"]``.
         sectors : int, optional
             Directional sectors. Only used when by="direction".
         seasons : dict[str, list[int]], optional
@@ -847,13 +750,13 @@ class TimeSeries:
         Returns
         -------
         pd.DataFrame
-            Groups as columns (+ "All"), statistics and percentiles as rows.
+            Groups as rows (+ "All"), statistics as columns, in the
+            standardised order produced by `utils.aggregate_statistics`.
         """
         if by == "direction":
             self._require_direction("statistics", direction=direction)
 
-        func        = func        or ["min", "mean", "max", "std", "count", "%"]
-        percentiles = percentiles if percentiles is not None else [1, 10, 50, 90, 99]
+        stats = stats or ["count", "%", "min", "P1", "P10", "mean", "P50", "P90", "P99", "max"]
 
         var = self._resolve_variable(variable, default=self.primary).col
 
@@ -865,21 +768,8 @@ class TimeSeries:
         # --- aggregation ----------------------------------------------------- #
         n_total = len(self.data)
 
-        def _agg_row(s: pd.Series) -> dict:
-            result = {}
-            for p in percentiles:
-                result[f"P{p:02d}"] = s.quantile(p / 100)
-            for f in func:
-                if   f == "mean":  result["Mean"]  = s.mean()
-                elif f == "std":   result["Std"]   = s.std()
-                elif f == "min":   result["Min"]   = s.min()
-                elif f == "max":   result["Max"]   = s.max()
-                elif f == "count": result["Count"] = len(s)
-                elif f == "%":     result["%"]     = 100 * len(s) / n_total
-            return result
-
         df = pd.DataFrame(
-            {label: _agg_row(s) for label, s in groups.items()}
+            {label: aggregate_statistics(s, stats, total=n_total) for label, s in groups.items()}
         ).T
         _by_names = {"direction": "sector"}
         if by in self._variables:
@@ -902,16 +792,17 @@ class TimeSeries:
         direction: str = None,
     ) -> pd.DataFrame:
         """
-        Non-exceedance table P(X ≤ x) in percent, grouped by month, season,
+        Non-exceedance table, P(X <= x) in percent, grouped by month, season,
         direction, or year.
 
         Convention
         ----------
-        by="direction" : values are P(dir=d AND X ≤ x), i.e. conditional CDF
-            scaled by sector frequency. The last row of each sector variable gives
-            P(dir=d) — the sector frequency. "All" variable is the marginal CDF.
-        by="month" / "season" / "year" : values are P(X ≤ x | group), i.e.
-            conditional CDF within each group. Last row is 100 for all columns.
+        For by="direction", values are P(dir=d and X <= x): the conditional
+        CDF scaled by the sector frequency. The threshold at or above the data
+        maximum gives P(dir=d) in each sector column. The "All" column is the
+        marginal CDF.
+        For other groupings, values are P(X <= x | group). The threshold at or
+        above the data maximum gives 100 in each group.
 
         Parameters
         ----------
@@ -1020,9 +911,9 @@ class TimeSeries:
         Parameters
         ----------
         row : str
-            Row axis — grouping keyword or variable name. Defaults to primary.
+            Row axis: grouping keyword or variable name. Defaults to primary.
         col : str
-            Column axis — grouping keyword or variable name. Defaults to first
+            Column axis: grouping keyword or variable name. Defaults to first
             secondary variable, or primary if none exists.
         step_row : float, optional
             Bin width for row axis when row is a variable name.
@@ -1109,10 +1000,9 @@ class TimeSeries:
     
     def block_maxima(
         self,
-        by: typing.Literal["year", "month", "season", "direction"] | str = "direction",
+        by: typing.Literal["year", "month", "season", "direction"] | str = "year",
         variable: str = None,
-        func: list[str] = None,
-        percentiles: list[float] = None,
+        stats: list[str] = None,
         year_start: int = 1,
         min_coverage: float = 0.9,
         sectors: int = None,
@@ -1131,12 +1021,9 @@ class TimeSeries:
             Defaults to "year".
         variable : str, optional
             Column to compute maxima of. Defaults to primary variable.
-        func : list[str], optional
-            Statistics to compute over the block maxima.
-            Defaults to ["min", "mean", "max"].
-        percentiles : list[float], optional
-            Percentiles to compute over the block maxima.
-            Defaults to None (no percentiles). Pass [50, 90, 99] for example.
+        stats : list[str], optional
+            Statistics to compute over the block maxima, as accepted by
+            `utils.aggregate_statistics`. Defaults to ["min", "mean", "max"].
         year_start : int, optional
             Month (1-12) that defines the start of a "year" block.
             Used for ALL grouping methods to ensure consistent year boundaries.
@@ -1163,15 +1050,9 @@ class TimeSeries:
             An "All" row with overall statistics is appended.
             Dropped year blocks are listed in a warning.
         """
-        func        = func or ["min", "mean", "max"]
-        percentiles = percentiles if percentiles is not None else []
-        var         = self._resolve_variable(variable, default=self.primary)
-        series      = self.data[var.col]
-
-        # Merge percentiles into func list
-        combined_func = func.copy()
-        for p in percentiles:
-            combined_func.append(f"p{int(p):02d}")
+        stats  = stats or ["min", "mean", "max"]
+        var    = self._resolve_variable(variable, default=self.primary)
+        series = self.data[var.col]
 
         # ------------------------------------------------------------------ #
         # STEP 1: Always group by year first (respecting year_start)        #
@@ -1270,21 +1151,18 @@ class TimeSeries:
         if by == "year":
             # Simple case: one value per year
             for label, max_val in maxima_series.items():
-                records[label] = aggregate_statistics(pd.Series([max_val]), combined_func)
-            records["All"] = aggregate_statistics(maxima_series, combined_func)
+                records[label] = aggregate_statistics(pd.Series([max_val]), stats)
+            records["All"] = aggregate_statistics(maxima_series, stats)
         else:
             # Complex case: multiple maxima per group
             for label, max_series in maxima_series.items():
-                records[label] = aggregate_statistics(max_series, combined_func)
+                records[label] = aggregate_statistics(max_series, stats)
             
             # "All": concatenate all maxima across all groups
             all_maxima = pd.concat(list(maxima_series.values()))
-            records["All"] = aggregate_statistics(all_maxima, combined_func)
+            records["All"] = aggregate_statistics(all_maxima, stats)
 
         df = pd.DataFrame(records).T  # Transpose: groups as rows, stats as columns
-
-        _stat_display = {"min": "Min", "mean": "Mean", "max": "Max", "std": "Std", "count": "Count"}
-        df = df.rename(columns=lambda c: _stat_display.get(c.lower(), c.upper() if c.lower().startswith("p") else c))
 
         _by_names = {"direction": "sector"}
         df.index.name   = self._variables[by].short_label if by in self._variables else _by_names.get(by, by)
@@ -1298,7 +1176,6 @@ class TimeSeries:
         by: typing.Literal["month", "season", "direction", "year"] | str = "month",
         variable: str = None,
         stats: list[str] = None,
-        percentiles: list[float] = None,
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         by_step: float = None,
@@ -1326,11 +1203,9 @@ class TimeSeries:
         variable : str, optional
             Column to analyse. Defaults to the primary variable.
         stats : list[str], optional
-            Duration statistics to report. Defaults to ["mean", "std", "max"].
-            Supported: "mean", "std", "min", "max", "median", "count".
-        percentiles : list[float], optional
-            Additional percentiles of event duration to append as rows.
-            E.g. [50, 90, 99]. Defaults to None.
+            Duration statistics to report, as accepted by
+            `utils.aggregate_statistics`. Defaults to ["mean", "std", "max"].
+            Duration values are in hours.
         sectors : int, optional
             Number of directional sectors. Used only when by="direction".
         seasons : dict[str, list[int]], optional
@@ -1349,25 +1224,16 @@ class TimeSeries:
 
         Notes
         -----
-        Event identification assumes a regular time step. NaN values are
-        treated as below-threshold, so gaps break any ongoing event.
+        Event identification assumes a regular time step. NaN values are never
+        part of an event, so they end any ongoing event.
         ``timestep_hours`` is used to convert event lengths to hours.
-
-        Examples
-        --------
-        >>> ts.persistence(threshold=5.0, by="month")
-        >>> ts.persistence(threshold=10.0, above=False, by="season")
-        >>> ts.persistence(threshold=8.0, by="direction", sectors=8)
-        >>> ts.persistence(threshold=5.0, by="year")
-        >>> ts.persistence(threshold=5.0, variable="ws", by="hs", by_step=1.0)
         """
         if by == "direction":
             self._require_direction("persistence")
 
-        var         = self._resolve_variable(variable, self.primary)
-        stats       = stats or ["mean", "std", "max"]
-        percentiles = percentiles or []
-        dt_h        = self.timestep_hours
+        var    = self._resolve_variable(variable, self.primary)
+        stats  = stats or ["mean", "std", "max"]
+        dt_h   = self.timestep_hours
 
         # ------------------------------------------------------------------ #
         # STEP 1: Build event mask and event-start on the full series         #
@@ -1430,46 +1296,12 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         # STEP 4: Aggregate duration statistics per group                     #
         # ------------------------------------------------------------------ #
-        stat_label_map = {
-            "mean":   "Mean (h)",
-            "std":    "Std (h)",
-            "min":    "Min (h)",
-            "max":    "Max (h)",
-            "median": "Median (h)",
-            "count":  "Count",
-        }
-
-        def _agg(durations: pd.Series) -> dict:
-            row = {}
-            if durations.empty:
-                for st in stats:
-                    row[stat_label_map.get(st, st)] = np.nan
-                for p in percentiles:
-                    row[f"p{int(p):02d}"] = np.nan
-                return row
-            for st in stats:
-                lbl = stat_label_map.get(st, st)
-                if   st == "mean":   row[lbl] = durations.mean()
-                elif st == "std":    row[lbl] = durations.std()
-                elif st == "min":    row[lbl] = durations.min()
-                elif st == "max":    row[lbl] = durations.max()
-                elif st == "median": row[lbl] = durations.median()
-                elif st == "count":  row[lbl] = float(len(durations))
-                else:
-                    raise ValueError(
-                        f"Unknown stat '{st}'. "
-                        "Supported: 'mean', 'std', 'min', 'max', 'median', 'count'."
-                    )
-            for p in percentiles:
-                row[f"p{int(p):02d}"] = durations.quantile(p / 100)
-            return row
-
         records = {}
         event_counts = {}
 
         for label in ordered_labels:
             grp_durations        = events.loc[events["group"] == label, "duration"]
-            records[label]       = _agg(grp_durations)
+            records[label]       = aggregate_statistics(grp_durations, stats)
             event_counts[label]  = len(grp_durations)
 
         # ------------------------------------------------------------------ #
@@ -1486,7 +1318,7 @@ class TimeSeries:
                 records[label]["Yearly"] = event_counts[label] / n_years
 
         # "Yearly" summary row: always total events / n_years regardless of `by`
-        yearly_row           = _agg(events["duration"])
+        yearly_row           = aggregate_statistics(events["duration"], stats)
         yearly_row["Yearly"] = len(events) / n_years
         records["Yearly"]    = yearly_row
 
@@ -1495,11 +1327,11 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         df = pd.DataFrame(records).T
 
-        stat_cols = [stat_label_map.get(st, st) for st in stats
-                     if stat_label_map.get(st, st) in df.columns]
-        pct_cols  = [f"p{int(p):02d}" for p in percentiles
-                     if f"p{int(p):02d}" in df.columns]
-        df = df[stat_cols + pct_cols + ["Yearly"]]
+        # Column order: the standardised order aggregate_statistics already
+        # sorts `stats` into (consistent with statistics()/block_maxima()),
+        # with "Yearly" always last.
+        stat_cols = list(aggregate_statistics(pd.Series([1.0]), stats).keys())
+        df = df[stat_cols + ["Yearly"]]
 
         df.index.name = (
             self._variables[by].short_label if by in self._variables
@@ -1536,24 +1368,25 @@ class TimeSeries:
         Parameters
         ----------
         by : {"month", "season", "direction"} or str, default "month"
-            Grouping strategy. ``"year"`` is not valid here — trends are by
-            definition computed over years. A continuous variable name is also
+            Grouping strategy. ``"year"`` is not valid here, because trends are
+            computed over years. A continuous variable name is also
             accepted and will be binned via ``infer_step`` / ``step``.
         variable : str, optional
             Column to analyse. Defaults to the primary variable.
         stat : str, default "mean"
-            Statistic aggregated per year within each group. Accepts
-            ``"mean"``, ``"median"``, ``"std"``, ``"min"``, ``"max"``, or a
-            percentile in the form ``"pNN"`` (e.g. ``"p90"``).
+            Statistic aggregated per year within each group, as accepted by
+            `utils.aggregate_statistics` (e.g. "mean", "median", "std",
+            "min"/"minimum", "max"/"maximum", or a percentile such as
+            "P90" or "90%"). "%"/"density" is not meaningful here.
         method : list[str], optional
             Trend methods to apply. Any subset of
             ``["ols", "theil_sen", "kendall"]``. Defaults to all three.
 
-            - ``"ols"``       — Ordinary least-squares. Returns slope,
-            intercept (optional), and R².
-            - ``"theil_sen"`` — Theil-Sen estimator. Returns median slope,
-            intercept (optional), and lower/upper slope confidence bounds.
-            - ``"kendall"``   — Kendall-tau test. Returns τ and p-value.
+            - ``"ols"``: ordinary least squares. Returns slope,
+              intercept (optional), and R².
+            - ``"theil_sen"``: Theil-Sen estimator. Returns median slope,
+              intercept (optional), and lower/upper slope confidence bounds.
+            - ``"kendall"``: Kendall-tau test. Returns τ and p-value.
 
         confidence : float, default 0.95
             Confidence level for the Theil-Sen slope interval. Must be in
@@ -1596,14 +1429,6 @@ class TimeSeries:
         AttributeError
             If ``by="direction"`` but no direction variable was provided.
 
-        Examples
-        --------
-        >>> ts.trends(by="month")
-        >>> ts.trends(by="season", stat="p90", method=["ols", "kendall"])
-        >>> ts.trends(by="direction", variable="hs", sectors=8)
-        >>> ts.trends(by="month", stat="p90", method=["theil_sen"], confidence=0.9)
-        >>> ts.trends(by="month", per=10)  # per decade
-        >>> ts.trends(by="hs", step=0.5, min_samples_per_year=200)
         """
         from scipy.stats import linregress, theilslopes, kendalltau
 
@@ -1658,22 +1483,11 @@ class TimeSeries:
         # Statistic helper                                                     #
         # ------------------------------------------------------------------ #
         def _apply_stat(s: "pd.Series") -> float:
-            if stat == "mean":   return float(s.mean())
-            if stat == "median": return float(s.median())
-            if stat == "std":    return float(s.std())
-            if stat == "min":    return float(s.min())
-            if stat == "max":    return float(s.max())
-            if stat.startswith("p"):
-                try:
-                    p = float(stat[1:]) / 100.0
-                    if 0.0 <= p <= 1.0:
-                        return float(s.quantile(p))
-                except ValueError:
-                    pass
-            raise ValueError(
-                f"Unknown stat '{stat}'. Use 'mean', 'median', 'std', "
-                f"'min', 'max', or 'pNN' (e.g. 'p90')."
-            )
+            return float(aggregate_statistics(s, [stat])[stat])
+
+        # Fail fast (and with a consistent message) on an unrecognised `stat`,
+        # rather than deferring to the first per-group-per-year call below.
+        aggregate_statistics(pd.Series([1.0, 2.0]), [stat])
 
         # ------------------------------------------------------------------ #
         # NaN row — returned for groups with insufficient data                #
@@ -1805,14 +1619,14 @@ class TimeSeries:
         by : {"month", "season", "year", "all", "omni"} or str, default "omni"
             Grouping strategy:
 
-            - ``"omni"`` / ``"all"`` — a single panel for the full record
-            (default; both accepted, "omni" matches the naming used
-            elsewhere, e.g. BivariateEVA).
-            - ``"month"``  — one panel per calendar month.
-            - ``"season"`` — one panel per season (custom via ``seasons``).
-            - ``"year"``   — one panel per year in the record.
-            - any variable name — panels for bins of that variable (step
-            auto-inferred or set via ``step``).
+            - ``"omni"`` / ``"all"``: a single panel for the full record
+              (default; both accepted, "omni" matches the naming used
+              elsewhere, e.g. BivariateEVA).
+            - ``"month"``: one panel per calendar month.
+            - ``"season"``: one panel per season (custom via ``seasons``).
+            - ``"year"``: one panel per year in the record.
+            - any variable name: panels for bins of that variable (step
+              auto-inferred or set via ``step``).
 
         seasons : dict[str, list[int]], optional
             Custom season map. Only used when ``by="season"``.
@@ -1826,12 +1640,12 @@ class TimeSeries:
         mag_max : float, optional
             Upper edge of the magnitude bins. Auto-selected as the 99th
             percentile of active (above ``calm_threshold``) values across all
-            plotted groups if None. Set this explicitly — together with
-            ``mag_step`` — to force identical magnitude bins across separate
+            plotted groups if None. Set this explicitly, together with
+            ``mag_step``, to force identical magnitude bins across separate
             calls to ``plot_rose``, so different figures share the same scale
             and legend. Regardless of this setting, if any group's data
             exceeds the resulting top edge, an open-ended ">X" bin is always
-            added — see Notes.
+            added, see Notes.
         cmap : str, default "YlOrRd"
             Colormap for magnitude classes.
         calm_threshold : float, default 0.0
@@ -1868,11 +1682,11 @@ class TimeSeries:
         group being plotted (so all panels share identical bins). If any
         group's data exceeds the resulting top edge (or falls below the
         bottom edge), the bin set is extended with an open-ended bucket on
-        that side — e.g. ">6 m/s" — on top of the normal bins, and every
+        that side, e.g. ">6 m/s", on top of the normal bins, and every
         panel (plus the shared legend) uses this same extended bin set. This
         mirrors the open-ended-bin behaviour of the underlying
         ``plots.plot_rose`` function, applied globally rather than per-panel,
-        so the shared legend and every panel's colour mapping always agree —
+        so the shared legend and every panel's colour mapping always agree;
         a panel whose own data doesn't reach the overflow bucket simply draws
         it as empty, rather than the bucket being silently absent from
         panels or the legend. This guarantees out-of-range data is always
@@ -2119,7 +1933,7 @@ class TimeSeries:
 
         Each cell contains a single statistic computed from all observations
         that fall into the corresponding (row group, col group) intersection.
-        This is a double groupby — both axes are computed independently via
+        This is a double groupby: both axes are computed independently via
         ``groupby_with_metadata`` and then intersected.
 
         Parameters
@@ -2136,15 +1950,12 @@ class TimeSeries:
             for ``stat="count"``/``"density"`` (which only count rows), but
             still determines which rows count as valid (non-NaN on this variable).
         stat : str, default "mean"
-            Statistic to compute per cell. Supported:
-
-            - ``"mean"``, ``"std"``, ``"min"``, ``"max"``
-            - ``"count"``   — number of observations in the cell
-            - ``"density"`` — ``count`` as a percentage of all valid rows
-            (``100 * count / len(data)``), i.e. the distribution of data
-            across cells rather than a per-cell row count
-            - ``"p{n}"``    — percentile, e.g. ``"p90"``, ``"p99"``
-
+            Statistic to compute per cell, as accepted by
+            `utils.aggregate_statistics`: "mean", "std", "min"/"minimum",
+            "max"/"maximum", "median", "count", "%"/"density" (count as a
+            percentage of all valid rows, i.e. the distribution of data
+            across cells rather than a per-cell row count), or a percentile
+            such as "P90" or "90%".
         step_row : float, optional
             Bin step for the row axis when ``row`` is a numeric variable.
             Auto-inferred via ``infer_step`` if None.
@@ -2172,14 +1983,6 @@ class TimeSeries:
         pd.DataFrame
             Row groups as index, variable groups as columns. Cell values are
             the requested statistic. NaN where a cell has no observations.
-
-        Examples
-        --------
-        >>> ts.statistics_2d()                                      # month × direction
-        >>> ts.statistics_2d(row="month", col="tp", stat="mean")
-        >>> ts.statistics_2d(row="year",  col="month", stat="p90")
-        >>> ts.statistics_2d(row="hs",    col="tp",    stat="count", margins=False)
-        >>> ts.statistics_2d(row="month", col="direction", stat="density")
         """
 
         if row == "direction" or col == "direction":
@@ -2235,24 +2038,7 @@ class TimeSeries:
         # Parse stat                                                           #
         # ------------------------------------------------------------------ #
         def _apply_stat(s: pd.Series) -> float:
-            if s.empty:
-                return np.nan if stat != "count" and stat != "density" else 0.0
-            if stat == "mean":    return s.mean()
-            elif stat == "std":   return s.std()
-            elif stat == "min":   return s.min()
-            elif stat == "max":   return s.max()
-            elif stat == "count": return float(len(s))
-            elif stat == "density":
-                return 100 * len(s) / n_total if n_total else np.nan
-            elif stat.startswith("p"):
-                try:
-                    return s.quantile(float(stat[1:]) / 100)
-                except ValueError:
-                    pass
-            raise ValueError(
-                f"Unknown stat '{stat}'. Use 'mean', 'std', 'min', 'max', "
-                f"'count', 'density', or 'p<n>' (e.g. 'p90')."
-            )
+            return aggregate_statistics(s, [stat], total=n_total)[stat]
 
         # ------------------------------------------------------------------ #
         # Build row and col groups via the shared grouping primitive           #
@@ -2300,8 +2086,7 @@ class TimeSeries:
             self,
             by: "typing.Literal['month', 'season', 'direction', 'year', 'week', 'day', 'hour'] | str" = "month",
             variable: str = None,
-            func: "list[str] | None" = None,
-            percentiles: "list[float] | None" = None,
+            stats: "list[str] | None" = None,
             sectors: "int | None" = None,
             seasons: "dict[str, list[int]] | None" = None,
             step: "float | None" = None,
@@ -2311,7 +2096,7 @@ class TimeSeries:
             ax: "plt.Axes | None" = None,
         ) -> "plt.Axes":
             """
-            Line plot of ``statistics`` — aggregated statistics for one variable
+            Line plot of ``statistics``: aggregated statistics for one variable
             grouped by month, season, direction, year, week, day, or hour.
 
             Each requested statistic is drawn as a separate line. Markers are added
@@ -2325,14 +2110,9 @@ class TimeSeries:
                 Grouping strategy. Passed directly to ``statistics``.
             variable : str, optional
                 Column to analyse. Defaults to the primary variable.
-            func : list[str], optional
-                Statistics to plot. Defaults to
-                ``["mean", "p75", "p90", "p95", "p99"]``.
-                Any token accepted by ``statistics`` is valid.
-            percentiles : list[float], optional
-                Passed to ``statistics``. If None, percentiles are inferred from
-                ``func`` so that any ``pNN`` token in ``func`` is automatically
-                included.
+            stats : list[str], optional
+                Statistics to plot, as accepted by ``statistics``. Defaults to
+                ``["mean", "P75", "P90", "P95", "P99"]``.
             sectors : int, optional
                 Directional sectors. Only used when ``by="direction"``.
             seasons : dict[str, list[int]], optional
@@ -2367,14 +2147,7 @@ class TimeSeries:
             # ------------------------------------------------------------------ #
             # Defaults                                                             #
             # ------------------------------------------------------------------ #
-            func = func or ["mean", "P75", "P90", "P95", "P99"]
-
-            pct_from_func = []
-            for f in func:
-                if f.lower().startswith("p") and f[1:].isdigit():
-                    pct_from_func.append(int(f[1:]))
-            if percentiles is None:
-                percentiles = pct_from_func
+            stats = stats or ["mean", "P75", "P90", "P95", "P99"]
 
             # ------------------------------------------------------------------ #
             # Resolve grouping-by variable metadata (if by is a variable name)      #
@@ -2387,22 +2160,12 @@ class TimeSeries:
             # transpose back to the orientation this method relies on.
             # ------------------------------------------------------------------ #
             df = self.statistics(
-                by=by, variable=variable, func=func, percentiles=percentiles,
+                by=by, variable=variable, stats=stats,
                 sectors=sectors, seasons=seasons, step=step,
             ).T
             df = df.drop(columns="All", errors="ignore")
 
-            def _row_label(f: str) -> str:
-                mapping = {"mean": "Mean", "std": "Std", "min": "Min",
-                        "max": "Max", "count": "Count"}
-                if f in mapping:
-                    return mapping[f]
-                if f.lower().startswith("p") and f[1:].isdigit():
-                    return f"P{int(f[1:]):02d}"
-                return f
-
-            row_labels = [_row_label(f) for f in func]
-            row_labels = [r for r in row_labels if r in df.index]
+            row_labels = [s for s in stats if s in df.index]
 
             var  = self._resolve_variable(variable, default=self.primary)
 
@@ -2553,7 +2316,7 @@ class TimeSeries:
         figsize: "tuple[float, float] | None" = None,
     ) -> "plt.Axes":
         """
-        Heatmap of ``statistics_2d`` — one variable aggregated across two
+        Heatmap of ``statistics_2d``: one variable aggregated across two
         grouping dimensions.
 
         Parameters
@@ -2568,13 +2331,12 @@ class TimeSeries:
             (``"count"``/``"density"``; see ``stat_cells``).
         stat_cells : str, default "mean"
             Statistic computed per heatmap cell. Any token accepted by
-            ``statistics_2d``: ``"mean"``, ``"std"``, ``"min"``, ``"max"``,
-            ``"count"``, ``"density"``, or ``"p<n>"`` (e.g. ``"p90"``).
+            `utils.aggregate_statistics` / ``statistics_2d``.
         stat_margins : str, optional
             Statistic computed for the row/variable margins (shown outside the
             heatmap when ``margins=True``). Computed independently over the
-            full marginal row or variable — not derived from the per-cell
-            values — so it can differ meaningfully from ``stat_cells``. E.g.
+            full marginal row or variable, not derived from the per-cell
+            values, so it can differ meaningfully from ``stat_cells``. E.g.
             ``stat_cells="mean"`` with ``stat_margins="density"`` shows mean
             per cell but the % of all data each row/variable holds in the
             margins. Defaults to ``stat_cells`` if None.
@@ -2856,156 +2618,6 @@ class TimeSeries:
                     bbox=(1, 0, 1 / len(df.columns), 1))
 
         return ax
-
-    def plot_timeseries(
-        self,
-        columns: list[str] = None,
-        ax: plt.Axes = None,
-        **kwargs,
-    ) -> plt.Axes:
-        """
-        Simple time series line plot of one or more columns.
-
-        Parameters
-        ----------
-        columns : list[str], optional
-            Columns to plot. Defaults to primary only.
-        ax : plt.Axes, optional
-            Existing axes to plot on.
-        """
-        raise NotImplementedError
-
-    def plot_monthly_boxplot(
-        self,
-        variable: str = None,
-        ax: plt.Axes = None,
-        **kwargs,
-    ) -> plt.Axes:
-        """
-        Box-and-whisker plot of a variable by calendar month.
-        Useful for visualising seasonality.
-
-        Parameters
-        ----------
-        variable : str, optional
-            Column to plot. Defaults to primary.
-        ax : plt.Axes, optional
-            Existing axes to plot on.
-        """
-        raise NotImplementedError
-
-    def plot_exceedance(
-        self,
-        variable: str = None,
-        thresholds: list[float] = None,
-        ax: plt.Axes = None,
-        **kwargs,
-    ) -> plt.Axes:
-        """
-        Non-exceedance (or exceedance) cumulative distribution plot.
-
-        Parameters
-        ----------
-        variable : str, optional
-            Column to plot. Defaults to primary.
-        thresholds : list[float], optional
-            Reference threshold lines to mark on the plot.
-        ax : plt.Axes, optional
-            Existing axes to plot on.
-        """
-        raise NotImplementedError
-
-    def plot_histogram(
-        self,
-        variable: str = None,
-        bins: int | list = None,
-        ax: plt.Axes = None,
-        **kwargs,
-    ) -> plt.Axes:
-        """
-        Histogram of a variable.
-
-        Parameters
-        ----------
-        variable : str, optional
-            Column to plot. Defaults to primary.
-        bins : int or list, optional
-            Number of bins or explicit bin edges.
-        ax : plt.Axes, optional
-            Existing axes to plot on.
-        """
-        raise NotImplementedError
-
-    # ---------------------------------------------------------------------- #
-    # Seasonality and trend                                                    #
-    # ---------------------------------------------------------------------- #
-
-    def climatology(
-        self,
-        variable: str = None,
-        freq: typing.Literal["month", "doy"] = "month",
-    ) -> pd.DataFrame:
-        """
-        Long-term mean climatology profile.
-
-        Parameters
-        ----------
-        variable : str, optional
-            Column to analyse. Defaults to primary.
-        freq : str
-            "month" → 12-point monthly climatology
-            "doy"   → 365-point day-of-year climatology
-        """
-        raise NotImplementedError
-
-    # ---------------------------------------------------------------------- #
-    # Output helpers                                                           #
-    # ---------------------------------------------------------------------- #
-
-    def to_csv(
-        self,
-        path: str,
-        columns: list[str] = None,
-        **kwargs,
-    ) -> None:
-        """
-        Export the underlying data (or a subset of columns) to CSV.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        columns : list[str], optional
-            Columns to export. Defaults to all.
-        """
-        raise NotImplementedError
-
-    def to_excel(
-        self,
-        path: str,
-        tables: dict[str, pd.DataFrame] = None,
-        **kwargs,
-    ) -> None:
-        """
-        Export one or more result tables to a formatted Excel workbook.
-        Each entry in `tables` becomes a separate sheet.
-
-        Parameters
-        ----------
-        path : str
-            Output file path (.xlsx).
-        tables : dict[str, pd.DataFrame], optional
-            Named tables to write. If None, writes self.data.
-
-        Example
-        -------
-        >>> ts.to_excel("results.xlsx", tables={
-        ...     "Monthly stats":  ts.monthly_stats(),
-        ...     "Exceedance":     ts.table_exceedance(),
-        ...     "EVA parameters": ts.EVA.table_model_parameters("omni", "POT", "GP"),
-        ... })
-        """
-        raise NotImplementedError
 
     @staticmethod
     def save_figure(

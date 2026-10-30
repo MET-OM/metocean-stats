@@ -1,74 +1,36 @@
 """
 SpectralTimeSeries
--------------------
-Single-point metocean spectral time series, built from a single xarray
-Dataset.
+------------------
+Single-point metocean spectral time series, built from one ``xarray.Dataset``.
 
-Design
-~~~~~~
-The user hands over one ``xr.Dataset`` (e.g. opened straight from a NetCDF /
-Zarr / GRIB file). We never require them to pre-sort their data into named
-arguments, and we never rename anything in their dataset. Instead:
+Construction runs three phases, always in full:
 
-  1. Dimension names for "time", "freq", "dir" are *detected* via aliases
-     (see ``_ALIASES_*`` below) -- e.g. a dim literally called "theta" or
-     "frequency" is recognised as playing the directional / frequency
-     role. Nothing is renamed. The mapping from canonical role to the
-     dataset's actual dim name is recorded in ``dim_map`` and used
-     internally wherever we need to look up "the frequency dimension,
-     whatever it's called here".
-  2. Every data variable in the Dataset is inspected by its *dimension
-     signature* (the set of canonical roles its dims play) and matched
-     against the table below. Only time-varying spectral signatures are
-     recognised -- this package is fundamentally about time series, so a
-     bare frequency or directional spectrum with no time axis is left
-     alone.
+1. Identify: dimensions are matched to the time, frequency and direction
+   roles using aliases (for example ``"frequency"`` or ``"theta"``). Data
+   variables are matched by their dimension signature:
 
-         {time, freq}        -> frequency spectral timeseries  ("E")
-         {time, dir}         -> directional spectral timeseries ("D")
-         {time, freq, dir}   -> 2D spectral timeseries          ("S")
+   - ``{time, freq}``: frequency spectrum (slot ``"E"``).
+   - ``{time, dir}``: directional spectrum (slot ``"D"``).
+   - ``{time, freq, dir}``: 2D spectrum (slot ``"S"``).
 
-  3. If more than one variable shares the same signature, that's an error:
-     we ask the user to fix their dataset (drop/rename one) rather than
-     silently guessing. There should be at most one of each.
-  4. The dataset is stored as a *single* object, ``self.ds`` -- byte-for-
-     byte what was passed in, with every original variable, coordinate,
-     and dimension name intact. We never split it into a "classified"
-     copy plus a separate "auxiliary" copy, and we never rename a
-     dimension just because we recognised its role. Instead, ``var_map``
-     records which original variable name (if any) plays each spectral
-     role ("S", "E", "D"), and ``dim_map`` records which original
-     dimension name (if any) plays each coordinate role ("time", "freq",
-     "dir"). Everything else -- wind speed, wind direction, water level,
-     whatever -- simply stays in ``self.ds`` under its original name,
-     untouched, available later as e.g. a `group_by` key.
-  5. Detection is heuristic (alias- and signature-based), so it can be
-     wrong. For that reason, classification never silently repairs the
-     data it finds. Instead, each detected spectral variable is *validated*
-     (datetime check, monotonicity, non-negativity, dim order) and any
-     problems are recorded as warnings/issues rather than fixed in place.
-     Call ``.standardize()`` to actually fix issues (sort, transpose,
-     clip) -- this mutates ``self.ds`` in place and is the only place
-     data is ever changed without being explicitly asked for. In practice
-     this always runs during ``__init__``, so a constructed instance is
-     always standardized.
-  6. Metadata lives *only* as xarray attributes on ``self.ds`` -- there is
-     no parallel metadata object. Every variable, coordinate, and derived
-     output gets ``name`` (short, human-readable, e.g. "Peak wave period")
-     and ``long_name`` (precise, lower_snake_case, e.g.
-     "spectral_peak_period") attrs, plus ``units`` where applicable.
-     Anything not explicitly recognised gets a bare placeholder built from
-     its own variable name. Existing attrs the user's dataset already had
-     are preserved except where a specific key (``name``, ``long_name``,
-     ``units``, ``history``, ...) is deliberately set by this class --
-     individual keys are overwritten, never the whole attrs dict.
+2. Standardize: each recognised variable is checked for datetime time
+   coordinates, dimension order, sort order, non-negative values and direction
+   units. Safe problems are fixed. Anything else raises before any change is
+   made.
+3. Describe: ``name``, ``long_name`` and ``units`` attributes are added where
+   they are not already set.
+
+Nothing is renamed. The dataset is stored in ``ds``, and other variables stay
+in it under their original names.
 
 Direction convention
-~~~~~~~~~~~~~~~~~~~~~
-Declared via ``dir_convention``:
-  "from"  - direction the wave/wind is coming from  (default)
-  "to"    - direction the wave/wind is going toward (e.g. currents)
-All directional outputs honour this declaration without silent conversion.
+--------------------
+Set with ``dir_convention``:
+
+- ``"from"``: the direction the wave or wind is coming from (default).
+- ``"to"``: the direction the wave or current is going toward.
+
+Directional outputs use the declared convention. No conversion is applied.
 """
 
 from __future__ import annotations
@@ -208,87 +170,40 @@ class SpectralTimeSeries:
     """
     Single-point metocean spectral time series.
 
-    Construction is a strict three-phase pipeline, always run in full:
-
-      1. **Identify** -- detect which dims play the time/freq/dir roles
-         (via aliases, never renamed) and which data variables are
-         time-varying spectra (S, E, and/or D), by dimension signature.
-         Only these recognised variables are reported at this stage.
-      2. **Standardize** -- immediately check the recognised variables for
-         problems (direction unit, dimension order, sort order, sign,
-         and exact dimensionality) and fix everything that is safely
-         fixable, printing each fix as it is applied. Anything not
-         safely fixable raises immediately, before any fix is applied,
-         so you never end up with a partially patched dataset. There is
-         no "unstandardized" object you can hold and forget to fix -- if
-         construction succeeds, the data is clean.
-      3. **Describe** -- now that units and structure are trustworthy,
-         attach ``name``/``long_name``/``units`` attrs (only where not
-         already meaningfully set) to every variable in the dataset --
-         spectral, freq/dir, and auxiliary -- and print the full table.
-
-    Every recognised spectral variable is required to have *exactly* the
-    dims implied by its signature (e.g. an "S" variable must be exactly
-    (time, freq, dir) -- no additional dims such as "station"). This is
-    enforced in ``standardize()``; see there for details.
-
     Parameters
     ----------
     ds : xr.Dataset
-        Source dataset (e.g. opened directly from NetCDF/Zarr/GRIB via
-        xarray). Dimension names playing the time/freq/dir role are
-        *detected* via aliases but never renamed. Data variables are
-        classified by which roles their dims play:
-
-            {time, freq}        -> frequency spectral timeseries
-            {time, dir}         -> directional spectral timeseries
-            {time, freq, dir}   -> 2D spectral timeseries
-
-        At most one variable may match each signature; if more than one
-        does, a ValueError is raised asking the user to resolve the
-        ambiguity in their dataset. Variables that don't match any of
-        these signatures are left completely untouched (original names,
-        original dims) -- useful later as `group_by` keys (e.g.
-        wind_speed, wind_direction).
-
-        The dataset is stored as ``self.ds``, mutated in place during
-        standardization (dimension order, sort order, sign, and
-        direction unit) but never renamed. Classification is recorded in
-        ``var_map`` (slot -> original variable name) and ``dim_map``
-        (role -> original dim name).
+        Source dataset, for example opened from NetCDF, Zarr or GRIB. Dimension
+        names are detected but never renamed. Variables that match none of the
+        supported signatures are left unchanged and can be used later as
+        grouping keys, such as wind speed or wind direction. At most one
+        variable may match each signature.
     dir_convention : {"from", "to"}, default "from"
-        Directional convention for all directional quantities.
-        "from" - the direction the signal is coming from (wind, waves).
-        "to"   - the direction the signal is going toward (currents, swell
-                  tracking in some model conventions).
+        Convention used for all directional quantities. "from" means the
+        direction the signal comes from, as for wind and waves. "to" means the
+        direction the signal travels toward, as for currents.
     depth : float, optional
         Water depth in metres.
     name : str, optional
-        Human-readable label for this record (site name, model run, etc.).
+        Label for this record, such as a site name or model run.
 
-    Attributes
-    ----------
-    ds : xr.Dataset
-        The full source dataset. Always standardized by the time
-        ``__init__`` returns: canonical dim order, ascending freq/dir,
-        non-negative spectral values, direction in degrees. All metadata
-        (``name``, ``long_name``, ``units``) lives in ``ds[var].attrs``.
-    var_map : dict[str, str | None]
-        Internal slot ("S", "E", "D") -> original variable name in the
-        input dataset, or None if that slot wasn't found.
-    dim_map : dict[str, str | None]
-        Canonical role ("time", "freq", "dir") -> original dimension name
-        in the input dataset, or None if that role wasn't found.
-    has_2d, has_frequency, has_directional : bool
-    dir_convention : {"from", "to"}
+    Raises
+    ------
+    TypeError
+        If `ds` is not an ``xr.Dataset``.
+    ValueError
+        If `dir_convention` is invalid, no spectral variable is found, more
+        than one variable matches a signature, or a variable cannot be
+        standardized.
 
     Notes
     -----
-    There is no ``standardized`` flag and no separate metadata object --
-    by design, an instance of this class is always standardized, and all
-    metadata is attached directly to ``self.ds`` as attrs. If the input
-    cannot be safely standardized, construction raises instead of
-    returning a partially-fixed object.
+    Every recognised spectral variable must have exactly the dimensions of its
+    signature. For example, an "S" variable must be (time, freq, dir), with no
+    extra dimensions such as ``station``.
+
+    A constructed instance is always standardized, so no partly fixed object
+    can be returned.
     """
 
     def __init__(
@@ -310,8 +225,11 @@ class SpectralTimeSeries:
                 f"dir_convention must be 'from' or 'to', got {dir_convention!r}."
             )
 
+        #: Convention for directional quantities, "from" or "to".
         self.dir_convention = dir_convention
+        #: Water depth in metres, or None.
         self.depth          = depth
+        #: Label for this record, or None.
         self.name           = name
 
         # ------------------------------------------------------------------ #
@@ -347,8 +265,11 @@ class SpectralTimeSeries:
         # ------------------------------------------------------------------ #
         # Store                                                               #
         # ------------------------------------------------------------------ #
+        #: The standardized source dataset.
         self.ds      = ds
+        #: Internal slot ("S", "E", "D") -> original variable name, or None.
         self.var_map = var_map
+        #: Canonical role ("time", "freq", "dir") -> original dimension name, or None.
         self.dim_map = dim_map
 
         self.ds.attrs["dir_convention"] = dir_convention
@@ -802,28 +723,45 @@ class SpectralTimeSeries:
 
     @property
     def has_2d(self) -> bool:
+        """Whether a 2D spectrum (slot ``S``) is present."""
         return self.var_map.get("S") is not None
 
     @property
     def has_frequency(self) -> bool:
+        """Whether a frequency spectrum (slot ``E``, or ``S``) is present."""
         return self.var_map.get("E") is not None or self.var_map.get("S") is not None
 
     @property
     def has_directional(self) -> bool:
+        """Whether a directional spectrum (slot ``D``, or ``S``) is present."""
         return self.var_map.get("D") is not None or self.var_map.get("S") is not None
 
     def spectrum(self, slot: Literal["S", "E", "D"]) -> xr.DataArray | None:
-        """Look up a classified spectral variable by canonical slot name."""
+        """
+        Return a classified spectral variable.
+
+        Parameters
+        ----------
+        slot : {"S", "E", "D"}
+            Internal slot: 2D, frequency, or directional spectrum.
+
+        Returns
+        -------
+        xr.DataArray or None
+            The variable, or None if the slot is not present.
+        """
         var_name = self.var_map.get(slot)
         return self.ds[var_name] if var_name is not None else None
 
     @property
     def time(self) -> pd.DatetimeIndex:
+        """Time coordinate of the dataset."""
         self._require_time_dim("time")
         return pd.DatetimeIndex(self.ds.coords[self.dim_map[_ROLE_TIME]].values)
 
     @property
     def freqs(self) -> np.ndarray | None:
+        """Frequency coordinate values in Hz, or None if there is no frequency dimension."""
         freq_dim = self.dim_map[_ROLE_FREQ]
         if freq_dim is not None:
             return self.ds.coords[freq_dim].values
@@ -831,6 +769,7 @@ class SpectralTimeSeries:
 
     @property
     def dirs(self) -> np.ndarray | None:
+        """Direction coordinate values in degrees, or None if there is no direction dimension."""
         dir_dim = self.dim_map[_ROLE_DIR]
         if dir_dim is not None:
             return self.ds.coords[dir_dim].values
@@ -838,17 +777,20 @@ class SpectralTimeSeries:
 
     @property
     def duration(self) -> pd.Timedelta:
+        """Time between the first and last timestamps."""
         self._require_time_dim("duration")
         t = self.time
         return t[-1] - t[0]
 
     @property
     def timestep(self) -> pd.Timedelta:
+        """Median time between consecutive timestamps."""
         self._require_time_dim("timestep")
         return pd.Series(self.time).diff().median()
 
     @property
     def n_years(self) -> float:
+        """Record length in years (365.2425 days per year)."""
         self._require_time_dim("n_years")
         return self.duration.total_seconds() / (365.2425 * 24 * 3600)
 
@@ -1261,13 +1203,15 @@ class SpectralTimeSeries:
 
     def compute_frequency_spectrum(self) -> xr.DataArray:
         """
-        Return the frequency spectrum E(t, f) in m²/Hz.
+        Frequency spectrum E(t, f) in m^2/Hz.
 
-        If the E slot is already present in the dataset it is returned
-        directly.  If only S is available, E is derived by integrating S
-        over direction (0→360° with periodic closure) and cached in
-        ``self.ds`` under the name ``'freq_spectrum'``.  Subsequent calls
-        are free (the cached result is returned immediately).
+        Returns the E slot if present. Otherwise E is derived by integrating S
+        over direction (periodic closure) and cached in ``self.ds`` as
+        ``freq_spectrum``. Later calls return the cached result.
+
+        Returns
+        -------
+        xr.DataArray
         """
         self._requires_frequency_spectrum("compute_frequency_spectrum")
 
@@ -1296,11 +1240,15 @@ class SpectralTimeSeries:
 
     def compute_directional_spectrum(self) -> xr.DataArray:
         """
-        Return the directional spectrum D(t, θ) in m²/deg.
+        Directional spectrum D(t, theta) in m^2/deg.
 
-        If the D slot is already present in the dataset it is returned
-        directly.  If only S is available, D is derived by integrating S
-        over frequency and cached in ``self.ds`` under ``'dir_spectrum'``.
+        Returns the D slot if present. Otherwise D is derived by integrating S
+        over frequency and cached in ``self.ds`` as ``dir_spectrum``. Later
+        calls return the cached result.
+
+        Returns
+        -------
+        xr.DataArray
         """
         self._requires_directional_spectrum("compute_directional_spectrum")
 
@@ -1432,7 +1380,7 @@ class SpectralTimeSeries:
         """
         Mean direction at the peak frequency, Dpm.
 
-        Evaluated at the discrete peak of E(f) — the frequency bin carrying
+        Evaluated at the discrete peak of E(f), the frequency bin carrying
         the most energy — using the first circular moments of S(f,θ) at that
         frequency slice. Not stored in self.ds; computed on demand for
         tracking.
@@ -1671,16 +1619,16 @@ class SpectralTimeSeries:
 
         Two aggregation modes, selected by whether ``select_by`` is given:
 
-        **Element-wise mode** (``select_by=None``, default): for each
+        Element-wise mode (``select_by=None``, the default): for each
         (freq[, dir]) bin independently, compute ``stat`` ("mean", "max",
         "min", or "p<NN>" e.g. "p95") across all spectra in the group. The
-        result is a synthetic spectrum -- no single time step necessarily
+        result is a synthetic spectrum; no single time step necessarily
         looked like it -- useful for e.g. "the average winter directional
         spread" but not guaranteed physically self-consistent (a bulk
         parameter computed from the aggregated spectrum need not equal the
         same stat computed from the per-timestep bulk parameter).
 
-        **Selection mode** (``select_by=<variable name>``): computes no new
+        Selection mode (``select_by=<variable name>``): computes no new
         spectral shape. Instead, ranks the existing scalar variable
         ``select_by`` (e.g. "hs") within each group, finds the time step
         nearest the requested ``stat`` percentile (or nearest the group
@@ -1691,7 +1639,7 @@ class SpectralTimeSeries:
         method never runs ``integrate()`` implicitly, since you may already
         have supplied your own variable under that name).
 
-        Single-level convenience wrapper -- see `groupby()` for the
+        Single-level convenience wrapper; see `groupby()` for the
         chained, multi-level version this now delegates to.
 
         Parameters
@@ -1705,7 +1653,7 @@ class SpectralTimeSeries:
             "mean", "max", "min", or "p<NN>" (e.g. "p50", "p95"). In
             selection mode, "mean" selects the time step nearest the
             group's mean of ``select_by`` (not an element-wise mean of
-            spectra) -- see notes above.
+            spectra). See notes above.
         select_by : str, optional
             Name of an existing scalar variable to select representative
             spectra by. If omitted, aggregation is element-wise (see above).
@@ -1890,19 +1838,29 @@ class SpectralTimeSeries:
         circular_by: bool = False,
     ) -> "_GroupedSpectralTimeSeries":
         """
-        Start a (possibly chained) groupby, terminated by
-        `.aggregate(stat=, select_by=)`. E.g.:
+        Start a grouping, to be completed with ``aggregate``.
 
-            sts.groupby("season") \\
-               .groupby("hs", step=2) \\
-               .groupby("tp", step=1) \\
-               .aggregate(select_by="hs", stat="max")
+        Groupings can be chained. ``aggregate`` then picks one representative
+        spectrum per leaf cell. A single ``groupby(by, ...).aggregate(...)``
+        call is equivalent to the one-level ``aggregate(by, ...)``.
 
-        nests by season, then by hs-bin, then by tp-bin, then picks the
-        representative spectrum in each leaf cell. A single
-        `.groupby(by, ...).aggregate(...)` call is equivalent to the old
-        one-level `aggregate(by, ...)`, which is now just a thin wrapper
-        around this.
+        Parameters
+        ----------
+        by : str
+            Grouping keyword ("month", "season", "direction", "year", "week",
+            "day", "hour"), or the name of a scalar variable to bin by value.
+        sectors : int or list of float, optional
+            Sectors used with ``circular_by=True``. See `aggregate`.
+        seasons : dict, optional
+            Custom season-to-months mapping, used when ``by="season"``.
+        step : float, optional
+            Bin width for a numeric ``by`` variable. Inferred if None.
+        circular_by : bool, default False
+            Treat ``by`` as a circular variable and bin it into sectors.
+
+        Returns
+        -------
+        _GroupedSpectralTimeSeries
         """
         self._require_time_dim("groupby")
         groups = self._get_time_groups(
@@ -2202,11 +2160,11 @@ class SpectralTimeSeries:
         stripped out and collected into a secondary wind-sea slot (index 1)
         rather than being left in the swell. Swell slots start at index 2.
 
+        All parameters except ``swells`` have the same meaning as in
+        ``partition_ptm1``.
+
         Parameters
         ----------
-        wspd_var, wdir_var, dpt_var, wdir_from, agefac, wscut, ihmax,
-        smooth, freq_window, dir_window :
-            Same as ``partition_ptm1``.
         swells : int
             Number of swell partitions (default 3). Output has
             ``2 + swells`` total slots.
@@ -2219,7 +2177,7 @@ class SpectralTimeSeries:
         """
         from wavespectra.partition.partition import np_ptm2
 
-        self._require_time_dim("partition_ptm1")
+        self._require_time_dim("partition_ptm2")
         self._requires_2d_spectrum("partition_ptm2")
         wspd, wdir, dpt = self._wind_inputs(wspd_var, wdir_var, dpt_var, wdir_from)
         freqs = self.ds.coords[self.dim_map[_ROLE_FREQ]].values.astype(float)
@@ -2243,7 +2201,7 @@ class SpectralTimeSeries:
         dir_window: int = 3,
     ) -> "SpectralTimeSeriesCollection":
         """
-        PTM3 watershed partitioning — no wind-sea/swell classification.
+        PTM3 watershed partitioning, without wind-sea or swell classification.
 
         Partitions are ordered by descending Hs only. Useful when wind
         information is unavailable or when classification is not needed
@@ -2290,13 +2248,24 @@ class SpectralTimeSeries:
         PTM4 WAM-style partitioning by wave-age criterion.
 
         Splits the spectrum into wind sea and a single swell partition by
-        masking: bins where celerity ≤ agefac × wspd × cos(dir − wdir) are
+        masking: bins where celerity <= agefac * wspd * cos(dir - wdir) are
         wind sea, everything else is swell. No watershed is computed.
+
+        The parameters have the same meaning as in ``partition_ptm1``, except
+        as listed here.
 
         Parameters
         ----------
-        wspd_var, wdir_var, dpt_var, wdir_from, agefac :
-            Same as ``partition_ptm1``.
+        wspd_var : str
+            Wind speed variable in ``self.ds`` (m/s).
+        wdir_var : str
+            Wind direction variable in ``self.ds`` (degrees).
+        dpt_var : str or None
+            Water depth variable in ``self.ds`` (m). If None, deep-water celerity is used.
+        wdir_from : bool
+            If True (default), ``wdir_var`` is the direction the wind comes from.
+        agefac : float
+            Wave-age factor (default 1.7).
 
         Returns
         -------
@@ -2357,10 +2326,9 @@ class SpectralTimeSeries:
 
         Notes
         -----
-        Unlike wavespectra's PTM5, this implementation does not interpolate
-        the spectrum at ``fcut`` — the split is applied to the existing
-        frequency grid as-is. Bins exactly at ``fcut`` are included in both
-        partitions (the boundary bin carries the full energy in each).
+        The spectrum is not interpolated at ``fcut``. The split is applied to
+        the existing frequency grid. Bins exactly at ``fcut`` are included in
+        both partitions, so the boundary bin contributes to each.
         """
         self._requires_2d_spectrum("partition_ptm5")
 
@@ -2413,11 +2381,11 @@ class SpectralTimeSeries:
         al. (2009). Useful for noisy measured spectra that the watershed
         algorithm tends to over-segment.
 
+        The parameters not listed here have the same meaning as in
+        ``partition_ptm1``.
+
         Parameters
         ----------
-        wspd_var, wdir_var, dpt_var, wdir_from, agefac, wscut, swells,
-        ihmax, smooth, freq_window, dir_window :
-            Same as ``partition_ptm1``.
         kappa : float
             Spread factor in the peak-separation criterion (HP01 eq. 9).
             Larger values combine more partitions. Default 0.4.
@@ -2433,7 +2401,7 @@ class SpectralTimeSeries:
             merged with their most connected neighbour. Default 0.2 m.
         noise_a : float or None
             Factor A in HP01 eq. 10 noise threshold
-            (e ≤ A / (fp⁴ + B)). Disabled if None.
+            (e <= A / (fp^4 + B)). Disabled if None.
         noise_b : float
             Factor B in HP01 eq. 10. Default 0.0.
         combine_extra_swells : bool
@@ -2657,15 +2625,38 @@ class SpectralTimeSeries:
         panel_size: float = 3.0,
     ):
         """
-        Plot this instance's spectrum -- one timestep, a time slice faceted
-        via row=/col=, etc. Thin wrapper around plotting.plot_spectra(); see
-        that function's docstring for full parameter documentation.
+        Plot this instance's spectrum at one timestep, or a time slice faceted
+        with ``row`` and ``col``. This is a thin wrapper around
+        `plotting.plot_spectra`, which documents all parameters.
 
-        Examples
-        --------
-        >>> sts.plot(time="2020-01-15T00")                     # doctest: +SKIP
-        >>> sts.plot(time=slice("2020-01-01", "2020-01-03"),
-        ...          col="time", col_wrap=4)                    # doctest: +SKIP
+        Parameters
+        ----------
+        var : str, optional
+            Spectral variable to plot. Defaults to the 2D spectrum, else the
+            1D spectrum that is present.
+        time : optional
+            Time selector passed to `plotting.plot_spectra`.
+        row, col : str, optional
+            Dimension to facet panels by.
+        col_wrap : int, optional
+            Maximum number of panels per row when faceting with ``col``.
+        radius : {"frequency", "period"}, default "frequency"
+            Radial axis of the polar plot.
+        plot_type : str, default "contourf"
+            Plot style passed to `plotting.plot_spectra`.
+        cmap : str, default "viridis"
+            Colormap name.
+        vmax : float, optional
+            Upper colour limit.
+        dir_letters : bool, default False
+            Label compass directions with letters instead of degrees.
+        panel_size : float, default 3.0
+            Size of each panel in inches.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or tuple
+            As returned by `plotting.plot_spectra`.
         """
         from .plotting import plot_spectra
         return plot_spectra(
@@ -2704,14 +2695,11 @@ class SpectralTimeSeries:
         Parameters
         ----------
         time_reduce : {"mean", "max_hs"}, default "mean"
-            How to collapse the time axis to one representative spectrum
-            before plotting.
-            "mean"    - element-wise mean spectrum across all timesteps.
-            "max_hs"  - the single actual timestep with the highest hs
-                        (a real physical spectrum, not a synthetic
-                        average) -- requires `integrate()` to have been
-                        run already, or is run here on demand if `hs`
-                        isn't yet in `self.ds`.
+            How to collapse the time axis to one representative spectrum.
+            ``"mean"`` is the element-wise mean over all timesteps. ``"max_hs"``
+            is the single timestep with the highest Hs, which is a real
+            spectrum and not an average. `integrate` is run first if ``hs`` is
+            not yet in `self.ds`.
         wspd_var, wdir_var, dpt_var : str, optional
             Names of wind speed / wind direction / depth variables in
             `self.ds`, forwarded to `partition_ptm1`/`ptm2`/`ptm3` if
@@ -3027,8 +3015,25 @@ class _GroupedSpectralTimeSeries:
     ) -> "_GroupedSpectralTimeSeries":
         """
         Add another grouping level to the chain. Resolves ``by`` with its
-        own independent ``sectors``/``seasons``/``step``/``circular_by`` --
-        no relation to whatever grouping variables came before it.
+        own independent grouping arguments.
+
+        Parameters
+        ----------
+        by : str
+            Grouping keyword or scalar variable name, as in `SpectralTimeSeries.groupby`.
+        sectors : int or list of float, optional
+            Sectors used with ``circular_by=True``.
+        seasons : dict, optional
+            Custom season-to-months mapping, used when ``by="season"``.
+        step : float, optional
+            Bin width for a numeric ``by`` variable.
+        circular_by : bool, default False
+            Treat ``by`` as a circular variable and bin it into sectors.
+
+        Returns
+        -------
+        _GroupedSpectralTimeSeries
+            A new chain with this level appended.
         """
         existing = [name for name, _ in self._levels]
         if by in existing:
@@ -3046,7 +3051,7 @@ class _GroupedSpectralTimeSeries:
         """
         Terminate the groupby chain, collapsing time into one output
         dimension per level. Same two modes (element-wise vs. selection)
-        as ``SpectralTimeSeries.aggregate()`` -- see its docstring for the
+        as ``SpectralTimeSeries.aggregate()``; see its docstring for the
         full explanation of ``stat``/``select_by`` semantics.
 
         If any bulk parameters (hs, tp, fp, ...) were already present in
@@ -3057,14 +3062,26 @@ class _GroupedSpectralTimeSeries:
         mean(hs) != 4*sqrt(mean(m0)) in general), so re-deriving from the
         highest-order spectrum available (S if present, else E/D) is the
         only way to keep the output internally consistent. Only the
-        parameter names that were present before are recomputed -- this
-        never adds parameters nobody had asked for via
+        parameter names that were present before are recomputed. This never adds parameters nobody had asked for via
         ``integrate(compute=[...])``.
 
         Leaf combinations with no time steps in them (e.g. no JJA
         observations with hs in the 8-10 bin) are simply absent from the
         result, which surfaces as ``NaN``/missing at that grid cell once
-        unstacked -- no explicit sparsity handling needed.
+        unstacked. No explicit sparsity handling is needed.
+
+        Parameters
+        ----------
+        stat : str, default "mean"
+            "mean", "max", "min", or "p<NN>". See `SpectralTimeSeries.aggregate`.
+        select_by : str, optional
+            Name of a scalar variable to select representative spectra by.
+            If omitted, aggregation is element-wise.
+
+        Returns
+        -------
+        xr.Dataset
+            One output dimension per groupby level, plus ``_group_counts``.
         """
         parent = self._parent
         level_names = [name for name, _ in self._levels]
@@ -3246,53 +3263,39 @@ class _GroupedSpectralTimeSeries:
 
 class SpectralTimeSeriesCollection:
     """
-    A named/labelled collection of related SpectralTimeSeries instances,
-    for comparison, validation, or plotting between them.
+    Labelled collection of related SpectralTimeSeries instances.
 
-    Typical sources: several wave model outputs for the same point and
-    period; or the partitions (wind sea / swell components) derived from
-    one spectrum via partition_watershed(). Members need not share
-    variable names or dim names -- each member's own dim_map is consulted
-    whenever "the freq dimension" or "the dir dimension" of that specific
-    member is needed, exactly as SpectralTimeSeries itself never assumes a
-    fixed name for these.
+    Used to compare members, for example several wave model outputs at one
+    point, or the partitions of one spectrum from ``partition_ptm1`` and
+    similar methods. Members may use different variable and dimension names.
+    Each member's own ``dim_map`` is used whenever its frequency or direction
+    dimension is needed.
 
-    This class holds no computational logic of its own beyond alignment
-    bookkeeping -- it is a container plus a compatibility check. Methods
-    that need directly-comparable arrays (e.g. a future RMSE/diff method)
-    should guard themselves with `_requires_aligned()`; methods that only
-    need per-member scalars (e.g. comparing integrated bulk parameters)
-    do not, since those can be compared across members regardless of
-    whether the underlying grids match.
+    The collection holds no computation of its own beyond alignment checks.
+    Methods that need comparable arrays should check `aligned` first. Methods
+    that compare scalar results, such as integrated bulk parameters, do not
+    need it.
 
     Parameters
     ----------
     members : dict[str, SpectralTimeSeries] or list[SpectralTimeSeries]
-        The collection's members. If a dict, its keys are used directly as
-        labels. If a list, each member's own `.name` is used as its label
-        if set and unique among the list; otherwise a default label
-        ("member_0", "member_1", ...) is assigned.
+        Members of the collection. A dict's keys are used as labels. For a
+        list, each member's ``name`` is used if all names are set and unique.
+        Otherwise the labels are ``"member_0"``, ``"member_1"``, and so on.
 
-    Attributes
-    ----------
-    members : dict[str, SpectralTimeSeries]
-        Label -> instance.
-    aligned : bool (property)
-        Whether every member's freq/dir coordinates (for whichever roles
-        they have) and dir_convention match exactly across the whole
-        collection. Does not consider time -- see class docstring and
-        `align()`. Cheap: compares coordinate arrays only, no
-        interpolation or copying.
+    Raises
+    ------
+    TypeError
+        If `members` is not a dict or list, or contains an entry that is not a
+        SpectralTimeSeries.
+    ValueError
+        If `members` is empty.
 
     Notes
     -----
-    There is no "standardized" state here distinct from `aligned`: every
-    individual SpectralTimeSeries member is already always standardized
-    internally by its own constructor (see that class's docstring). What
-    this class adds is purely cross-member *compatibility* -- do the
-    members' own grids agree with each other -- which is a different,
-    genuinely collection-level property, hence `aligned` rather than
-    reusing the word "standardized".
+    The collection has no standardized state of its own. Each member is
+    standardized by its constructor. `aligned` only reports whether the
+    members' freq, dir and dir_convention agree.
     """
 
     def __init__(
@@ -3351,9 +3354,11 @@ class SpectralTimeSeriesCollection:
         return label in self.members
 
     def labels(self) -> list[str]:
+        """Member labels, in insertion order."""
         return list(self.members.keys())
 
     def items(self):
+        """Iterate over ``(label, member)`` pairs."""
         return self.members.items()
 
     def __repr__(self) -> str:
@@ -3443,27 +3448,24 @@ class SpectralTimeSeriesCollection:
             not something to infer silently (e.g. "first in the dict").
         method : {"interp", "nearest"}, default "interp"
             How to resample freq/dir onto the target's grid.
-            "interp" - linear interpolation (xr.DataArray.interp).
-            "nearest" - subsample to the nearest existing bin instead of
-                        interpolating -- avoids inventing values between
-                        bins, at the cost of not landing exactly on the
-                        target grid's spacing if the source grid is coarser.
+
+            - ``"interp"``: linear interpolation, using ``xr.DataArray.interp``.
+            - ``"nearest"``: subsample to the nearest existing bin. This avoids
+              inventing values between bins, but does not land exactly on the
+              target spacing if the source grid is coarser.
+
         time : {"inner", "outer", "interp", "none"}, default "inner"
             How to reconcile the time axis across members.
-            "inner"  - keep only timestamps common to all members
-                        (intersection). Never invents data.
-            "outer"  - keep every timestamp appearing in any member
-                        (union); members are NaN where they had no data at
-                        a given step.
-            "interp" - reindex every member onto the target's own time
-                        axis, linearly interpolating the others onto it.
-            "none"   - leave each member's time axis untouched entirely.
-                        `.aligned` only ever reflects freq/dir/dir_convention
-                        (see its docstring), so this is a legitimate choice
-                        for e.g. `align(time="none")` before a method that
-                        only needs matching freq/dir (like plotting spectra
-                        side by side) and handles time overlap itself, or
-                        not at all.
+
+            - ``"inner"``: keep only timestamps common to all members. Never
+              invents data.
+            - ``"outer"``: keep every timestamp present in any member. Members
+              are NaN where they have no data.
+            - ``"interp"``: reindex every member onto the target's time axis,
+              interpolating linearly.
+            - ``"none"``: leave each member's time axis unchanged. `aligned`
+              only reflects freq, dir and dir_convention, so this is valid when
+              the caller handles time overlap itself.
 
         Returns
         -------
@@ -3825,7 +3827,17 @@ class SpectralTimeSeriesCollection:
 
     def integrate(self, **kwargs) -> "SpectralTimeSeriesCollection":
         """
-        Run .integrate() on every member.
+        Run ``.integrate()`` on every member.
+
+        Parameters
+        ----------
+        **kwargs
+            Passed to each member's ``integrate``.
+
+        Returns
+        -------
+        SpectralTimeSeriesCollection
+            This collection, updated in place.
         """
         for member in self.members.values():
             member.integrate(**kwargs)
@@ -3865,10 +3877,18 @@ class SpectralTimeSeriesCollection:
             dimension.
         ncols : int, optional
             Panels per row. Defaults to one row of all members.
-        figsize : tuple[float, float], optional
             Figure size in inches. Defaults to matplotlib's rcParams
             ``figure.figsize``.
-        (other parameters as in plotting.plot_spectra())
+        radius : {"frequency", "period"}, default "frequency"
+            Radial axis of the polar plots.
+        plot_type : str, default "pcolormesh"
+            Plot style, passed to `plotting.plot_spectra`.
+        cmap : str, default "viridis"
+            Colormap name.
+        vmax : float, optional
+            Upper colour limit.
+        dir_letters : bool, default False
+            Label compass directions with letters instead of degrees.
 
         Returns
         -------
@@ -3906,7 +3926,7 @@ class SpectralTimeSeriesCollection:
         for ax, (label, member, da) in zip(axes_flat, panels):
             freq_dim = member.dim_map[_ROLE_FREQ] if member.dim_map[_ROLE_FREQ] in da.dims else None
             dir_dim  = member.dim_map[_ROLE_DIR]  if member.dim_map[_ROLE_DIR]  in da.dims else None
-            mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmax_shared, dir_letters)
+            mesh = _draw_one_panel(ax, da, freq_dim, dir_dim, radius, plot_type, cmap, vmax=vmax_shared, dir_letters=dir_letters)
             last_mesh = mesh if mesh is not None else last_mesh
             ax.set_title(label)
 
