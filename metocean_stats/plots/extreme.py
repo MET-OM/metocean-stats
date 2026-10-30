@@ -1144,7 +1144,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
 
 
 def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
-    df = tables.table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df = tables.table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=None)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -1162,13 +1162,14 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    if output_file != "": plt.savefig(output_file)
+    if output_file: 
+        plt.savefig(output_file)
 
     return fig
 
 
 def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: str,max_hs=20,output_file='surge_for_given_hs.png'):
-    df, df_coeff = tables.table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df, df_coeff = tables.table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=None)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_surge], bins=50, cmap='hot', cmin=1)
@@ -1186,7 +1187,9 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    if output_file != "": plt.savefig(output_file)
+    
+    if output_file: 
+        plt.savefig(output_file)
 
     return fig
 

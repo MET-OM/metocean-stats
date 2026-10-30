@@ -28,7 +28,7 @@ def test_plot_heatmap_monthly_yearly():
 
 
 def test_plot_yearly_depth_profiles():
-    fig = plots.plot_yearly_vertical_profiles(ds_ocean, rad_colname='current_speed_', method='mean', yaxis_direction='down', xlabel='Current speed [m/s]', output_file='')
+    fig = plots.plot_yearly_vertical_profiles(ds_ocean, rad_colname='current_speed_', method='mean', yaxis_direction='down', xlabel='Current speed [m/s]', output_file=None)
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 
@@ -40,7 +40,7 @@ def test_plot_yearly_depth_profiles_wind():
 
 
 def test_plot_linear_regression():
-    fig = plots.plot_linear_regression(ds,var='W10',time='Year',stat='P90',method=['Least-Squares','Theil-Sen'],confidence_interval=0.95,ylabel='Wind speed [m/s]',output_figure='')
+    fig = plots.plot_linear_regression(ds,var='W10',time='Year',stat='P90',method=['Least-Squares','Theil-Sen'],confidence_interval=0.95,ylabel='Wind speed [m/s]')
     # Check that the output is a Matplotlib Figure
     assert isinstance(fig, plt.Figure), "The output is not a Matplotlib Figure."
 

@@ -264,7 +264,7 @@ def plot_yearly_vertical_profiles(df, rad_colname='current_speed_', method='mean
     ax.tick_params(axis='y', labelsize=14) 
     plt.grid()
     plt.tight_layout()
-    if output_file != "":
+    if output_file:
         plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
     plt.close()
 
@@ -361,7 +361,7 @@ def plot_linear_regression(df,var='air_temperature_2m',time='Jan',stat='mean',me
     plt.legend()
     ax.grid(True)
     plt.tight_layout()
-    if output_figure != None:
+    if output_figure:
         plt.savefig(output_figure,dpi=250,facecolor='white',bbox_inches='tight')
     plt.close()
 
