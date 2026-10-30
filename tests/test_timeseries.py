@@ -6,8 +6,6 @@ from metocean_stats.timeseries import CMAConfig, TimeSeries, Variable
 HS = Variable(col="HS", name="Significant wave height", symbol="H_s", unit="m")
 DIRP = Variable(col="DIRP", name="Peak direction", symbol="theta_p", unit="deg")
 
-NOT_IMPLEMENTED = pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="not implemented yet")
-
 
 @pytest.fixture
 def ts(nora):
@@ -35,28 +33,8 @@ def test_properties(ts):
     ts.columns
 
 
-@NOT_IMPLEMENTED
-def test_resample(ts):
-    ts.resample("1D")
-
-
-@NOT_IMPLEMENTED
-def test_fill_gaps(ts):
-    ts.fill_gaps()
-
-
-@NOT_IMPLEMENTED
-def test_trim(ts):
-    ts.trim()
-
-
 def test_smooth_discrete_geometric(ts):
     ts.smooth_discrete_geometric("TP")
-
-
-@NOT_IMPLEMENTED
-def test_availability(ts):
-    ts.availability()
 
 
 def test_describe(ts):
@@ -65,6 +43,16 @@ def test_describe(ts):
 
 def test_statistics(ts):
     ts.statistics()
+
+
+def test_statistics_accepts_unified_stats_list_and_keeps_labels(ts):
+    """The func/percentiles split used to force two parameters for one
+    concept; a single `stats` list (as accepted by
+    `utils.aggregate_statistics`) now covers both, and output columns use
+    exactly the strings given."""
+    stats = ["Count", "Min", "P5", "Mean", "P95", "Maximum"]
+    df = ts.statistics(by="month", stats=stats)
+    assert list(df.columns) == stats
 
 
 def test_nonexceedance(ts):
@@ -79,12 +67,41 @@ def test_block_maxima(ts):
     ts.block_maxima(by="direction", min_coverage=0.0)
 
 
+def test_block_maxima_default_works_without_direction(nora):
+    """Regression test: block_maxima's `by` parameter used to default to
+    "direction", so the most basic call (no arguments) failed outright for
+    any TimeSeries without a direction variable configured. The sensible,
+    always-available default is "year"."""
+    ts_no_direction = TimeSeries(nora, primary=HS)
+    df = ts_no_direction.block_maxima(min_coverage=0.0)
+    assert "All" in df.index
+    assert all(label.isdigit() for label in df.index if label != "All")
+
+
+def test_block_maxima_accepts_unified_stats_list(ts):
+    stats = ["min", "P50", "mean", "max"]
+    df = ts.block_maxima(by="year", stats=stats, min_coverage=0.0)
+    assert list(df.columns) == stats
+
+
 def test_persistence(ts):
     ts.persistence(threshold=2.0)
 
 
+def test_persistence_accepts_unified_stats_list(ts):
+    stats = ["count", "mean", "P90"]
+    df = ts.persistence(threshold=2.0, stats=stats)
+    assert list(df.columns) == stats + ["Yearly"]
+
+
 def test_trends(ts):
     ts.trends(by="month")
+
+
+def test_trends_percentile_equivalent_forms_agree(ts):
+    df_p = ts.trends(by="month", stat="P90", min_entries_per_year=50)
+    df_pct = ts.trends(by="month", stat="90%", min_entries_per_year=50)
+    assert df_p.equals(df_pct)
 
 
 def test_plot_rose(ts):
@@ -95,42 +112,18 @@ def test_statistics_2d(ts):
     ts.statistics_2d()
 
 
+def test_statistics_2d_density_and_percent_tokens_agree(ts):
+    df_density = ts.statistics_2d(row="month", col="direction", stat="density")
+    df_percent = ts.statistics_2d(row="month", col="direction", stat="%")
+    assert df_density.equals(df_percent)
+
+
 def test_plot_statistics(ts):
     ts.plot_statistics()
 
 
 def test_plot_statistics_2d(ts):
     ts.plot_statistics_2d()
-
-
-@NOT_IMPLEMENTED
-def test_plot_timeseries(ts):
-    ts.plot_timeseries()
-
-
-@NOT_IMPLEMENTED
-def test_plot_monthly_boxplot(ts):
-    ts.plot_monthly_boxplot()
-
-
-@NOT_IMPLEMENTED
-def test_plot_exceedance(ts):
-    ts.plot_exceedance()
-
-
-@NOT_IMPLEMENTED
-def test_plot_histogram(ts):
-    ts.plot_histogram()
-
-
-@NOT_IMPLEMENTED
-def test_climatology(ts):
-    ts.climatology()
-
-
-@NOT_IMPLEMENTED
-def test_to_csv(ts, tmp_path):
-    ts.to_csv(str(tmp_path / "ts.csv"))
 
 
 def test_save_figure(ts, tmp_path):

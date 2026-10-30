@@ -34,6 +34,39 @@ def test_aggregate_statistics(nora):
     utils.aggregate_statistics(nora["HS"], ["mean", "p90", "max"])
 
 
+def test_aggregate_statistics_keeps_input_labels_and_sorts_output():
+    s = pd.Series(np.arange(1, 101, dtype=float))
+    stats = ["Count", "Min", "P5", "P25", "P50", "Mean", "P75", "P90", "P99", "Maximum"]
+    result = utils.aggregate_statistics(s, stats)
+    assert list(result.keys()) == stats
+
+
+def test_aggregate_statistics_aliases_and_equivalent_percentiles():
+    s = pd.Series(np.arange(1, 101, dtype=float))
+    result = utils.aggregate_statistics(
+        s, ["minimum", "MIN", "MAXIMUM", "max", "P90", "90%", "p090"]
+    )
+    assert result["minimum"] == result["MIN"]
+    assert result["MAXIMUM"] == result["max"]
+    assert result["P90"] == result["90%"] == result["p090"]
+
+
+def test_aggregate_statistics_percent_of_total_requires_total():
+    s = pd.Series(np.arange(10, dtype=float))
+    with pytest.raises(ValueError, match="total"):
+        utils.aggregate_statistics(s, ["%"])
+    result = utils.aggregate_statistics(s, ["%", "density", "count"], total=100)
+    assert result["%"] == result["density"] == 10.0
+
+
+def test_aggregate_statistics_rejects_bare_number_and_unknown_token():
+    s = pd.Series(np.arange(10, dtype=float))
+    with pytest.raises(ValueError):
+        utils.aggregate_statistics(s, ["90"])
+    with pytest.raises(ValueError):
+        utils.aggregate_statistics(s, ["bogus"])
+
+
 def test_table_to_latex(tmp_path):
     df = pd.DataFrame({"a": [1.0, 2.0]})
     utils.table_to_latex(df, str(tmp_path / "table.tex"), float_format=".2f")
