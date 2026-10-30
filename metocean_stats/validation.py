@@ -318,7 +318,6 @@ class TimeSeriesValidation:
             else:
                 self._data[key].index = df.index.astype("datetime64[ns]")
 
-
     def summary(self) -> None:
         """
         Print a diagnostic summary for each source dataset.
@@ -330,8 +329,8 @@ class TimeSeriesValidation:
         - Number of columns
         - Percentage of valid (non-NaN) values per column
         """
-        SEP   = "─" * 60
-        SEP_S = "─" * 40
+        SEP   = "-" * 60
+        SEP_S = "-" * 40
 
         # Alignment status
         if self.aligned is not None:
@@ -344,7 +343,7 @@ class TimeSeriesValidation:
             align_info = "  Aligned  : no  (call .align() before time-based methods)"
 
         print(SEP)
-        print("TimeSeriesValidation — source summary")
+        print("TimeSeriesValidation -- source summary")
         print(align_info)
         print(SEP)
 
@@ -362,7 +361,7 @@ class TimeSeriesValidation:
 
                 # Flag irregular sampling
                 unique_steps = steps.nunique()
-                regular_flag = "" if unique_steps == 1 else "  ⚠ irregular sampling"
+                regular_flag = "" if unique_steps == 1 else "  [!] irregular sampling"
             else:
                 mean_step    = median_step = pd.NaT
                 regular_flag = ""
@@ -383,13 +382,12 @@ class TimeSeriesValidation:
             for col in df.columns:
                 n_valid   = df[col].notna().sum()
                 pct_valid = 100 * n_valid / n if n > 0 else 0.0
-                flag      = "  ⚠" if pct_valid < 90 else ""
+                flag      = "  [!]" if pct_valid < 90 else ""
                 print(f"  {col:<20}  {n_valid:>8,}  {pct_valid:>7.1f}%{flag}")
 
             print(SEP)
 
         print()
-
     # ---------------------------------------------------------------------- #
     # Alignment                                                                #
     # ---------------------------------------------------------------------- #
