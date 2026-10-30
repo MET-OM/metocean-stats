@@ -4,3 +4,7 @@ build/
 .vscode/
 *.eggs
 *__pycache__*
+*.ipynb
+docs/api/
+.conda/
+docs/_build/

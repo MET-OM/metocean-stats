@@ -157,11 +157,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         ----------
         data : pandas dataframe.
             The data, shape (n_samples, n_columns), with a datetime-compatible index.
-        var0 : int or str, default 0 (first column)
+        var1 : int or str, default 0 (first column)
             The data column used to fit the marginal distribution.
-        var1 : int or str, default 1 (second column)
+        var2 : int or str, default 1 (second column)
             The data column used to fit the conditional distribution.
-        var2 : int or str, default 2 (third column)
+        var3 : int or str, default 2 (third column)
             The data column used to fit the second conditional distribution.
         """
 
@@ -190,7 +190,19 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
     def plot_marginal_quantiles(self,axes:list=None,sample=None):
         """
-        Plot the theoretical (distribution) vs empirical (sample) quantiles.
+        Plot theoretical (distribution) quantiles against empirical (sample) quantiles, one panel per variable.
+
+        Parameters
+        ----------
+        axes : list of matplotlib.axes.Axes, optional
+            Two axes to draw on. Created if None.
+        sample : array-like or pd.DataFrame, optional
+            Sample to compare with. Defaults to the fitted data.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or array of Axes
+            As returned by ``virocon.plot_marginal_quantiles``.
         """
         if sample is None: sample = self.data.values
         elif isinstance(sample,pd.DataFrame):
@@ -202,17 +214,39 @@ class JointProbabilityModel(GlobalHierarchicalModel):
     def plot_dependence_functions(self,axes=None):
         """
         Plot the dependence functions of the conditional parameters.
+
+        Parameters
+        ----------
+        axes : list of matplotlib.axes.Axes, optional
+            Axes to draw on. Created if None.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or array of Axes
+            As returned by ``virocon.plot_dependence_functions``.
         """
         if axes is not None:
             axes = np.array(axes).ravel()
         return virocon.plot_dependence_functions(self,self.semantics,axes=axes)
 
-    def plot_histograms_of_interval_distributions(self,plot_pdf=True,max_cols=4):
+    def plot_histograms_of_interval_distributions(self,plot_pdf=True,ncols=3):
         """
         Plot histograms for the estimated distribution in each data interval.
+
+        Parameters
+        ----------
+        plot_pdf : bool, default True
+            Overlay the fitted probability density.
+        ncols : int, default 3
+            Maximum number of subplot columns.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or array of Axes
+            As returned by ``virocon.plot_histograms_of_interval_distributions``.
         """        
         return virocon.plot_histograms_of_interval_distributions(self,
-            self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=max_cols)
+            self.data.values,self.semantics,plot_pdf=plot_pdf,max_cols=ncols)
 
     def plot_isodensity_contours(
             self,
@@ -234,9 +268,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         -----------
         ax : matplotlib axes, optional
             Plot on existing axes object.
-        levels : list[float]
-            List of probabilities to plot. Either this or return_values
-            can be specified.
+        levels : list[float], optional
+            Probability density levels to plot. Cannot be combined with ``points``.
         points : np.ndarray
             A list of marginal return values, of e.g. Hs,
             from which to draw the isodensity contours.
@@ -255,6 +288,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         contour_kwargs : dict, optional
             Any other keyword arguments for matplotlib.pyplot.contour().
             Example: {"linewidths": [1,2,3], "linestyles": ["solid","dotted","dashed"]}.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
 
         if ax is None:
@@ -359,7 +396,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         state_duration : float
             The average duration (hours) of each sample 
             in the data used to fit the model.
-        contour_method : str
+        method : str, default "IFORM"
             The method of calculating a contour. One of:
 
              - "IFORM", the inverse first-order method
@@ -376,6 +413,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         kwargs : keyword arguments
             Any matplotlib plot keyword arguments, e.g.
             "color"="blue","linewidth"=[2,3,4],"label":["1 year","10 year","100 year"]}.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
 
         periods = np.array(periods)
@@ -388,7 +429,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             labels = [f"{i}-year" for i in periods]
         else:
             if isinstance(labels,str):
-                labels = []
+                labels = [labels]
             if len(labels) != periods.size:
                 raise ValueError("Number of labels does not match number of return periods.")
         if "c" not in kwargs and "color" not in kwargs:
@@ -460,6 +501,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             Existing axes object, otherwise a new will be created.
         **kwargs : keyword arguments
             Any other keyword arguments will be passed directly to seaborn's heatmap.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         return plot_2D_pdf_heatmap(
             self,
@@ -497,6 +542,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             Percentile (0 to 1).
         dim : int
             The dimension from which you want to get values.
+
+        Returns
+        -------
+        np.ndarray
+            The requested percentile of the dependent dimension, one value per given value.
         """
         # Check percentile
         percentile = np.squeeze(percentile)
@@ -543,8 +593,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             List of percentiles.
         labels : list of string
             Names, for the legend.
-        limit : float, default 2x data
+        limit : float, default 1.1 times the largest marginal value
             Limit in the marginal variable (e.g. Hs) for which to plot percentiles (of e.g. Tp/Tz).
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         percentiles = np.array(percentiles)
         # Set default style.
@@ -601,10 +655,18 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         
         Parameters
         ----------
-        period_type : str, default peak
-            Type of wave period: peak or mean.
+        use_peak_wave_period : bool, default True
+            True to use the peak wave period (Tp), False to use the zero-crossing period (Tz).
         ax : matplotlib axes
             Axes to plot on. Will create new if not included.
+        ylim : float, optional
+            Draw the line up to this Hs value. Defaults to 1.5x the data's
+            own maximum Hs if neither `ylim` nor `xlim` is given.
+        xlim : float, optional
+            Draw the line up to this period value instead of `ylim`.
+            Ignored if `ylim` is given.
+        label : str, optional
+            Legend label for the line. Pass None to omit it from the legend.
         **kwargs : keyword arguments
             These will be passed to matplotlib.plot().
 
@@ -614,26 +676,21 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         if ax is None:
             _,ax = plt.subplots()
-        if ylim is None:
-            ylim = np.max(self.data.values[:,0])*1.5
-        # Get h and t.
-        wave_period_type = 'tp' if use_peak_wave_period else 'tz'
         if xlim is None and ylim is None:
-            xlim,ylim = 40,20
-        if ylim is not None:
-            h = np.linspace(0,ylim,10000)
-            t = get_DNVGL_steepness(h,"hs",wave_period_type)
-        elif xlim is not None:
-            t = np.linspace(0,xlim,10000)
-            h = get_DNVGL_steepness(t,wave_period_type,"hs")
+            # By default (neither limit given), use the data's own Hs range
+            # rather than the shared helper's fixed 40/20 fallback.
+            ylim = np.max(self.data.values[:,0])*1.5
 
-        # These are defaults, to be overwritten by **kwargs.
-        plot_params = {**{'linestyle':'--','color':'black',},**kwargs}
-        handle = ax.plot(t,h,**plot_params)
+        # Delegate the actual drawing to the shared helper so the line is
+        # only drawn once; just grab the resulting artist for the legend.
+        old_lines = list(ax.lines)
+        plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
+        new_lines = [l for l in ax.lines if l not in old_lines]
+
         if label is not None:
             self.legend_labels.append(label)
-            self.legend_handles += handle
-        return plot_DNVGL_steepness(ax=ax,peak_period_line=use_peak_wave_period,xlim=xlim,ylim=ylim,**kwargs)
+            self.legend_handles += new_lines
+        return ax
     
     def plot_data_scatter(
             self,
@@ -656,6 +713,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             no label is used.
         **kwargs : keyword arguments
             These will be passed to the scatter plot function.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         if ax is None:
             _,ax = plt.subplots()
@@ -670,7 +731,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if data.ndim > 2:
             raise ValueError("Data should have exactly two dimensions: samples x variables.")
         if data.shape[1] != 2:
-            raise NotImplementedError("Only 2-dimensional data is supported.")
+            raise ValueError(
+                f"data must have shape (n_samples, 2) -- one column per variable -- "
+                f"or be a flat 2-element (x, y) point, got shape {data.shape}."
+            )
         
         kwargs.setdefault("s",2)
 
@@ -717,6 +781,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             If True, becomes a density plot (sum 1). If false, a histogram.
         **kwargs : keyword arguments
             These will be passed to the hist2d plot function.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
         if ax is None:
             _,ax = plt.subplots()
@@ -732,7 +800,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         if data.ndim > 2:
             raise ValueError("Data should have exactly two dimensions: samples x variables.")
         if data.shape[1] != 2:
-            raise NotImplementedError("Only 2-dimensional data is supported.")
+            raise ValueError(
+                f"data must have shape (n_samples, 2) -- one column per variable -- "
+                f"or be a flat 2-element (x, y) point, got shape {data.shape}."
+            )
 
         x,y = (1,0) if self.swap_axis else (0,1)
         
@@ -796,11 +867,14 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - "DirectSampling", monte carlo sampling
              - "ConstantAndExceedance"
              - "ConstantOrExceedance"
-        labels : list of str, optional
-            A name for each contour.
+        label : str, optional
+            Legend label for the contour.
         kwargs : keyword arguments
-            Keyword arguments will go to either ax.plot_surface or ax.scatter.
-            depending on the setting of surface_plot parameter.
+            Passed to ``ax.scatter``.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
 
         if ax is None:
@@ -888,6 +962,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         **kwargs : keyword arguments
             Keyword arguments will be passed to matplotlib.
 
+        Returns
+        -------
+        matplotlib.axes.Axes or array of Axes
+            The axes that were drawn on.
+
         Notes
         ------
         Algorithm:
@@ -938,10 +1017,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # Which dimension's semantics that should be plotted on which axis (x,y,z)
         if slice_dim == 0:
             axis_labels = (2,1) if self.swap_axis else (1,2)
-        if slice_dim == 1:
+        elif slice_dim == 1:
             axis_labels = (0,2)
-        if slice_dim == 2:
+        elif slice_dim == 2:
             axis_labels = (0,1)
+        else:
+            raise ValueError(f"slice_dim must be 0, 1, or 2, got {slice_dim!r}.")
 
         contour = get_contour(self,return_period=return_period,state_duration=state_duration,
                               method=method,point_distribution="random",n_samples=n_samples)
@@ -1017,7 +1098,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         slice_value : float
             Variable value to cut at.
         grid_steps : int
-            How precicely the model pdf is sampled in each dimension.
+            How precisely the model pdf is sampled in each dimension.
         limits : list of 2 tuples of 2 floats, optional
             Two tuples defining upper and lower limits of pdf sampling,
             for the two remaining dimensions.
@@ -1028,10 +1109,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
              - "drop" drops these contours from the legend, default.
              - "ignore" to keep in legend
              - "raise" to raise error, good if this is unexpected.
-        label : str
-            A label.
         **kwargs : keyword arguments
             Keyword arguments will be passed to matplotlib's ax.contour().
+
+        Returns
+        -------
+        matplotlib.axes.Axes
         """
 
         if np.array(limits).size == 1:
@@ -1079,6 +1162,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         # Check density levels
         if density_levels is None:
             density_levels = np.power(10.,np.arange(-30,0,5))
+            level_sort = np.arange(len(density_levels))
         else:
             density_levels = np.array(density_levels)
             if density_levels.ndim == 0:
@@ -1119,10 +1203,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 X,Y = Y,X
             else:
                 axis_labels = (1,2)
-        if slice_dim == 1:
+        elif slice_dim == 1:
             axis_labels = (0,2)
-        if slice_dim == 2:
+        elif slice_dim == 2:
             axis_labels = (0,1)
+        else:
+            raise ValueError(f"slice_dim must be 0, 1, or 2, got {slice_dim!r}.")
 
         # Check if requested density levels exist on sampled pdf and act accordingly
         valid_density = (density_levels>=Z.min()) & (density_levels<=Z.max())
@@ -1146,8 +1232,12 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         self.legend_labels += list(labels)
 
         # The contour doesn't set correct limits, these must be manually provided.
-        if CS.allsegs:
-            contour = np.concatenate([np.array(line) for seg in CS.allsegs for line in seg],axis=0)
+        # A requested level that lies exactly at a single grid point (e.g. the
+        # peak of the sampled pdf) can produce a "found" but empty segment, so
+        # check the actual point count too, not just whether allsegs is non-empty.
+        segments = [np.array(line) for seg in CS.allsegs for line in seg if len(line)]
+        if segments:
+            contour = np.concatenate(segments,axis=0)
             ax.dataLim.bounds = (*contour.min(axis=0), *contour.max(axis=0))
             self._reset_axlim(ax)
         else:
@@ -1233,7 +1323,11 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         Y = np.zeros(shape=(len(contours),contour_points))
         Z = np.zeros(shape=(len(contours),contour_points))
         for i,c in enumerate(contours):
-            if c.allsegs: 
+            # A requested level lying exactly on a single grid point (e.g. the
+            # peak of the sampled pdf) can produce a "found" but empty segment,
+            # so check the actual point count too, not just allsegs itself.
+            has_points = bool(c.allsegs) and bool(c.allsegs[0]) and len(c.allsegs[0][0]) > 0
+            if has_points:
                 x,y = c.allsegs[0][0].T
                 xi = np.linspace(0,len(x),contour_points)
                 xp = np.arange(len(x))
@@ -1243,9 +1337,9 @@ class JointProbabilityModel(GlobalHierarchicalModel):
                 Y[i] = np.interp(yi,yp,y)
                 Z[i] = np.ones(contour_points)*slice_values[i]
             else:
-                X[i] = None
-                Y[i] = None
-                Z[i] = None
+                X[i] = np.nan
+                Y[i] = np.nan
+                Z[i] = np.nan
 
         if ax is None:
             _,ax = plt.subplots(subplot_kw={"projection":"3d"})
@@ -1385,8 +1479,8 @@ class JointProbabilityModel(GlobalHierarchicalModel):
 
         if range_values is None:
             range_from = np.ceil(coords[range_dim].min()/range_interval)*range_interval
-            range_to = np.ceil(coords[range_dim].max()/range_interval)*range_interval
-            range_values = np.arange(range_from,range_to,range_interval)
+            range_to = np.floor(coords[range_dim].max()/range_interval)*range_interval
+            range_values = np.arange(range_from,range_to+range_interval,range_interval)
         else:
             range_values = np.atleast_1d(range_values)
 
@@ -1473,7 +1567,10 @@ class JointProbabilityModel(GlobalHierarchicalModel):
             column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=low"]
             column_names += ["Contour: "+label + f", {self.semantics['symbols'][slice_dim]}=high"]
 
-        plt.close()
+        # Close the throwaway figure this method created (not just "whichever
+        # figure happens to be current"), so it never closes a figure the
+        # caller owns.
+        plt.close(ax.get_figure())
 
         # Reduce to 2 dimensions
         if self.n_dim == 3:
@@ -1636,7 +1733,7 @@ class JointProbabilityModel(GlobalHierarchicalModel):
         """
         Printout of the model.
         """
-        return self.parameters(complete=True)
+        return str(self.parameters(complete=True))
 
     def _reset_axlim(self,ax):
         """

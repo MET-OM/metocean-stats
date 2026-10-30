@@ -13,6 +13,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
@@ -28,7 +29,43 @@ release = 'latest'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['crate.sphinx.csv']
+extensions = [
+    'crate.sphinx.csv',
+    'sphinx.ext.napoleon',
+    'autoapi.extension',
+    'sphinx.ext.intersphinx',
+]
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable', None),
+    'pandas': ('https://pandas.pydata.org/docs', None),
+    'matplotlib': ('https://matplotlib.org/stable', None),
+}
+
+# -- Napoleon (parses the NumPy-style docstrings used across the codebase) --
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+napoleon_use_param = True
+napoleon_use_rtype = False
+
+# -- AutoAPI (generates API reference pages straight from docstrings/signatures
+# at build time -- nothing here is hand-written or needs manual updating when
+# the code changes). Parses source statically rather than importing it, so it
+# doesn't need metocean-stats or its (heavy) runtime dependencies installed to
+# build docs -- important since readthedocs only installs docs/requirements.txt.
+autoapi_type = 'python'
+autoapi_dirs = ['../metocean_stats']
+autoapi_root = 'api'
+autoapi_add_toctree_entry = False
+autoapi_options = [
+    'members',
+    'undoc-members',
+    'show-inheritance',
+    'show-module-summary',
+]
+autoapi_member_order = 'groupwise'
+autoapi_keep_files = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

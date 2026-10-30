@@ -28,7 +28,7 @@ def plot_return_levels(data, var, rl, output_file):
     
     method = rl.attrs['method']
 
-    color = plt.cm.rainbow(np.linspace(0, 1, len(rl)))
+    color = plt.get_cmap('rainbow')(np.linspace(0, 1, len(rl)))
     fig, ax = plt.subplots(figsize=(12,6))
     data[var].plot(color='lightgrey')
     for i in range(len(rl.index)):
@@ -731,7 +731,7 @@ def plot_multi_joint_distribution_Hs_Tp_var3(data,var_hs='hs',var_tp='tp',var3='
     fig, ax = plt.subplots(figsize=(8,6))
     #custom_cycler = cycler(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
     #ax.set_prop_cycle(custom_cycler)
-    cmap = plt.cm.Blues
+    cmap = plt.get_cmap('Blues')
     ii = np.linspace(0.2,1,len(window)-1)
 
     for i in range(len(window)-1):
@@ -797,7 +797,9 @@ def plot_joint_distribution_Hs_Tp(
         return ax
 
     a1, a2, a3, b1, b2, b3, pdf_Hs, h, t3,h3,X,hs_tpl_tph = stats.joint_distribution_Hs_Tp(data=data,var_hs=var_hs,var_tp=var_tp,periods=periods)
-    df = data
+    df = data.copy()
+    df.loc[:,'hs'] = df[var_hs].values
+    df.loc[:,'tp'] = aux_funcs.Tp_correction(df[var_tp].values)
     # calculate pdf Hs, Tp 
     t = np.linspace(start=0.01, stop=40, num=2000)
     
@@ -815,16 +817,16 @@ def plot_joint_distribution_Hs_Tp(
     
     interval = ((df.index[-1]-df.index[0]).days + 1)*24/df.shape[0] # in hours 
     t_steepness, h_steepness = aux_funcs.DNV_steepness(df,h,t,periods,interval)
-    percentile05 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,5,periods,interval)
-    percentile50 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,50,periods,interval)
-    percentile95 = aux_funcs.find_percentile(df.hs.values,pdf_Hs_Tp,h,t,95,periods,interval)
+    percentile05 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,5,periods,interval)
+    percentile50 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,50,periods,interval)
+    percentile95 = aux_funcs.find_percentile(df[var_hs].values,pdf_Hs_Tp,h,t,95,periods,interval)
     
     fig, ax = plt.subplots(figsize=(8,6))
     df = df[df['hs'] >= 0.1]
     if density_plot is False: 
-        plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+        plt.scatter(df.tp.values,df[var_hs].values,c='red',label='data',s=3)
     else:
-        #plt.scatter(df.tp.values,df.hs.values,c='red',label='data',s=3)
+        #plt.scatter(df.tp.values,df[var_hs].values,c='red',label='data',s=3)
         plt.hist2d(df['tp'].values, df['hs'].values,bins=50, cmap='hot',cmin=1)
         plt.colorbar()
 
@@ -1142,7 +1144,7 @@ def plot_current_for_given_wind(data: pd.DataFrame, var_curr: str, var_wind: str
 
 
 def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max_hs=20,output_file='curr_for_given_hs.png'):
-    df = tables.table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df = tables.table_current_for_given_hs(data=data, var_curr=var_curr, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=None)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_curr], bins=50, cmap='hot', cmin=1)
@@ -1160,13 +1162,14 @@ def plot_current_for_given_hs(data: pd.DataFrame, var_curr: str, var_hs: str,max
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    if output_file != "": plt.savefig(output_file)
+    if output_file: 
+        plt.savefig(output_file)
 
     return fig
 
 
 def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: str,max_hs=20,output_file='surge_for_given_hs.png'):
-    df, df_coeff = tables.table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=False)
+    df, df_coeff = tables.table_storm_surge_for_given_hs(data=data, var_surge=var_surge, var_hs=var_hs, bin_width=2,max_hs=max_hs, output_file=None)
     # Plot the 2D histogram
     fig, ax = plt.subplots()
     plt.hist2d(data[var_hs],data[var_surge], bins=50, cmap='hot', cmin=1)
@@ -1184,7 +1187,9 @@ def plot_storm_surge_for_given_hs(data: pd.DataFrame, var_surge: str, var_hs: st
     plt.grid()
     plt.legend(loc='lower right')
     plt.tight_layout()
-    if output_file != "": plt.savefig(output_file)
+    
+    if output_file: 
+        plt.savefig(output_file)
 
     return fig
 
