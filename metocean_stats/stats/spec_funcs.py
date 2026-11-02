@@ -707,12 +707,12 @@ def compute_mean_wave_direction(data, var='SPEC', mean_pdir=False):
 
     if mean_pdir:
         peak_directions_rad = np.deg2rad(450 - (spectrum.integrate('freq').idxmax(dim='direction')) % 360)      # Computes mean peak direction
-        a = xr.ufuncs.cos(peak_directions_rad) 
-        b = xr.ufuncs.sin(peak_directions_rad)
+        a = np.cos(peak_directions_rad) 
+        b = np.sin(peak_directions_rad)
 
     else:
-        a = (xr.ufuncs.cos(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])            # Compute weighted sums a and b over freq and direction dimensions
-        b = (xr.ufuncs.sin(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])
+        a = (np.cos(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])            # Compute weighted sums a and b over freq and direction dimensions
+        b = (np.sin(directions_rad) * spectrum * area_element).sum(dim=['freq', 'direction'])
 
     mean_dir_rad = np.arctan2(b, a)
 

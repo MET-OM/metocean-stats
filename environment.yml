@@ -4,21 +4,28 @@ channels:
 dependencies:
   - python>=3.10
   - pip
-  - python-build     
-  - wheel            
-  - xarray
-  - matplotlib>=3.1
-  - numpy>=2.0
-  - pandas>=2.2.1
-  - scipy
+  - python-build
+  - wheel
+  - setuptools>=80
+  - setuptools_scm>=8
   - pytest
-  - windrose
+  - numpy>=2.0
+  - xarray
+  - matplotlib>=3.5
+  - pandas
+  - scipy
+  - wavespectra
   - seaborn>=0.12.2
-  - pyextremes
+  - cmocean
+  - pyextremes>=2.4
   - cartopy
-  - python-docx
   - netcdf4
   - pydap
-  - setuptools
-  - metpy
-  - virocon
+  - virocon>=2.4
+  - tqdm
+  - lmoments3
+  - windrose
+  - requests
+  - python-docx
+  # for the optional "notebook" extra in pyproject.toml
+  - notebook

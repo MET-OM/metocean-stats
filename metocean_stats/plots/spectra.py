@@ -3,7 +3,6 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcol
-import matplotlib.cm as cm
 import matplotlib.ticker as mticker
 import matplotlib.patches as patches
 import re
@@ -190,7 +189,7 @@ def plot_spectrum_2d(data,var='SPEC', period=None, month = None, method='mean', 
     data_aggregated = spec_funcs.aggregate_spectrum(data=filtered_data, hm0=filtered_data['hm0'], method=method, month=month)
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection="polar"))
-    cmap = plt.cm.hot_r
+    cmap = plt.get_cmap('hot_r')
 
     frequencies=spec.coords['freq']
 
@@ -382,8 +381,8 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     
     # Compute u/v wind components if wind_direction is available
     if 'wind_direction' in filtered_data:
-        filtered_data['u'] =  filtered_data['wind_speed'] * xr.ufuncs.sin(np.deg2rad((450 - filtered_data['wind_direction'])%360))
-        filtered_data['v'] =  filtered_data['wind_speed'] * xr.ufuncs.cos(np.deg2rad((450 - filtered_data['wind_direction'])%360))
+        filtered_data['u'] =  filtered_data['wind_speed'] * np.sin(np.deg2rad((450 - filtered_data['wind_direction'])%360))
+        filtered_data['v'] =  filtered_data['wind_speed'] * np.cos(np.deg2rad((450 - filtered_data['wind_direction'])%360))
 
     # Normalize and wrap directional spectral data to 0-360°.
     spec, dirc = spec_funcs.wrap_directional_spectrum(filtered_data, var=var)                
@@ -402,7 +401,7 @@ def plot_diana_spectrum(data, var='SPEC', period=None, month = None, method='mea
     ax_2D_spectra = fig_main.add_axes([0.25, 0.25, 0.6, 0.6], projection='polar')        # [left, bottom, width, height]
     
     # Style preferences — change these to update all colors in the figure consistently
-    cmap = cm.ocean_r                                                                    
+    cmap = plt.get_cmap('ocean_r')                                                                    
     color="#0463d7ff"                                                                 
     alpha = 0.22
     textcolor = 'black'
@@ -727,7 +726,7 @@ def plot_partition_peak_dir_freq_2d(data, period = None, month=None, hm0_thresho
     '''
 
     # Style preferences — change these to update all colors in the figure consistently
-    cmap = cm.ocean_r                                                              
+    cmap = plt.get_cmap('ocean_r')                                                              
     color="#0463d7ff"                                                                 
     alpha = 0.22
 
@@ -905,7 +904,7 @@ def plot_spectra_2d(data,var='SPEC', period=None, method='monthly_mean', plot_ty
     # Normalize and wrap directional spectral data to 0-360°.
     spec, dirc = spec_funcs.wrap_directional_spectrum(data, var=var)
     
-    cmap = plt.cm.hot_r 
+    cmap = plt.get_cmap('hot_r') 
     
     if method == 'monthly_mean':
         max_spec = np.round(spec.groupby('time.month').mean(dim='time').max().item(),1) 
@@ -926,7 +925,7 @@ def plot_spectra_2d(data,var='SPEC', period=None, method='monthly_mean', plot_ty
                     rad_data=frequencies.values
 
                 if plot_type == 'contour':
-                    cmap = cm.hot_r(np.linspace(0,1,10))
+                    cmap = plt.get_cmap('hot_r')(np.linspace(0,1,10))
                     cmap = mcol.ListedColormap(cmap)
                     cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, data_spec.values, cmap=cmap, vmin=0, vmax=max_spec if cbar=='single' else None)
                 elif plot_type == 'pcolormesh':
@@ -988,7 +987,7 @@ def plot_spectra_2d(data,var='SPEC', period=None, method='monthly_mean', plot_ty
                         rad_data=frequencies.values
                     
                     if plot_type == 'contour':
-                        cmap = cm.hot_r(np.linspace(0,1,10))
+                        cmap = plt.get_cmap('hot_r')(np.linspace(0,1,10))
                         cmap = mcol.ListedColormap(cmap)
                         cp=axs[r,c].contourf(np.radians(dirc.values), rad_data, dir_mean_spec_1[i1,:,:], cmap=cmap, vmin=0, vmax=max_spec if cbar=='single' else None)
                     elif plot_type == 'pcolormesh':

@@ -1,4 +1,5 @@
 import virocon
+import warnings
 import numpy as np
 from scipy.signal import find_peaks
 
@@ -146,9 +147,6 @@ class LoNoWeDistribution(Distribution):
         self.lognormal._fit_mle(sample)
         self._fit_shifting_point(sample)
 
-    def _fit_lsq(self, data, weights):
-        raise NotImplementedError()
-    
     def _fit_shifting_point(self,sample):
 
         data = np.sort(np.squeeze(sample))
@@ -160,7 +158,7 @@ class LoNoWeDistribution(Distribution):
 
         peaks, _ = find_peaks(-d_pdf)
         if not peaks.size: 
-            print('Warning: No optimal shifting point found.')
+            warnings.warn("No optimal shifting point found.", UserWarning, stacklevel=2)
             peaks = [np.argmin(d_pdf)]
 
         self.shifting_point = np.squeeze(data[peaks[-1]])

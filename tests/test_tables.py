@@ -267,7 +267,7 @@ def test_table_current_for_rv_wind(ds=ds):
 def test_table_current_for_rv_hs(ds=ds):
     output_file = 'test_table_current_for_given_hs.csv'
     ds['current_speed_0m'] = 0.05*ds['W10']
-    df = tables.table_current_for_rv_hs(ds, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file=output_file)
+    df = tables.table_current_for_rv_hs(ds, var_curr='current_speed_0m', var_hs='HS',periods=[1,10,100,10000],output_file=None)
     if os.path.exists(output_file):
         os.remove(output_file)
     if df.shape == (4, 6):
@@ -301,7 +301,7 @@ def test_table_current_for_given_wind(ds=ds):
 def test_table_current_for_given_hs(ds=ds):
     output_file = 'test_table_current_for_given_Hs.csv'
     ds['current_speed_0m'] = 0.05*ds['W10']
-    df = tables.table_current_for_given_hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file=output_file)
+    df = tables.table_current_for_given_hs(ds, var_curr='current_speed_0m', var_hs='HS', bin_width=2, max_hs=20, output_file=None)
 
     if os.path.exists(output_file):
         os.remove(output_file)
@@ -415,10 +415,7 @@ def test_table_nb_hours_below_threshold(ds=ds):
         raise ValueError("Shape is not correct")
 
 def test_table_monthly_weather_window(ds=ds):
-    output_file = 'table_ww_threshold.csv'
-    df = tables.table_monthly_weather_window(ds,var=['HS','TP'],threshold=[2,8],window_size=24,timestep=3,output_file=output_file)
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    df = tables.table_monthly_weather_window(ds,var=['HS','TP'],threshold=[2,8],window_size=24,timestep=3)
     if df.shape == (6, 12):
         pass
     else:

@@ -1,0 +1,1295 @@
+"""
+Univariate extreme value analysis with pyextremes.
+
+`UnivariateEVA` groups a single variable by calendar month and, if a
+direction variable is given, by directional sector. For each group it
+extracts block maxima (AM) and peaks over threshold (POT) extremes, fits
+the requested distributions (including the initial distribution method,
+IDM), and derives return values and confidence intervals.
+"""
+
+import copy
+import logging
+import warnings
+import typing
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import matplotlib.colors as mcolors
+import pyextremes as pyex
+
+from tqdm import tqdm
+
+from ..utils import groupby_with_metadata, get_n_axes, resolve_axes_grid
+
+# pyextremes logs an INFO message on every EVA(...) call ("successfully
+# initialized EVA object"); silence it since we create many per fit.
+logging.getLogger("pyextremes").setLevel(logging.WARNING)
+
+def _dist_name_map(dist,abbreviate=True):
+    """
+    Return the abbreviation of a scipy distribution name.
+
+    With ``abbreviate=False``, map an abbreviation back to its scipy name.
+    Unknown names are returned unchanged.
+    """
+    mapping = {
+        "expon": "EXP",         # Exponential
+        "genextreme": "GEV",    # Generalised Extreme Value
+        "genpareto": "GP",      # Generalised Pareto
+        "gumbel_r": "GUM",      # Gumbel
+        "weibull_min": "WEI",   # Weibull
+        "exponweib": "EW",      # Exponentiated Weibull
+        "lognorm": "LOGN"       # Log-Normal
+    }
+
+    if abbreviate: return mapping.get(dist,dist)
+    reverse_mapping = {v:k for k,v in mapping.items()}
+    return reverse_mapping.get(dist,dist)
+
+def _dist_param_map(dist,params):
+    """Mapping from pyextremes distribution parameter names to proper names."""
+    default = {"c":"Shape","loc":"Location","scale":"Scale"}
+    return [default.get(p,p) for p in params]
+
+def _dist_fit_method(dist,extreme_method):
+    """
+    Return the pyextremes fitting method for a distribution and extremes
+    method (``MLE``, ``MOM``, or ``Lmoments``).
+    """
+    if dist == "exponweib": return "MLE"
+    if extreme_method == "IDM": return "MOM"
+    if extreme_method == "POT" and dist =="weibull_min": return "Lmoments"
+    if extreme_method == "POT" and dist == "expon": return "Lmoments"
+    return "MLE"
+
+class UnivariateEVA:
+    """
+    Extreme value analysis of a single variable.
+
+    Typical workflow: `get_extremes`, then `fit`, then the plotting and
+    table methods.
+    """
+
+    #: Full time series of the analysed variable.
+    data_omni:pd.Series
+    #: Monthly subsets of the variable, keyed by month label.
+    data_monthly:dict[str,pd.Series]
+    #: Directional sector subsets, keyed by sector label. Empty if no
+    #: direction variable was given.
+    data_sectors:dict[str,pd.Series]
+    #: Omni models, keyed by ``(method, distribution)``.
+    models_omni:dict[str,dict[tuple[str,str],pyex.EVA]]
+    #: Monthly models, keyed by month label, then ``(method, distribution)``.
+    models_monthly:dict[str,dict[tuple[str,str],pyex.EVA]]
+    #: Sector models, keyed by sector label, then ``(method, distribution)``.
+    models_sectors:dict[str,dict[tuple[str,str],pyex.EVA]]
+    
+    def __init__(self,
+                 data:pd.DataFrame,
+                 var:str,
+                 var_dir:str=None,
+                 var_name:str=None,
+                 var_symbol:str=None,
+                 var_unit:str=None,
+                 sectors:int=12,
+                 dist_name_map:callable=_dist_name_map,
+                 poisson_correction:bool=True,
+                 ):
+        """
+        Group the data into omni, monthly and sector subsets.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            Data indexed by a datetime-compatible index. Must contain
+            `var`, and `var_dir` if given.
+        var : str
+            Column name of the variable to analyse.
+        var_dir : str, optional
+            Column name of a directional variable in degrees (0-360). If
+            None, sector-based analysis is unavailable; omni and monthly
+            analysis are unaffected.
+        var_name : str, optional
+            Name used in axis labels. Defaults to `var`.
+        var_symbol : str, optional
+            Symbol used in axis labels. Defaults to `var`.
+        var_unit : str, optional
+            Unit used in axis labels. Defaults to an empty string.
+        sectors : int, default 12
+            Number of directional sectors. Ignored if `var_dir` is None.
+        dist_name_map : callable, default _dist_name_map
+            Function mapping scipy distribution names to display names.
+            Also called with ``abbreviate=False`` to map names back.
+        poisson_correction : bool, default True
+            Use the Poisson interpretation of return periods (see
+            `_poisson_exceedance_probability`) instead of the naive
+            expected-count definition. Applies to all return value
+            methods and can be overridden per call.
+        """
+
+        # Semantics (fall back to sensible defaults so direct construction
+        # doesn't require boilerplate).
+        self.var = var
+        self.var_dir = var_dir
+        self.var_name = var_name if var_name is not None else var
+        self.var_symbol = var_symbol if var_symbol is not None else var
+        self.var_unit = var_unit if var_unit is not None else ""
+        self.dist_name_map = dist_name_map
+        self.poisson_correction = poisson_correction
+
+        # Direction is optional - sector-based analysis is only
+        # available when a direction column is supplied.
+        self._has_direction = var_dir is not None
+
+        # Sort into sectors
+        cols = [var] + ([var_dir] if self._has_direction else [])
+        data = data[cols].copy()
+        # data.index = pd.to_datetime(data.index)
+        # bins = np.linspace(0, 360, sectors+1,dtype=int)
+        # dir_offset = (bins[1]-bins[0])/2
+        # labels = [f"{(bins[i]-dir_offset)%360:.0f}-{(bins[i+1]-dir_offset)%360:.0f}°" for i in range(sectors)]
+        # data["sector"] = pd.cut((data[var_dir]+dir_offset)%360, bins=bins, labels=labels, right=False)
+
+        # Group the data. observed=True: a month/sector with zero
+        # observations can't fit an EVA model, so it's dropped rather
+        # than kept as an empty group.
+        self.data_omni = data[var]
+        month_meta = groupby_with_metadata(data, by="month", var=var, observed=True)
+        self.data_monthly = dict(zip(month_meta["label"], month_meta["data"]))
+        if self._has_direction:
+            sector_meta = groupby_with_metadata(
+                data, by="direction", var=var, var_dir=var_dir, sectors=sectors,
+                observed=True,
+                )
+            self.data_sectors = dict(zip(sector_meta["label"], sector_meta["data"]))
+        else:
+            self.data_sectors = {}
+
+        # Set keys
+        self.keys_sectors = list(self.data_sectors.keys())
+        self.keys_monthly = list(self.data_monthly.keys())
+
+        # State flags
+        self._got_extremes = False
+        self._fitted_models = False
+
+    def _require_direction(self,method_name:str) -> None:
+        """Raise a clear error if direction was not provided at initialisation."""
+        if not self._has_direction:
+            raise AttributeError(
+                f"{method_name} requires a direction variable (var_dir), "
+                "but none was provided when this UnivariateEVA was created. "
+                "Sector-based analysis is unavailable; 'omni' and 'monthly' "
+                "groupings remain fully available."
+            )
+
+    def _poisson_exceedance_probability(self, return_period, rate, poisson_correction=None):
+        """
+        Exceedance probability of a single candidate event for a return period.
+
+        Parameters
+        ----------
+        return_period : array-like
+            Nominal return period(s), in years.
+        rate : float
+            Candidate-event rate, in events per year. This is about 1 per
+            year for AM, and the empirical peak rate for POT and IDM.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+
+        Returns
+        -------
+        numpy.ndarray
+            Probability that a single candidate event exceeds the return value.
+
+        Notes
+        -----
+        Without the correction the probability is
+        ``1 / (return_period * rate)``. This is greater than 1 (invalid)
+        whenever ``return_period * rate < 1``. With the correction it is
+        ``1 - exp(-1 / (return_period * rate))``, which always lies in
+        (0, 1) and approaches the uncorrected value for large
+        ``return_period * rate``.
+        """
+        poisson_correction = self.poisson_correction if poisson_correction is None else poisson_correction
+        rt = np.asarray(return_period, dtype=np.float64) * rate
+        if poisson_correction:
+            return 1 - np.exp(-1 / rt)
+        return 1 / rt
+
+    def _extremes_rate_from_duration(self,duration,return_period_size="365.2425D"):
+        """Candidate-event rate (events per year) implied by an event duration."""
+        duration = pd.to_timedelta(duration)
+        return_period_size = pd.to_timedelta(return_period_size)
+        return return_period_size / duration
+
+    def _get_return_value(self,model,return_period,return_period_size="365.2425D",
+                           duration=None,exposure_fraction=1.0,poisson_correction=None,alpha=None,**kwargs):
+        """
+        Return values of a fitted model for nominal return periods.
+
+        Parameters
+        ----------
+        model : pyextremes.EVA
+            Fitted model (AM, POT or IDM).
+        return_period : float or array-like
+            Nominal return period(s), in years.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year, used with `duration`.
+        duration : str or pandas.Timedelta, optional
+            Event duration used to derive the candidate rate instead of the
+            empirical rate. Only valid for POT-based models (including IDM).
+            If None, the rate is ``len(model.extremes) / self.N_years``.
+        exposure_fraction : float, default 1.0
+            Fraction of the record covered by the model. Only applied when
+            `duration` is given.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        alpha : float, optional
+            Significance level for confidence bounds.
+        **kwargs
+            Passed to ``model.model.get_return_value``, such as ``n_samples``.
+
+        Returns
+        -------
+        tuple
+            ``(value, lower, upper)`` on the data scale. ``lower`` and
+            ``upper`` are None when `alpha` is not given.
+
+        Raises
+        ------
+        ValueError
+            If `duration` is given for an AM model, or `return_period` is
+            not a scalar or 1D array.
+        """
+        if duration is not None and model.extremes_method != "POT":
+            raise ValueError(
+                "duration override is only valid for POT-based models (this "
+                "includes IDM, which is fit via the POT backend); got "
+                f"extremes_method='{model.extremes_method}'. AM return periods "
+                "are governed by block_size, not event duration, so `duration` "
+                "must be left as None for AM models."
+            )
+
+        if duration is not None:
+            extremes_rate = self._extremes_rate_from_duration(duration,return_period_size) * exposure_fraction
+        else:
+            extremes_rate = len(model.extremes) / self.N_years
+
+        return_period = np.asarray(return_period,dtype=np.float64).copy()
+        if return_period.ndim == 0:
+            return_period = return_period[np.newaxis]
+        if return_period.ndim != 1:
+            raise ValueError(
+                f"invalid shape in {return_period.shape} for the 'return_period' "
+                f"argument, must be a scalar or 1D array"
+            )
+
+        exceedance_probability = self._poisson_exceedance_probability(
+            return_period, extremes_rate, poisson_correction
+        )
+
+        return tuple(
+            model.extremes_transformer.transform(value)
+            for value in model.model.get_return_value(
+                exceedance_probability=exceedance_probability,alpha=alpha,**kwargs
+            )
+        )
+
+    def get_extremes(
+            self,
+            th_omni:float=None,
+            th_monthly:list[float]=None,
+            th_sectors:list[float]=None,
+            block_size="365.2425D",
+            min_last_block = 0.9,
+            r = "48h",
+            extremes_type="high",
+            errors="raise",
+            th_percentile=0.98,
+        ):
+        """
+        Extract block maxima (AM) and peaks over threshold (POT) extremes.
+
+        Parameters
+        ----------
+        th_omni : float, optional
+            POT threshold for the omni data. Defaults to the
+            `th_percentile` quantile.
+        th_monthly : dict or list of float, optional
+            POT thresholds for the months present in the data (see
+            `keys_monthly`; a calendar month with no observations at all is
+            dropped at construction, so this may be fewer than 12), as a
+            dict keyed by month label or a list in month order. Defaults to
+            the `th_percentile` quantile of each month.
+        th_sectors : dict or list of float, optional
+            POT thresholds per sector, in the same format as `th_monthly`.
+            Defaults to the `th_percentile` quantile of each sector. Only
+            allowed if a direction variable was given at construction.
+        block_size : str or pandas.Timedelta, default "365.2425D"
+            Block length for AM extremes.
+        min_last_block : float, default 0.9
+            Minimum fraction of a block that must be covered by data for the
+            last block to be kept.
+        r : str or pandas.Timedelta, default "48h"
+            Declustering run length for POT peaks.
+        extremes_type : {"high", "low"}, default "high"
+            Whether to extract maxima or minima.
+        errors : str, default "raise"
+            Passed to pyextremes for the AM extraction.
+        th_percentile : float, default 0.98
+            Quantile used for the default thresholds.
+
+        Raises
+        ------
+        ValueError
+            If the monthly thresholds do not match the number of months
+            present in the data, or the sector thresholds do not match the
+            number of sectors.
+        AttributeError
+            If `th_sectors` is given without a direction variable.
+
+        Notes
+        -----
+        Sector extremes are only computed if a direction variable was given
+        at construction. Otherwise they are skipped.
+        """
+
+        if th_omni is None:
+            th_omni = self.data_omni.quantile(th_percentile)
+        if th_monthly is None:
+            th_monthly = {k:v.quantile(th_percentile)
+                          for k,v in self.data_monthly.items()}
+
+        if not len(th_monthly) == len(self.data_monthly):
+            raise ValueError(
+                f"Expected {len(self.data_monthly)} monthly thresholds "
+                f"(one per month present in the data: {self.keys_monthly}), "
+                f"got {len(th_monthly)}."
+            )
+        if not isinstance(th_monthly,dict):
+            th_monthly = {k:t for k,t in zip(self.keys_monthly,th_monthly)}
+
+        if self._has_direction:
+            if th_sectors is None:
+                th_sectors = {k:v.quantile(th_percentile)
+                              for k,v in self.data_sectors.items()}
+            if not len(th_sectors) == len(self.data_sectors):
+                raise ValueError(f"Expected {len(self.data_sectors)} sector thresholds, got {len(th_sectors)}.")
+            if not isinstance(th_sectors,dict):
+                th_sectors = {k:t for k,t in zip(self.keys_sectors,th_sectors)}
+        elif th_sectors is not None:
+            raise AttributeError(
+                "th_sectors was given, but this UnivariateEVA has no direction "
+                "variable (var_dir), so sector-based extremes are unavailable."
+            )
+        else:
+            th_sectors = {}
+
+        # Omni
+        self.am_omni = pyex.get_extremes(
+            self.data_omni,"BM",extremes_type,
+            errors=errors,
+            block_size=block_size,
+            min_last_block=min_last_block,
+            )
+        self.pot_omni = pyex.get_extremes(
+            self.data_omni,"POT",extremes_type,
+            threshold=th_omni,r=r)
+
+        # Sectors
+        if self._has_direction:
+            self.am_sectors = {k:pyex.get_extremes(
+                self.data_sectors[k],"BM",extremes_type,
+                errors=errors,
+                block_size=block_size,
+                min_last_block=min_last_block*
+                (len(self.data_sectors[k])/len(self.data_omni)))
+                for k in self.keys_sectors}
+            self.pot_sectors = {k:pyex.get_extremes(
+                self.data_sectors[k],"POT",extremes_type,
+                threshold=th_sectors[k],r=r)
+                for k in self.keys_sectors}
+        else:
+            self.am_sectors = {}
+            self.pot_sectors = {}
+
+        # Monthly
+        self.am_monthly = {k:pyex.get_extremes(
+            self.data_monthly[k],"BM",extremes_type,
+            errors=errors,
+            block_size=block_size,
+            min_last_block=min_last_block/12)
+            for k in self.keys_monthly}
+        self.pot_monthly = {k:pyex.get_extremes(
+            self.data_monthly[k],"POT",extremes_type,
+            threshold=th_monthly[k],r=r)
+            for k in self.keys_monthly}
+
+        self.th_omni = th_omni
+        self.th_monthly = th_monthly
+        self.th_sectors = th_sectors
+        self.extremes_type = extremes_type
+        self.min_last_block = min_last_block
+        self.block_size = block_size
+        self.r = r
+        self.N_years = len(self.am_omni)
+        self._got_extremes = True
+
+    def fit(self,
+            AM_dist = [],
+            POT_dist = [],
+            IDM_dist = [],
+            dist_fit_method:callable = _dist_fit_method,
+            errors = "raise",
+            ):
+        """
+        Fit distributions to the AM, POT and IDM extremes of all subsets.
+
+        Parameters
+        ----------
+        AM_dist, POT_dist, IDM_dist : list of str, default []
+            Distributions to fit for each extremes method. Shorthand
+            abbreviations (e.g. "GEV") and scipy names are both accepted.
+        dist_fit_method : callable, default _dist_fit_method
+            Called as ``dist_fit_method(dist, method)``. Returns the
+            pyextremes fitting method.
+        errors : {"raise", "warn"}, default "raise"
+            Applies to omni, monthly and sector fits alike. With "warn", a
+            failed fit is reported as a warning and skipped.
+
+        Raises
+        ------
+        ValueError
+            If `get_extremes` has not been run, or no distributions are given.
+
+        Notes
+        -----
+        Sector models are only fitted if a direction variable was given at
+        construction. `models_sectors` is an empty dict otherwise.
+        """
+
+        if not self._got_extremes:
+            raise ValueError("No extremes to fit on. You must first use .get_extremes().")
+
+        AM_dist = [self.dist_name_map(d,abbreviate=False) for d in AM_dist]
+        POT_dist = [self.dist_name_map(d,abbreviate=False) for d in POT_dist]
+        IDM_dist = [self.dist_name_map(d,abbreviate=False) for d in IDM_dist]
+
+        # # This part is unnecessary if pyextremes can handle IDM
+        # data_interval = self.data_omni.index.diff().mean().total_seconds()/3600
+        # if hours_per_entry is None:
+        #     hours_per_entry = data_interval
+        # elif isinstance(hours_per_entry,str):
+        #     hours_per_entry = pd.to_timedelta(hours_per_entry).total_seconds()/3600
+        # elif abs(hours_per_entry-data_interval) > (1/6):
+        #     warnings.warn(f"Average data time-interval is {data_interval:.2f}h, not {hours_per_entry:.2f}h.")
+        # else:
+        #     hours_per_entry = pd.to_timedelta(hours_per_entry,"h")
+
+        all_dist = [("AM",d) for d in AM_dist]+[("POT",d) for d in POT_dist]+[("IDM",d) for d in IDM_dist]
+        if not len(all_dist): raise ValueError("No distributions to fit.")
+
+        self.models_omni = {}
+        self.models_sectors = {k:{} for k in self.keys_sectors}
+        self.models_monthly = {k:{} for k in self.keys_monthly}
+
+        pbar = tqdm(all_dist)
+        for (method,dist) in pbar:
+            pbar.set_description(f"Fitting {dist} to {method}")
+            # Omni
+            try:
+                model = pyex.EVA(self.data_omni)
+                if method == "AM":
+                    model.set_extremes(self.am_omni,"BM",self.extremes_type,
+                                       block_size=self.block_size,
+                                       min_last_block=self.min_last_block)
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                if method == "POT":
+                    model.set_extremes(self.pot_omni,"POT",self.extremes_type,
+                                       threshold=self.th_omni)
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                if method == "IDM":
+                    model.set_extremes(self.data_omni,"POT",self.extremes_type,
+                                    #    block_size=hours_per_entry
+                                       )
+                    model.fit_model(dist_fit_method(dist,method),dist)
+                self.models_omni[(method,dist)] = model
+            except Exception as e:
+                if errors == "raise":
+                    raise
+                elif errors == "warn":
+                    warnings.warn(f"Failed to fit {dist} ({method}) for omni: {e}")
+
+            # Sectors
+            if self._has_direction:
+                for sector,data in self.data_sectors.items():
+                    try:
+                        model = pyex.EVA(data)
+                        if method == "AM":
+                            model.set_extremes(self.am_sectors[sector],
+                                            "BM",self.extremes_type,
+                                                block_size=self.block_size,
+                                                min_last_block=self.min_last_block)
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        if method == "POT":
+                            model.set_extremes(self.pot_sectors[sector],
+                                            "POT",self.extremes_type,
+                                                threshold=self.th_sectors[sector])
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        if method == "IDM":
+                            model.set_extremes(self.data_sectors[sector],
+                                            "POT",self.extremes_type,
+                                                # block_size=hours_per_entry
+                                                )
+                            model.fit_model(dist_fit_method(dist,method),dist)
+                        self.models_sectors[sector][(method,dist)] = model
+
+                    except Exception as e:
+                        if errors == "raise":
+                            raise
+                        elif errors == "warn":
+                            warnings.warn(f"Failed to fit {dist} ({method}) for sector '{sector}': {e}")
+
+            # Monthly
+            for month,data in self.data_monthly.items():
+                try:
+                    model = pyex.EVA(data)
+                    if method == "AM":
+                        model.set_extremes(self.am_monthly[month],
+                                        "BM",self.extremes_type,
+                                            block_size=self.block_size,
+                                            min_last_block=self.min_last_block)
+                        model.fit_model(dist_fit_method(dist,method),dist)
+                    if method == "POT":
+                        model.set_extremes(self.pot_monthly[month],
+                                        "POT",self.extremes_type,
+                                            threshold=self.th_monthly[month])
+                        model.fit_model(dist_fit_method(dist,method),dist)
+                    if method == "IDM":
+                        model.set_extremes(self.data_monthly[month],
+                                        "POT",self.extremes_type,
+                                            # block_size=hours_per_entry
+                                            )
+                        model.fit_model(dist_fit_method(dist,method),dist)
+                    self.models_monthly[month][(method,dist)] = model
+                except Exception as e:
+                    if errors == "raise":
+                        raise
+                    elif errors == "warn":
+                        warnings.warn(f"Failed to fit {dist} ({method}) for month '{month}': {e}")
+
+        self._fitted_models = True
+
+    def _subplot_return_value_comparison(
+            self,
+            models:dict[tuple[str,str],pyex.EVA],
+            return_periods:list[float],
+            return_period_size:str="365.2425D",
+            duration_POT=None,
+            duration_IDM=None,
+            poisson_correction=None,
+            ax = None,
+            scatter_kwargs_AM  = {},
+            scatter_kwargs_POT = {},
+            scatter_kwargs_IDM = {},
+            plot_kwargs_AM  = {},
+            plot_kwargs_POT = {},
+            plot_kwargs_IDM = {},
+            table_kwargs = {},
+            legend_kwargs = {},
+            ):
+        """
+        Plot empirical extremes and fitted return value curves on one axes.
+
+        Parameters
+        ----------
+        models : dict
+            Fitted models keyed by ``(method, distribution)``.
+        return_periods : list of float
+            Return periods, in years, used for the table.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
+        duration_POT, duration_IDM : str or pandas.Timedelta, optional
+            Event duration overriding the empirical rate for POT and IDM
+            models. Has no effect on AM models.
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        ax : matplotlib.axes.Axes, optional
+            Axes to draw on. A new figure is created if None.
+        scatter_kwargs_AM, scatter_kwargs_POT, scatter_kwargs_IDM : dict, optional
+            Keyword arguments for the empirical points.
+        plot_kwargs_AM, plot_kwargs_POT, plot_kwargs_IDM : dict, optional
+            Keyword arguments for the fitted curves. Accepts ``cmap`` and
+            ``linestyle``.
+        table_kwargs : dict, optional
+            Keyword arguments for the return value table. The key
+            ``include`` (default True) shows or hides the table, and
+            ``rp_index`` (default True) puts return periods on the rows.
+        legend_kwargs : dict, optional
+            Keyword arguments for the legend. The key ``standing`` (default
+            False) places the legend in the upper left corner. Otherwise it
+            goes in the lower right corner.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+        """
+
+        # Input checks
+        return_periods = np.array(return_periods)
+
+        # Customization
+        if ax is None: fig,ax = plt.subplots()
+        scatter_kwargs_AM  = {"marker":"o","color":"black","facecolor":"none","s":30,"rasterized":True} | scatter_kwargs_AM
+        scatter_kwargs_POT = {"marker":"x","color":"black","s":15,"rasterized":True} | scatter_kwargs_POT
+        scatter_kwargs_IDM = {"marker":".","color":"black","s":15,"rasterized":True} | scatter_kwargs_IDM
+        plot_kwargs_AM = {"cmap":"winter","linestyle":"-"}    | plot_kwargs_AM
+        plot_kwargs_POT = {"cmap":"autumn","linestyle":"--"}  | plot_kwargs_POT
+        plot_kwargs_IDM = {"cmap":"copper","linestyle":":"}   | plot_kwargs_IDM
+        table_kwargs = {"include":True,"loc":"top","rp_index":True,"bbox":[0,1,1,0.07*len(return_periods)]} | table_kwargs
+        legend_kwargs = {"standing":False} | legend_kwargs
+
+        # Legend
+        legend = []
+        methods_list = [m[0] for m in models.keys()]
+        N_dist_per_method = [methods_list.count(k) for k in ["AM","POT","IDM"]]
+        if legend_kwargs.pop("standing",False):
+            legend_fill = [0,0,0]
+            legend_kwargs = {"loc":"upper left","ncols":1} | legend_kwargs
+        else:
+            legend_fill = [np.max(N_dist_per_method)-n if n else 0 for n in N_dist_per_method]
+            legend_kwargs = {"loc":"lower right","ncols":np.count_nonzero(N_dist_per_method)} | legend_kwargs
+
+        # Plotting
+        smallest_extreme = np.inf
+        plot_rp = np.power(10.,np.linspace(-1,np.log10(np.max(return_periods))*1.1,100))
+        colors_am = plt.get_cmap(plot_kwargs_AM["cmap"])(np.linspace(0,0.9,N_dist_per_method[0]))
+        colors_pot = plt.get_cmap(plot_kwargs_POT["cmap"])(np.linspace(0,0.9,N_dist_per_method[1]))
+        colors_idm = plt.get_cmap(plot_kwargs_IDM["cmap"])(np.linspace(0,0.9,N_dist_per_method[2]))
+
+        # RVEs
+        models_AM = {k:v for k,v in models.items() if k[0]=="AM"}
+        models_POT = {k:v for k,v in models.items() if k[0]=="POT"}
+        models_IDM = {k:v for k,v in models.items() if k[0]=="IDM"}
+        RVE = {}
+
+        # Iterate AM
+        for i,((method,dist),model) in enumerate(models_AM.items()):
+            if i == 0:
+                N_extremes_AM = len(model.extremes)
+                empirical_extremes = pyex.get_return_periods(
+                    model.data,model.extremes,"BM",
+                    self.extremes_type,self.block_size)
+                ax.scatter(empirical_extremes["return period"],
+                        empirical_extremes[self.var],
+                        **scatter_kwargs_AM)
+                legend.append(f"AM, N={N_extremes_AM}")
+                smallest_extreme = np.minimum(smallest_extreme,model.extremes.min())
+                
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    poisson_correction=poisson_correction)[0]
+            ax.plot(plot_rp,plot_rv,c=colors_am[i],
+                    linestyle=plot_kwargs_AM["linestyle"])
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    poisson_correction=poisson_correction)[0]
+            legend.append(f"{self.dist_name_map(dist)}")
+
+        for i in range(legend_fill[0]):
+            ax.plot(np.nan,np.nan,"-",color="none",label="")
+            legend.append("")
+        
+        # Iterate POT
+        for i,((method,dist),model) in enumerate(models_POT.items()):
+            if i == 0:
+                N_extremes_POT = len(model.extremes)
+                empirical_extremes = pyex.get_return_periods(
+                    model.data,model.extremes,"POT",self.extremes_type)
+                ax.scatter(empirical_extremes["return period"],
+                        empirical_extremes[self.var],
+                        **scatter_kwargs_POT)
+                legend.append(f"POT, N={N_extremes_POT}")
+                smallest_extreme = np.minimum(smallest_extreme,model.extremes.min())
+                
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
+            ax.plot(plot_rp,plot_rv,c=colors_pot[i],
+                    linestyle=plot_kwargs_POT["linestyle"])
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    duration=duration_POT,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
+            legend.append(f"{self.dist_name_map(dist)}")
+
+        for i in range(legend_fill[1]):
+            ax.plot(np.nan,np.nan,"-",color="none",label="")
+            legend.append("")
+        
+        # Iterate IDM
+        for i,((method,dist),model) in enumerate(models_IDM.items()):
+            if i == 0:
+                N_extremes_IDM = len(model.extremes)
+                empirical_extremes = pyex.get_return_periods(
+                    model.data,model.data,"POT",self.extremes_type)
+                #empirical_extremes = empirical_extremes[empirical_extremes["return period"]>0.1]
+                ax.scatter(empirical_extremes["return period"],
+                        empirical_extremes[self.var],
+                        **scatter_kwargs_IDM)
+                legend.append(f"IDM, N={N_extremes_IDM}")
+                if smallest_extreme == np.inf: # only use idm if no pot or am available
+                    smallest_extreme = model.extremes.min()
+                
+            plot_rv = self._get_return_value(model,plot_rp,return_period_size,
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
+            ax.plot(plot_rp,plot_rv,c=colors_idm[i],
+                    linestyle=plot_kwargs_IDM["linestyle"])
+            RVE[(method,dist)] = self._get_return_value(model,return_periods,return_period_size,
+                    duration=duration_IDM,exposure_fraction=len(model.data)/len(self.data_omni),
+                    poisson_correction=poisson_correction)[0]
+            legend.append(f"{self.dist_name_map(dist)}")
+
+        for i in range(legend_fill[2]):
+            ax.plot(np.nan,np.nan,"-",color="none",label="")
+            legend.append("")
+
+        # Ticks and grid
+        ax.semilogx()
+        ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+        ax.grid(True,which="both")
+        ax.grid(True,which="minor",linestyle="--")
+
+        # Axis limits
+        ax.set_xlim([0.9*np.min(return_periods),1.1*np.max(return_periods)])
+        ax.set_ylim([smallest_extreme,ax.get_ylim()[1]])
+
+        # Labels and legend
+        ax.set_xlabel("Return period (years)")
+        ax.set_ylabel(f"{self.var_name}, {self.var_symbol} ({self.var_unit})")
+        ax.legend(legend,**legend_kwargs)
+
+        # Return values table
+        if table_kwargs.pop("include",False):
+            RVE = pd.DataFrame(RVE,index=[f"{rp}-year" for rp in return_periods])
+            RVE.columns = [f"{self.dist_name_map(c[1],True)} ({c[0]})" for c in RVE.columns]
+            def strformat(cell): return f"{cell:.1f}"
+            RVE = RVE.map(strformat).replace("-inf","-")
+            rp_index = table_kwargs.pop("rp_index")
+            RVE = RVE if rp_index else RVE.T
+            ax.table(RVE,**table_kwargs)
+
+        return ax
+
+    def plot_return_value_comparison(
+            self,
+            grouping:typing.Literal["omni","sectors","monthly"],
+            return_periods:list[float],
+            ax: plt.Axes | list[plt.Axes] = None,
+            ncols = 3,
+            nfigs = 1,
+            **kwargs,
+            ):
+        """
+        Plot return value curves for every subset in a grouping.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        return_periods : list of float
+            Return periods, in years.
+        ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
+            Axes to draw on. "omni" needs a single axes. The other groupings
+            need one axes per subset. Created if None.
+        ncols : int, default 3
+            Number of subplot columns, used only if `ax` is None.
+        nfigs : int, default 1
+            Number of figures to split the subset panels over, used only if
+            `ax` is None.
+        **kwargs
+            Passed to the single-subset plotting routine, such as
+            ``duration_POT``, ``duration_IDM``, ``poisson_correction``,
+            ``scatter_kwargs_*``, ``plot_kwargs_*``, ``table_kwargs``, and
+            ``legend_kwargs``. See `_subplot_return_value_comparison`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+            A single axes for "omni", otherwise the axes array.
+
+        Raises
+        ------
+        ValueError
+            If the models are not fitted, or `grouping` is not recognised.
+        """
+        if not self._fitted_models:
+            raise ValueError("Models not fitted. Run .fit() first.")
+
+        if grouping == "sectors":
+            self._require_direction("plot_return_value_comparison(grouping='sectors')")
+
+        # Check if table is included, and its size, to correcly place title
+        titlepos = 1 + 0.07*len(return_periods)
+        if "table_kwargs" in kwargs:
+            if not kwargs["table_kwargs"].get("include",True):
+                titlepos = 1
+            elif "bbox" in kwargs["table_kwargs"]:
+                titlepos = 1 + kwargs["table_kwargs"]["bbox"][3]
+
+        if grouping == "omni":
+            if ax is None:
+                fig,ax = plt.subplots()
+            elif not isinstance(ax,plt.Axes):
+                raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
+            self._subplot_return_value_comparison(self.models_omni,return_periods,ax=ax,**kwargs)
+            ax.set_title("Omni",y=titlepos)
+            return ax
+        elif grouping == "monthly":
+            models = self.models_monthly
+        elif grouping == "sectors":
+            models = self.models_sectors
+        else:
+            raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
+
+        N_plots = len(models)
+        figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
+        for i,(subset,subset_models) in enumerate(models.items()):
+            self._subplot_return_value_comparison(subset_models,return_periods,**kwargs,ax=ax[i])
+            ax[i].set_title(f"{subset}",y=titlepos)
+
+        # for fig in figures:
+        #     fig.subplots_adjust(hspace = 0.6, wspace=0.3)
+
+        return ax
+
+    def _subplot_return_value_confidence(
+            self,
+            method:typing.Literal["AM","POT","IDM"],
+            model:pyex.EVA,
+            return_periods:list[float],
+            return_period_size:str="365.2425D",
+            duration=None,
+            poisson_correction=None,
+            alphas:float|list[float]=[0.99,0.9],
+            samples=300,
+            cmap="viridis",
+            table_scale = 0.07,
+            table_flip = False,
+            ax=None):
+        """
+        Plot return value curves with bootstrapped confidence bands on one axes.
+
+        Parameters
+        ----------
+        method : {"AM", "POT", "IDM"}
+            Extremes method of the model.
+        model : pyextremes.EVA
+            Fitted model.
+        return_periods : list of float
+            Return periods, in years, used for the table.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
+        duration : str or pandas.Timedelta, optional
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        alphas : float or list of float, default [0.99, 0.9]
+            Confidence levels.
+        samples : int, default 300
+            Number of bootstrap samples.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap for the confidence bands.
+        table_scale : float, default 0.07
+            Table height per row, as a fraction of the axes height. Set to 0
+            to omit the table.
+        table_flip : bool, default False
+            Transpose the table.
+        ax : matplotlib.axes.Axes, optional
+            Axes to draw on. A new figure is created if None.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+        """
+        if not hasattr(alphas,"__len__"): alphas = [alphas]
+        alphas = np.sort(alphas)
+
+        # Semantics
+        if ax is None: fig,ax = plt.subplots()
+        plot_rp = np.power(10.,np.linspace(-1,np.log10(np.max(return_periods))*1.1,100))
+        if not isinstance(cmap,mcolors.Colormap): cmap = plt.get_cmap(cmap)
+        colors = cmap(np.linspace(0,1,len(alphas)+1))
+
+        # Plotting
+        table = {}
+        legend = [f"{method}","Fitted"]
+        exposure_fraction = len(model.data)/len(self.data_omni)
+        for i,alpha in enumerate(alphas):
+            rv,cl,cu = self._get_return_value(model,plot_rp,return_period_size,duration=duration,
+                                               exposure_fraction=exposure_fraction,
+                                               poisson_correction=poisson_correction,
+                                               alpha=alpha,n_samples=samples)
+            if i == 0:
+                extremes_method = "BM" if method=="AM" else "POT"
+                extremes = pyex.get_return_periods(
+                    model.data,model.extremes,extremes_method,self.extremes_type)
+                ax.scatter(extremes["return period"], extremes[self.var],s=10,c="black")
+                ax.plot(plot_rp,rv,c=colors[0])
+
+            ax.plot(plot_rp,cu,c=colors[i+1])
+            ax.plot(plot_rp,cl,c=colors[i+1],label="_nolegend_")
+            
+            rv,cl,cu = self._get_return_value(model,return_periods,return_period_size,duration=duration,
+                                               exposure_fraction=exposure_fraction,
+                                               poisson_correction=poisson_correction,
+                                               alpha=alpha,n_samples=samples)
+            exceedance = 1-alpha
+            table[(100*(exceedance)/2)] = cl
+            table[(100*(alpha+exceedance/2))] = cu
+            if i == 0: table[50] = rv
+            legend.append(f"{100*alpha:.0f}% CI")
+
+        # Ticks and grid
+        ax.semilogx()
+        ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+        ax.grid(True,which="both")
+        ax.grid(True,which="minor",linestyle="--")
+
+        ax.set_xlim([0.9*np.min(return_periods),1.1*np.max(return_periods)])
+        ax.set_ylim([model.extremes.min(),ax.get_ylim()[1]])
+
+        ax.set_xlabel("Return period (years)")
+        ax.set_ylabel(f"{self.var_name}, {self.var_symbol} ({self.var_unit})")
+        ax.legend(legend)
+
+        table = pd.DataFrame(table,index=[f"{rp}-year" for rp in return_periods])
+        table = table.sort_index(axis=1)
+        table.columns = [f"{p:.1f}%" if abs(p-50)>0.001 else "Fitted" for p in table.columns]
+        if table_flip: table = table.T
+        def float_format(float): return f"{float:.1f}"
+        table = table.map(float_format)
+        if table_scale: ax.table(table,loc="top",bbox=[0,1,1,table_scale*table.shape[0]])
+
+        return ax
+
+    def plot_return_value_confidence(
+            self,
+            grouping:typing.Literal["omni","sectors","monthly"],
+            method:str,
+            dist:str,
+            return_periods:list[float],
+            ax:plt.Axes | list[plt.Axes] = None,
+            ncols = 3,
+            nfigs = 1,
+            duration=None,
+            poisson_correction=None,
+            alphas = [0.99,0.9],
+            cmap = "viridis",
+            table_scale = 0.07,
+            table_flip = False,
+            samples = 200,
+            ):
+        """
+        Plot return value confidence bands for every subset in a grouping.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        method : {"AM", "POT", "IDM"}
+            Extremes method to plot.
+        dist : str
+            Distribution, as an abbreviation (e.g. "GEV") or scipy name.
+        return_periods : list of float
+            Return periods, in years.
+        ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
+            Axes to draw on. "omni" needs a single axes. The other groupings
+            need one axes per subset. Created if None.
+        ncols : int, default 3
+            Number of subplot columns, used only if `ax` is None.
+        nfigs : int, default 1
+            Number of figures to split the subset panels over, used only if
+            `ax` is None.
+        duration : str or pandas.Timedelta, optional
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        alphas : list of float, default [0.99, 0.9]
+            Confidence levels.
+        cmap : str or matplotlib.colors.Colormap, default "viridis"
+            Colormap for the confidence bands.
+        table_scale : float, default 0.07
+            Table height per row, as a fraction of the axes height. Set to 0
+            to omit the table.
+        table_flip : bool, default False
+            Transpose the table.
+        samples : int, default 200
+            Number of bootstrap samples.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+            A single axes for "omni", otherwise the axes array.
+
+        Raises
+        ------
+        ValueError
+            If the models are not fitted, or `grouping` is not recognised.
+        """
+
+        if not self._fitted_models:
+            raise ValueError("Models not fitted. Run .fit() first.")
+
+        if grouping == "sectors":
+            self._require_direction("plot_return_value_confidence(grouping='sectors')")
+
+        dist = self.dist_name_map(dist,False)
+        if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
+        else: titlepos = 1 + table_scale*len(return_periods)
+
+        if grouping == "omni":
+            if ax is None:
+                fig,ax = plt.subplots()
+            elif not isinstance(ax,plt.Axes):
+                raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
+            model = self.models_omni[(method,dist)]
+            self._subplot_return_value_confidence(
+                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                alphas=alphas,samples=samples,
+                cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax)
+            ax.set_title("Omni",y=titlepos)
+            return ax
+
+        elif grouping == "monthly":
+            models = self.models_monthly
+        elif grouping == "sectors":
+            models = self.models_sectors
+        else:
+            raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
+
+        N_plots = len(models)
+        figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
+
+        for i,(subset,subset_models) in enumerate(models.items()):
+            model = subset_models[(method,dist)]
+            self._subplot_return_value_confidence(
+                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                alphas=alphas,samples=samples,
+                cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax[i])
+            ax[i].set_title(f"{subset}",y=titlepos)
+
+        for fig in figures:
+            fig.subplots_adjust(hspace = 0.6, wspace=0.3)
+
+        return ax
+
+
+    def table_model_parameters(
+            self,
+            grouping:typing.Literal["monthly","sectors"],
+            method:str,
+            dist:str,
+            ):
+        """
+        Table of fitted distribution parameters per subset.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable.
+            The omni model is added as the last row, labelled "Yearly" for
+            monthly and "Omni" for sectors.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per subset. Columns are the fitted parameters, with
+            ``c``, ``loc`` and ``scale`` renamed to Shape, Location and
+            Scale. For POT models, the table also includes peaks per year and
+            the threshold. For IDM models it includes entries per year.
+        """
+        if not self._fitted_models:
+            raise ValueError("Models not fitted. Run .fit() first.")
+
+        if grouping == "sectors":
+            self._require_direction("table_model_parameters(grouping='sectors')")
+
+        if grouping == "monthly": 
+            models = self.models_monthly | {"Yearly":self.models_omni}
+            thresholds = self.th_monthly | {"Yearly":self.th_omni} 
+        elif grouping == "sectors": 
+            models = self.models_sectors | {"Omni":self.models_omni}
+            thresholds = self.th_sectors | {"Omni":self.th_omni}
+        else: raise ValueError(f"grouping should be one of [monthly,sectors], got {grouping}")
+        
+        table = {}
+        for subset,subset_models in models.items():
+            model = subset_models[(method,self.dist_name_map(dist,False))]
+            if method == "POT": entries = {"Peaks per year":len(model.extremes) / self.N_years}
+            if method == "IDM": entries = {"Entries per year":len(model.extremes) / self.N_years}
+            if method == "AM":  entries = {}
+            param = model.distribution.mle_parameters | model.distribution.fixed_parameters
+            threshold = {"Threshold":thresholds[subset]} if method == "POT" else {}
+            table[subset] = entries | param | threshold
+
+        table = pd.DataFrame.from_dict(table,orient="index")
+        table.columns = _dist_param_map(dist,table.columns)
+        return table
+
+    def table_return_values_final(
+            self,
+            grouping:typing.Literal["omni","monthly","sectors"],
+            method:str,
+            dist:str,
+            return_periods:list[float],
+            return_period_size:str="365.2425D",
+            duration=None,
+            poisson_correction=None,
+            ):
+        """
+        Return values per subset for a given distribution.
+
+        Parameters
+        ----------
+        grouping : {"omni", "monthly", "sectors"}
+            Subsets to tabulate. "sectors" requires a direction variable.
+            The omni model is added as the last row, labelled "Yearly" for
+            monthly and "Omni" for sectors.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
+        return_periods : list of float
+            Return periods, in years.
+        return_period_size : str or pandas.Timedelta, default "365.2425D"
+            Length of one year.
+        duration : str or pandas.Timedelta, optional
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Return values with one row per subset and one column per return
+            period, named ``"{rp}-year"``.
+
+        Notes
+        -----
+        For "monthly" and "sectors" the table is also stored as
+        `rve_monthly` or `rve_sectors`, together with the model as
+        `rve_monthly_model` or `rve_sectors_model`.
+        """
+        
+        if not self._fitted_models:
+            raise ValueError("Models not fitted. Run .fit() first.")
+
+        if grouping == "sectors":
+            self._require_direction("table_return_values_final(grouping='sectors')")
+
+        if grouping == "omni":
+            models = {"Omni":self.models_omni}
+        elif grouping == "monthly": 
+            models = self.models_monthly | {"Yearly":self.models_omni}
+        elif grouping == "sectors": 
+            models = self.models_sectors | {"Omni":self.models_omni}
+        else: raise ValueError(f"grouping should be one of [omni,monthly,sectors], got {grouping}")
+
+        RVE = {}
+        for subset,subset_models in models.items():
+            model = subset_models[(method,self.dist_name_map(dist,False))]
+            RVE[subset] = {f"{rp}-year":self._get_return_value(
+                model,
+                rp,
+                return_period_size=return_period_size,
+                duration=duration,
+                poisson_correction=poisson_correction,
+                exposure_fraction=len(model.data)/len(self.data_omni))[0]
+                for rp in return_periods}
+        
+        RVE = pd.DataFrame.from_dict(RVE,orient="index")
+
+        if grouping == "monthly":
+            self.rve_monthly = RVE
+            self.rve_monthly_model = (method,dist)
+        elif grouping == "sectors":
+            self.rve_sectors = RVE
+            self.rve_sectors_model = (method,dist)
+
+        return RVE
+    
+    def plot_return_values_final(
+            self,
+            grouping:typing.Literal["monthly","sectors"],
+            method:str,
+            dist:str,
+            return_periods:list[float],
+            duration=None,
+            poisson_correction=None,
+            plot_kwargs = {},
+            table_kwargs = {},
+            ):
+        """
+        Plot return values per month or sector for a given distribution.
+
+        Parameters
+        ----------
+        grouping : {"monthly", "sectors"}
+            Subsets to plot. "sectors" requires a direction variable.
+        method : {"AM", "POT", "IDM"}
+            Extremes method.
+        dist : str
+            Distribution, as an abbreviation or scipy name.
+        return_periods : list of float
+            Return periods, in years. One line is drawn per return period.
+        duration : str or pandas.Timedelta, optional
+            Event duration overriding the empirical rate. Only valid for
+            "POT" and "IDM". Must be None for "AM".
+        poisson_correction : bool, optional
+            Defaults to `self.poisson_correction` if not given.
+        plot_kwargs : dict, optional
+            Passed to ``pandas.DataFrame.plot.line``.
+        table_kwargs : dict, optional
+            If non-empty, a table of values is drawn above the plot. Set the
+            key ``include`` to False to hide it. Other keys are passed to
+            ``matplotlib.axes.Axes.table``. The key ``float_format`` sets the
+            number format (default ".1f").
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+        """
+        if grouping == "sectors":
+            self._require_direction("plot_return_values_final(grouping='sectors')")
+
+        table = self.table_return_values_final(grouping,method,dist,return_periods,duration=duration,
+                                                poisson_correction=poisson_correction)
+        if grouping == "monthly": N = 12
+        else: N = len(self.models_sectors)
+        table = table[:N]
+
+        plot_kwargs = {"marker":"o","colormap":"viridis","xticks":np.arange(N)} | plot_kwargs
+        table_kwargs = {"include":bool(table_kwargs),"loc":"top","float_format":".1f"} | table_kwargs
+
+        ax = table.plot.line(**plot_kwargs)
+        if table_kwargs.pop("include"):
+            fmt = table_kwargs.pop("float_format")
+            def float_format(f): return f"{f:{fmt}}"
+            ax.table(table.round(1).T.map(float_format),**table_kwargs)
+
+        ax.set_xlabel("Month" if grouping=="monthly" else "Sector")
+        ax.set_ylim([0,ax.get_ylim()[1]])
+        ax.grid(True)
+        ax.set_ylabel(f"{self.var_name}, {self.var_symbol} ({self.var_unit})")
+        return ax

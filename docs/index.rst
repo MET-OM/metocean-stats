@@ -2349,4 +2349,25 @@ returns wind_speed2 = 11.08 m/s
 
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
+   :caption: metocean-stats v1
+
+   api/metocean_stats/plots/index
+   api/metocean_stats/tables/index
+   api/metocean_stats/stats/index
+   api/metocean_stats/maps/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: metocean-stats v2
+
+   api/metocean_stats/timeseries/index
+   api/metocean_stats/profile/index
+   api/metocean_stats/spectral/index
+   api/metocean_stats/validation/index
+   api/metocean_stats/utils/index
+   api/metocean_stats/spatial/index
+   api/metocean_stats/plotting/index
+   api/metocean_stats/WW/index
+   api/metocean_stats/EVA/index
+   api/metocean_stats/CMA/index

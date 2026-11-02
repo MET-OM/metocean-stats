@@ -708,7 +708,7 @@ def plot_mean_air_temperature_map(product='NORA3', title='empty title', set_exte
         print('Chosen unit not correct, should be K or degC')
         return
 
-    cmap = mcolors.ListedColormap(plt.cm.get_cmap('RdYlBu_r', int((vmax-vmin)/1))(np.linspace(0, 1, int((vmax-vmin)/1))))
+    cmap = mcolors.ListedColormap(plt.get_cmap('RdYlBu_r', int((vmax-vmin)/1))(np.linspace(0, 1, int((vmax-vmin)/1))))
 
     fig = plt.figure(figsize=(9, 10))
     ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=set_extent[0]+(set_extent[1]-set_extent[0])/2))
@@ -1016,7 +1016,7 @@ def plot_bathymetry_cross_section_with_variable_from_NORKYST800_overall(product:
     #First subplot for longitude:
     Lon, Depth = np.meshgrid(lon, depths)
     ### Variable plot ###
-    cmap = plt.cm.viridis
+    cmap = plt.get_cmap('viridis')
     norm = mcolors.Normalize(vmin=np.min(variable), vmax=np.max(variable))
     cf = ax2_0.imshow(variable, cmap=cmap, norm=norm, aspect='auto', extent=[lon_start, lon_end, max_bath_depth_1, 0], alpha=0.5)
     cf.set_zorder(0)                # Make sure that it will be made before the bathymetry line
@@ -1041,7 +1041,7 @@ def plot_bathymetry_cross_section_with_variable_from_NORKYST800_overall(product:
     Lat, Depth = np.meshgrid(lat, depths)
     
     ### Variable plot ###
-    cmap = plt.cm.viridis
+    cmap = plt.get_cmap('viridis')
     norm = mcolors.Normalize(vmin=np.min(variable), vmax=np.max(variable))
     cf = ax2_1.imshow(variable, cmap=cmap, norm=norm, aspect='auto', extent=[lat_start, lat_end, max_bath_depth_1, 0], alpha=0.5)
     cf.set_zorder(1)                # Make sure that it will be made before the bathymetry line

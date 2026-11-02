@@ -45,7 +45,7 @@ def plot_heatmap_profiles_yearly(df, rad_colname='current_speed_', cb_label='Cur
     max_value = max(df1.max())
 
     norm = mcolors.Normalize(vmin=min_value, vmax=max_value)
-    cmap = plt.cm.get_cmap('viridis',int((max_value-min_value)*1000))
+    cmap = plt.get_cmap('viridis',int((max_value-min_value)*1000))
 
     fig, ax = plt.subplots(figsize=(12, 7))
     cax = ax.imshow(df1.T, aspect='auto', cmap=cmap, norm=norm)
@@ -105,7 +105,7 @@ def plot_yearly_stripes(df,var_name='Hs',method='mean',ylabel='Y label',output_f
     df2=climate.table_yearly_stats(df,var=var_name,percentiles=method,output_file="")
     df2=df2.iloc[:-1,0]
     fig, ax = plt.subplots(figsize=(10, 5))
-    colors = plt.cm.RdBu_r((df2 - df2.min()) / (df2.max() - df2.min()))
+    colors = plt.get_cmap('RdBu_r')((df2 - df2.min()) / (df2.max() - df2.min()))
     ax.bar(df2.index.to_numpy(), height=100, width=1.0, color=colors, bottom=df2.min()-1.5)
     ax.set_xlim(df2.index.min()-0.5, df2.index.max()+0.5)
     ax.set_ylim(df2.min()-0.5, df2.max()+0.5)
@@ -179,7 +179,7 @@ def plot_heatmap_monthly_yearly(df,var='air_temperature_2m',method='mean',cb_lab
     del df2_1st,df2,df3
     
     fig, ax = plt.subplots(figsize=(12, 6))
-    cmap = plt.cm.get_cmap('viridis',20)
+    cmap = plt.get_cmap('viridis',20)
     cax = ax.imshow(arr, aspect='auto', cmap=cmap, norm=norm)
     cbar = fig.colorbar(cax, ax=ax)
     cbar.ax.tick_params(labelsize=14)
@@ -264,7 +264,7 @@ def plot_yearly_vertical_profiles(df, rad_colname='current_speed_', method='mean
     ax.tick_params(axis='y', labelsize=14) 
     plt.grid()
     plt.tight_layout()
-    if output_file != "":
+    if output_file:
         plt.savefig(output_file,dpi=250,facecolor='white',bbox_inches='tight')
     plt.close()
 
@@ -361,7 +361,7 @@ def plot_linear_regression(df,var='air_temperature_2m',time='Jan',stat='mean',me
     plt.legend()
     ax.grid(True)
     plt.tight_layout()
-    if output_figure != None:
+    if output_figure:
         plt.savefig(output_figure,dpi=250,facecolor='white',bbox_inches='tight')
     plt.close()
 
