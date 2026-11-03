@@ -133,13 +133,21 @@ class BivariateEVA:
         """
         suffix = f" {self.var1_symbol}"
         var1_cols = [c for c in RVE.columns if c.endswith(suffix)]
-        if not var1_cols:
-            raise ValueError(
-                f"Could not find any '{self.var1_symbol}' columns in RVE. "
-                f"Available columns: {list(RVE.columns)}."
-            )
-        rp_labels = [c[:-len(suffix)] for c in var1_cols]
-        return var1_cols, rp_labels
+        if var1_cols:
+            rp_labels = [c[:-len(suffix)] for c in var1_cols]
+            return var1_cols, rp_labels
+
+        var2_suffix = f" {self.var2_symbol}"
+        if not any(c.endswith(var2_suffix) for c in RVE.columns):
+            # No var1 or var2 suffixed columns anywhere - treat the whole
+            # table as var1 return values keyed by return period.
+            var1_cols = list(RVE.columns)
+            return var1_cols, var1_cols
+
+        raise ValueError(
+            f"Could not find any '{self.var1_symbol}' columns in RVE. "
+            f"Available columns: {list(RVE.columns)}."
+        )
 
     def fit(
             self,
