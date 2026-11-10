@@ -125,20 +125,25 @@ class BivariateEVA:
         Pick out the marginal (var1) return-value columns of an RVE table,
         and the return-period label (e.g. "10-year") for each one.
 
-        `table_return_values` lays out columns as one var1 column and one
-        var2 column per return period. Methods that condition on var1's
-        return value (isodensity contours, dependent percentiles) must use
-        only the var1 half; mixing in the var2 columns would treat a Tp
-        return value as if it were an Hs point.
+        `BivariateEVA.table_return_values` lays out columns as one var1
+        column and one var2 column per return period (e.g. "10-year H_s",
+        "10-year T_p"); only the var1 half is used here. A plain,
+        single-variable table (e.g. from
+        `UnivariateEVA.table_return_values_final`, with columns like
+        "10-year" and no variable suffix) has no such columns to match, so
+        every column is assumed to already be a var1 (primary variable)
+        return value instead.
         """
         suffix = f" {self.var1_symbol}"
         var1_cols = [c for c in RVE.columns if c.endswith(suffix)]
-        if not var1_cols:
-            raise ValueError(
-                f"Could not find any '{self.var1_symbol}' columns in RVE. "
-                f"Available columns: {list(RVE.columns)}."
-            )
-        rp_labels = [c[:-len(suffix)] for c in var1_cols]
+        if var1_cols:
+            rp_labels = [c[:-len(suffix)] for c in var1_cols]
+            return var1_cols, rp_labels
+
+        # No var1-suffixed columns: assume RVE is already a plain,
+        # single-variable return-value table, one column per return period.
+        var1_cols = list(RVE.columns)
+        rp_labels = var1_cols
         return var1_cols, rp_labels
 
     def fit(

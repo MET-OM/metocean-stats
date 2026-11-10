@@ -70,6 +70,29 @@ def test_table_conditional_return_values_matches_rve_hs(bvm_fit, rve):
         assert np.allclose(cond[cond_col].values, rve[rve_col].values)
 
 
+def test_table_conditional_return_values_univariate_rve(bvm_fit, rve):
+    """Regression test: a plain, single-variable RVE table (e.g. from
+    UnivariateEVA.table_return_values_final, with unsuffixed columns like
+    "10-year") must be accepted and treated as var1 (primary variable)
+    return values, instead of raising ValueError."""
+    hs_cols = [c for c in rve.columns if c.endswith(" H_s")]
+    uni_rve = rve[hs_cols].rename(columns=lambda c: c[: -len(" H_s")])
+    cond = bvm_fit.table_conditional_return_values(grouping="monthly", RVE=uni_rve)
+    hs_cols_cond = [c for c in cond.columns if "H_s" in c]
+    assert len(hs_cols_cond) == len(hs_cols)
+    for rve_col, cond_col in zip(hs_cols, hs_cols_cond):
+        assert np.allclose(cond[cond_col].values, rve[rve_col].values)
+
+
+def test_table_isodensity_contours_univariate_rve(bvm_fit, rve):
+    """Same as above, for table_isodensity_contours."""
+    hs_cols = [c for c in rve.columns if c.endswith(" H_s")]
+    uni_rve = rve[hs_cols].rename(columns=lambda c: c[: -len(" H_s")])
+    tables = bvm_fit.table_isodensity_contours(grouping="monthly", RVE=uni_rve)
+    any_table = next(iter(tables.values()))
+    assert any_table.shape[1] == len(hs_cols) * 2
+
+
 def test_table_return_values(bvm_fit):
     bvm_fit.table_return_values(grouping="monthly", return_periods=[10, 100])
 
