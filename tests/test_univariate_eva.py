@@ -29,32 +29,32 @@ def test_fit(ts):
 
 
 def test_plot_return_value_comparison(eva):
-    eva.plot_return_value_comparison(grouping="omni", return_periods=[10, 100])
+    eva.plot_return_value_comparison(by="all", return_periods=[10, 100])
 
 
 def test_plot_return_value_confidence(eva):
-    eva.plot_return_value_confidence(grouping="omni", method="AM", dist="genextreme",
+    eva.plot_return_value_confidence(by="all", method="AM", dist="genextreme",
                                      return_periods=[10, 100], samples=20)
 
 
 def test_table_model_parameters(eva):
-    eva.table_model_parameters(grouping="monthly", method="AM", dist="genextreme")
+    eva.table_model_parameters(by="month", method="AM", dist="genextreme")
 
 
 def test_table_return_values_final(eva):
-    eva.table_return_values_final(grouping="omni", method="AM", dist="genextreme",
+    eva.table_return_values_final(by="all", method="AM", dist="genextreme",
                                   return_periods=[10, 100])
 
 
 def test_plot_return_values_final(eva):
-    eva.plot_return_values_final(grouping="omni", method="AM", dist="genextreme",
+    eva.plot_return_values_final(by="all", method="AM", dist="genextreme",
                                  return_periods=[10, 100])
 
 
 def test_plot_return_values_final_returns_axes(eva):
     """Regression test: used to return None because the function had no
     `return ax` statement."""
-    ax = eva.plot_return_values_final(grouping="omni", method="AM", dist="genextreme",
+    ax = eva.plot_return_values_final(by="all", method="AM", dist="genextreme",
                                       return_periods=[10, 100])
     assert ax is not None
 
@@ -97,7 +97,7 @@ def test_dist_name_map_honoured_by_plot_return_value_confidence(ts):
     eva = UnivariateEVA(data=ts.data, var="HS", dist_name_map=custom_map)
     eva.get_extremes(errors="ignore")
     eva.fit(AM_dist=["genextreme"], errors="ignore")
-    eva.plot_return_value_confidence(grouping="omni", method="AM", dist="MYGEV",
+    eva.plot_return_value_confidence(by="all", method="AM", dist="MYGEV",
                                      return_periods=[10, 100], samples=20)
 
 
