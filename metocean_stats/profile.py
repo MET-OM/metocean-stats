@@ -1069,6 +1069,16 @@ class ProfileTimeSeries:
             Index = level values for var's level dimension (or `levels`,
             if given). Columns are statistic names when by="all", or
             group labels (+ "All") otherwise.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.statistics(by="all")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/profile_statistics_all.csv
         """
         if var is None:
             var = self.primary.col
@@ -1174,6 +1184,15 @@ class ProfileTimeSeries:
         Returns
         -------
         matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.plot_profile(time=pts.time[100])
+
+        .. image:: /files_v2/profile_plot_profile.png
+           :width: 600
         """
         import matplotlib.pyplot as plt
 
@@ -1313,6 +1332,15 @@ class ProfileTimeSeries:
         -------
         matplotlib.axes.Axes or np.ndarray of matplotlib.axes.Axes
             A single Axes for by="all"; an array of Axes otherwise.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.plot_statistics(by="all", stat=["mean", "P90", "P99", "max"])
+
+        .. image:: /files_v2/profile_plot_statistics.png
+           :width: 600
         """
         import matplotlib.pyplot as plt
 
@@ -1538,6 +1566,15 @@ class ProfileTimeSeries:
         Returns
         -------
         np.ndarray of matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.plot_rose()
+
+        .. image:: /files_v2/profile_plot_rose.png
+           :width: 600
         """
         import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
@@ -2218,6 +2255,18 @@ class ProfileEVA:
             requested return period, sourced by column from the
             corresponding *grouping subset's* actual model, exactly as
             UnivariateEVA.table_return_values_final's own columns are.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.EVA.get_extremes(errors="ignore")
+            pts.EVA.fit(AM_dist=["GEV"], errors="ignore")
+            pts.EVA.table_return_values(10, "monthly", "AM", "GEV")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/profile_eva_table_return_values_monthly.csv
         """
         rp_label = f"{return_period}-year"
         target_levels = list(self.models)
@@ -2229,7 +2278,7 @@ class ProfileEVA:
                 skipped.append(level)
                 continue
             level_table = self.models[level].table_return_values_final(
-                grouping=grouping,
+                by={"omni": "all", "monthly": "month", "sectors": "direction"}[grouping],
                 method=method,
                 dist=dist,
                 return_periods=[return_period],
@@ -2353,6 +2402,15 @@ class ProfileEVA:
         Returns
         -------
         np.ndarray of matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.EVA.plot_return_values([1, 10, 100], "omni", "AM", "GEV")
+
+        .. image:: /files_v2/profile_eva_plot_return_values_omni.png
+           :width: 600
         """
         import matplotlib.pyplot as plt
 

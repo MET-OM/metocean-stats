@@ -17,7 +17,7 @@ def bvm_fit(bvm):
 
 @pytest.fixture
 def rve(bvm_fit):
-    return bvm_fit.table_return_values(grouping="monthly", return_periods=[10, 100])
+    return bvm_fit.table_return_values(by="month", return_periods=[10, 100])
 
 
 def test_init(nora):
@@ -29,26 +29,26 @@ def test_fit(bvm):
 
 
 def test_plot_isodensity_contours(bvm_fit, rve):
-    bvm_fit.plot_isodensity_contours(grouping="omni", RVE=rve)
+    bvm_fit.plot_isodensity_contours(by="all", RVE=rve)
 
 
 def test_plot_isodensity_contours_with_explicit_ax(bvm_fit, rve):
-    """Regression test: passing ax for grouping='omni' used to raise
+    """Regression test: passing ax for by='all' used to raise
     TypeError due to isinstance(ax, plt.axes) checking a function."""
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
-    bvm_fit.plot_isodensity_contours(grouping="omni", RVE=rve, ax=ax)
+    bvm_fit.plot_isodensity_contours(by="all", RVE=rve, ax=ax)
 
 
 def test_table_isodensity_contours(bvm_fit, rve):
-    bvm_fit.table_isodensity_contours(grouping="monthly", RVE=rve)
+    bvm_fit.table_isodensity_contours(by="month", RVE=rve)
 
 
 def test_table_isodensity_contours_column_count(bvm_fit, rve):
     """Regression test: columns used to be doubled (8 instead of 4) because
     the loop iterated over every RVE column (both var1 and var2) instead of
     just var1's return-value columns."""
-    tables = bvm_fit.table_isodensity_contours(grouping="monthly", RVE=rve)
+    tables = bvm_fit.table_isodensity_contours(by="month", RVE=rve)
     any_table = next(iter(tables.values()))
     # 2 return periods -> 2 (low, high) columns each = 4, same count as RVE's
     # own columns (2 return periods x 2 variables).
@@ -56,13 +56,13 @@ def test_table_isodensity_contours_column_count(bvm_fit, rve):
 
 
 def test_table_conditional_return_values(bvm_fit, rve):
-    bvm_fit.table_conditional_return_values(grouping="monthly", RVE=rve)
+    bvm_fit.table_conditional_return_values(by="month", RVE=rve)
 
 
 def test_table_conditional_return_values_matches_rve_hs(bvm_fit, rve):
     """Regression test: the HS column used to be computed from a mix of HS
     and TP return values zipped together incorrectly."""
-    cond = bvm_fit.table_conditional_return_values(grouping="monthly", RVE=rve)
+    cond = bvm_fit.table_conditional_return_values(by="month", RVE=rve)
     hs_cols_rve = [c for c in rve.columns if c.endswith(" H_s")]
     hs_cols_cond = [c for c in cond.columns if "H_s" in c]
     assert len(hs_cols_cond) == len(hs_cols_rve)
@@ -70,30 +70,53 @@ def test_table_conditional_return_values_matches_rve_hs(bvm_fit, rve):
         assert np.allclose(cond[cond_col].values, rve[rve_col].values)
 
 
+def test_table_conditional_return_values_univariate_rve(bvm_fit, rve):
+    """Regression test: a plain, single-variable RVE table (e.g. from
+    UnivariateEVA.table_return_values_final, with unsuffixed columns like
+    "10-year") must be accepted and treated as var1 (primary variable)
+    return values, instead of raising ValueError."""
+    hs_cols = [c for c in rve.columns if c.endswith(" H_s")]
+    uni_rve = rve[hs_cols].rename(columns=lambda c: c[: -len(" H_s")])
+    cond = bvm_fit.table_conditional_return_values(by="month", RVE=uni_rve)
+    hs_cols_cond = [c for c in cond.columns if "H_s" in c]
+    assert len(hs_cols_cond) == len(hs_cols)
+    for rve_col, cond_col in zip(hs_cols, hs_cols_cond):
+        assert np.allclose(cond[cond_col].values, rve[rve_col].values)
+
+
+def test_table_isodensity_contours_univariate_rve(bvm_fit, rve):
+    """Same as above, for table_isodensity_contours."""
+    hs_cols = [c for c in rve.columns if c.endswith(" H_s")]
+    uni_rve = rve[hs_cols].rename(columns=lambda c: c[: -len(" H_s")])
+    tables = bvm_fit.table_isodensity_contours(by="month", RVE=uni_rve)
+    any_table = next(iter(tables.values()))
+    assert any_table.shape[1] == len(hs_cols) * 2
+
+
 def test_table_return_values(bvm_fit):
-    bvm_fit.table_return_values(grouping="monthly", return_periods=[10, 100])
+    bvm_fit.table_return_values(by="month", return_periods=[10, 100])
 
 
 def test_table_model_parameters(bvm_fit):
-    bvm_fit.table_model_parameters(grouping="monthly")
+    bvm_fit.table_model_parameters(by="month")
 
 
 def test_plot_marginal_quantiles(bvm_fit):
-    bvm_fit.plot_marginal_quantiles(grouping="monthly")
+    bvm_fit.plot_marginal_quantiles(by="month")
 
 
 def test_plot_marginal_quantiles_with_explicit_axes(bvm_fit):
-    """Regression test: passing axes explicitly for grouping='monthly' used
+    """Regression test: passing axes explicitly for by='month' used
     to raise UnboundLocalError('fig') since fig was only set when axes was
     created internally."""
     import matplotlib.pyplot as plt
     n = len(bvm_fit.data_monthly)
     fig, axes = plt.subplots(2 * n, 1)
-    bvm_fit.plot_marginal_quantiles(grouping="monthly", axes=axes.ravel())
+    bvm_fit.plot_marginal_quantiles(by="month", axes=axes.ravel())
 
 
 def test_plot_dependence_functions(bvm_fit):
-    bvm_fit.plot_dependence_functions(grouping="monthly")
+    bvm_fit.plot_dependence_functions(by="month")
 
 
 def test_plot_dependence_functions_with_explicit_axes(bvm_fit):
@@ -101,4 +124,4 @@ def test_plot_dependence_functions_with_explicit_axes(bvm_fit):
     import matplotlib.pyplot as plt
     n = len(bvm_fit.data_monthly)
     fig, axes = plt.subplots(2 * n, 1)
-    bvm_fit.plot_dependence_functions(grouping="monthly", axes=axes.ravel())
+    bvm_fit.plot_dependence_functions(by="month", axes=axes.ravel())

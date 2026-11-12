@@ -182,7 +182,7 @@ class UnivariateEVA:
             raise AttributeError(
                 f"{method_name} requires a direction variable (var_dir), "
                 "but none was provided when this UnivariateEVA was created. "
-                "Sector-based analysis is unavailable; 'omni' and 'monthly' "
+                "Sector-based analysis is unavailable; 'all' and 'month' "
                 "groupings remain fully available."
             )
 
@@ -785,7 +785,7 @@ class UnivariateEVA:
 
     def plot_return_value_comparison(
             self,
-            grouping:typing.Literal["omni","sectors","monthly"],
+            by:typing.Literal["all","direction","month"],
             return_periods:list[float],
             ax: plt.Axes | list[plt.Axes] = None,
             ncols = 3,
@@ -793,16 +793,16 @@ class UnivariateEVA:
             **kwargs,
             ):
         """
-        Plot return value curves for every subset in a grouping.
+        Plot return value curves across subsets, according to `by`.
 
         Parameters
         ----------
-        grouping : {"omni", "monthly", "sectors"}
-            Subsets to plot. "sectors" requires a direction variable.
+        by : {"all", "month", "direction"}
+            Subsets to plot. "direction" requires a direction variable.
         return_periods : list of float
             Return periods, in years.
         ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
-            Axes to draw on. "omni" needs a single axes. The other groupings
+            Axes to draw on. "all" needs a single axes. The other groupings
             need one axes per subset. Created if None.
         ncols : int, default 3
             Number of subplot columns, used only if `ax` is None.
@@ -818,18 +818,27 @@ class UnivariateEVA:
         Returns
         -------
         matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
-            A single axes for "omni", otherwise the axes array.
+            A single axes for "all", otherwise the axes array.
 
         Raises
         ------
         ValueError
-            If the models are not fitted, or `grouping` is not recognised.
+            If the models are not fitted, or `by` is not recognised.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_value_comparison(by="all", return_periods=[1, 10, 100])
+
+        .. image:: /files_v2/univariate_eva_plot_return_value_comparison.png
+           :width: 600
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
-        if grouping == "sectors":
-            self._require_direction("plot_return_value_comparison(grouping='sectors')")
+        if by == "direction":
+            self._require_direction("plot_return_value_comparison(by='direction')")
 
         # Check if table is included, and its size, to correcly place title
         titlepos = 1 + 0.07*len(return_periods)
@@ -839,7 +848,7 @@ class UnivariateEVA:
             elif "bbox" in kwargs["table_kwargs"]:
                 titlepos = 1 + kwargs["table_kwargs"]["bbox"][3]
 
-        if grouping == "omni":
+        if by == "all":
             if ax is None:
                 fig,ax = plt.subplots()
             elif not isinstance(ax,plt.Axes):
@@ -847,12 +856,12 @@ class UnivariateEVA:
             self._subplot_return_value_comparison(self.models_omni,return_periods,ax=ax,**kwargs)
             ax.set_title("Omni",y=titlepos)
             return ax
-        elif grouping == "monthly":
+        elif by == "month":
             models = self.models_monthly
-        elif grouping == "sectors":
+        elif by == "direction":
             models = self.models_sectors
         else:
-            raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
+            raise ValueError(f"by should be one of [all, direction, month], got {by}")
 
         N_plots = len(models)
         figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
@@ -979,7 +988,7 @@ class UnivariateEVA:
 
     def plot_return_value_confidence(
             self,
-            grouping:typing.Literal["omni","sectors","monthly"],
+            by:typing.Literal["all","direction","month"],
             method:str,
             dist:str,
             return_periods:list[float],
@@ -995,12 +1004,12 @@ class UnivariateEVA:
             samples = 200,
             ):
         """
-        Plot return value confidence bands for every subset in a grouping.
+        Plot return value confidence bands across subsets, according to `by`.
 
         Parameters
         ----------
-        grouping : {"omni", "monthly", "sectors"}
-            Subsets to plot. "sectors" requires a direction variable.
+        by : {"all", "month", "direction"}
+            Subsets to plot. "direction" requires a direction variable.
         method : {"AM", "POT", "IDM"}
             Extremes method to plot.
         dist : str
@@ -1008,7 +1017,7 @@ class UnivariateEVA:
         return_periods : list of float
             Return periods, in years.
         ax : matplotlib.axes.Axes or list of matplotlib.axes.Axes, optional
-            Axes to draw on. "omni" needs a single axes. The other groupings
+            Axes to draw on. "all" needs a single axes. The other groupings
             need one axes per subset. Created if None.
         ncols : int, default 3
             Number of subplot columns, used only if `ax` is None.
@@ -1035,25 +1044,36 @@ class UnivariateEVA:
         Returns
         -------
         matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
-            A single axes for "omni", otherwise the axes array.
+            A single axes for "all", otherwise the axes array.
 
         Raises
         ------
         ValueError
-            If the models are not fitted, or `grouping` is not recognised.
+            If the models are not fitted, or `by` is not recognised.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_value_confidence(
+                by="all", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. image:: /files_v2/univariate_eva_plot_return_value_confidence.png
+           :width: 600
         """
 
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
-        if grouping == "sectors":
-            self._require_direction("plot_return_value_confidence(grouping='sectors')")
+        if by == "direction":
+            self._require_direction("plot_return_value_confidence(by='direction')")
 
         dist = self.dist_name_map(dist,False)
         if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
         else: titlepos = 1 + table_scale*len(return_periods)
 
-        if grouping == "omni":
+        if by == "all":
             if ax is None:
                 fig,ax = plt.subplots()
             elif not isinstance(ax,plt.Axes):
@@ -1066,12 +1086,12 @@ class UnivariateEVA:
             ax.set_title("Omni",y=titlepos)
             return ax
 
-        elif grouping == "monthly":
+        elif by == "month":
             models = self.models_monthly
-        elif grouping == "sectors":
+        elif by == "direction":
             models = self.models_sectors
         else:
-            raise ValueError(f"grouping should be one of [omni, sectors, monthly], got {grouping}")
+            raise ValueError(f"by should be one of [all, direction, month], got {by}")
 
         N_plots = len(models)
         figures, ax = resolve_axes_grid(N_plots, ax=ax, ncols=ncols, nfigs=nfigs)
@@ -1092,7 +1112,7 @@ class UnivariateEVA:
 
     def table_model_parameters(
             self,
-            grouping:typing.Literal["monthly","sectors"],
+            by:typing.Literal["month","direction"],
             method:str,
             dist:str,
             ):
@@ -1101,10 +1121,10 @@ class UnivariateEVA:
 
         Parameters
         ----------
-        grouping : {"monthly", "sectors"}
-            Subsets to tabulate. "sectors" requires a direction variable.
+        by : {"month", "direction"}
+            Subsets to tabulate. "direction" requires a direction variable.
             The omni model is added as the last row, labelled "Yearly" for
-            monthly and "Omni" for sectors.
+            month and "Omni" for direction.
         method : {"AM", "POT", "IDM"}
             Extremes method.
         dist : str
@@ -1117,20 +1137,30 @@ class UnivariateEVA:
             ``c``, ``loc`` and ``scale`` renamed to Shape, Location and
             Scale. For POT models, the table also includes peaks per year and
             the threshold. For IDM models it includes entries per year.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.table_model_parameters(by="direction", method="AM", dist="GEV")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/univariate_eva_table_model_parameters_direction.csv
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
-        if grouping == "sectors":
-            self._require_direction("table_model_parameters(grouping='sectors')")
+        if by == "direction":
+            self._require_direction("table_model_parameters(by='direction')")
 
-        if grouping == "monthly": 
+        if by == "month": 
             models = self.models_monthly | {"Yearly":self.models_omni}
             thresholds = self.th_monthly | {"Yearly":self.th_omni} 
-        elif grouping == "sectors": 
+        elif by == "direction": 
             models = self.models_sectors | {"Omni":self.models_omni}
             thresholds = self.th_sectors | {"Omni":self.th_omni}
-        else: raise ValueError(f"grouping should be one of [monthly,sectors], got {grouping}")
+        else: raise ValueError(f"by should be one of [month,direction], got {by}")
         
         table = {}
         for subset,subset_models in models.items():
@@ -1148,7 +1178,7 @@ class UnivariateEVA:
 
     def table_return_values_final(
             self,
-            grouping:typing.Literal["omni","monthly","sectors"],
+            by:typing.Literal["all","month","direction"],
             method:str,
             dist:str,
             return_periods:list[float],
@@ -1161,10 +1191,10 @@ class UnivariateEVA:
 
         Parameters
         ----------
-        grouping : {"omni", "monthly", "sectors"}
-            Subsets to tabulate. "sectors" requires a direction variable.
+        by : {"all", "month", "direction"}
+            Subsets to tabulate. "direction" requires a direction variable.
             The omni model is added as the last row, labelled "Yearly" for
-            monthly and "Omni" for sectors.
+            month and "Omni" for direction.
         method : {"AM", "POT", "IDM"}
             Extremes method.
         dist : str
@@ -1187,24 +1217,36 @@ class UnivariateEVA:
 
         Notes
         -----
-        For "monthly" and "sectors" the table is also stored as
+        For "month" and "direction" the table is also stored as
         `rve_monthly` or `rve_sectors`, together with the model as
         `rve_monthly_model` or `rve_sectors_model`.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.table_return_values_final(
+                by="direction", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/univariate_eva_table_return_values_final_direction.csv
         """
         
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
 
-        if grouping == "sectors":
-            self._require_direction("table_return_values_final(grouping='sectors')")
+        if by == "direction":
+            self._require_direction("table_return_values_final(by='direction')")
 
-        if grouping == "omni":
+        if by == "all":
             models = {"Omni":self.models_omni}
-        elif grouping == "monthly": 
+        elif by == "month": 
             models = self.models_monthly | {"Yearly":self.models_omni}
-        elif grouping == "sectors": 
+        elif by == "direction": 
             models = self.models_sectors | {"Omni":self.models_omni}
-        else: raise ValueError(f"grouping should be one of [omni,monthly,sectors], got {grouping}")
+        else: raise ValueError(f"by should be one of [all,month,direction], got {by}")
 
         RVE = {}
         for subset,subset_models in models.items():
@@ -1220,10 +1262,10 @@ class UnivariateEVA:
         
         RVE = pd.DataFrame.from_dict(RVE,orient="index")
 
-        if grouping == "monthly":
+        if by == "month":
             self.rve_monthly = RVE
             self.rve_monthly_model = (method,dist)
-        elif grouping == "sectors":
+        elif by == "direction":
             self.rve_sectors = RVE
             self.rve_sectors_model = (method,dist)
 
@@ -1231,7 +1273,7 @@ class UnivariateEVA:
     
     def plot_return_values_final(
             self,
-            grouping:typing.Literal["monthly","sectors"],
+            by:typing.Literal["month","direction"],
             method:str,
             dist:str,
             return_periods:list[float],
@@ -1245,8 +1287,8 @@ class UnivariateEVA:
 
         Parameters
         ----------
-        grouping : {"monthly", "sectors"}
-            Subsets to plot. "sectors" requires a direction variable.
+        by : {"month", "direction"}
+            Subsets to plot. "direction" requires a direction variable.
         method : {"AM", "POT", "IDM"}
             Extremes method.
         dist : str
@@ -1269,13 +1311,24 @@ class UnivariateEVA:
         Returns
         -------
         matplotlib.axes.Axes
-        """
-        if grouping == "sectors":
-            self._require_direction("plot_return_values_final(grouping='sectors')")
 
-        table = self.table_return_values_final(grouping,method,dist,return_periods,duration=duration,
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_values_final(
+                by="direction", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. image:: /files_v2/univariate_eva_plot_return_values_final_direction.png
+           :width: 600
+        """
+        if by == "direction":
+            self._require_direction("plot_return_values_final(by='direction')")
+
+        table = self.table_return_values_final(by,method,dist,return_periods,duration=duration,
                                                 poisson_correction=poisson_correction)
-        if grouping == "monthly": N = 12
+        if by == "month": N = 12
         else: N = len(self.models_sectors)
         table = table[:N]
 
@@ -1288,7 +1341,7 @@ class UnivariateEVA:
             def float_format(f): return f"{f:{fmt}}"
             ax.table(table.round(1).T.map(float_format),**table_kwargs)
 
-        ax.set_xlabel("Month" if grouping=="monthly" else "Sector")
+        ax.set_xlabel("Month" if by=="month" else "Sector")
         ax.set_ylim([0,ax.get_ylim()[1]])
         ax.grid(True)
         ax.set_ylabel(f"{self.var_name}, {self.var_symbol} ({self.var_unit})")

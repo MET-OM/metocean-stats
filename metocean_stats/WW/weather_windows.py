@@ -662,6 +662,10 @@ class WeatherWindow:
         >>>
         >>> # Statistics by direction sector
         >>> stats_dir = ww.statistics(by="direction", metric="waiting_time", sectors=8)
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/weather_window_statistics_month.csv
         """
         self._require_fit()
         
@@ -828,6 +832,9 @@ class WeatherWindow:
         >>> ww.fit(stages=[{"duration": 12, "criteria": {"hs": 4.0}}])
         >>> fig, ax = plt.subplots(figsize=(15, 6))
         >>> ww.plot_operability(freqs=["M", "W", "D", "h"], ax=ax)
+
+        .. image:: /files_v2/weather_window_plot_operability.png
+           :width: 600
         """
         self._require_fit()
         import matplotlib.pyplot as plt
@@ -1012,6 +1019,9 @@ class WeatherWindow:
         ...     metric="duration",
         ...     stats=["mean", "P50", "P90", "max"],
         ... )
+
+        .. image:: /files_v2/weather_window_plot_statistics_month.png
+           :width: 600
         """
         self._require_fit()
 
@@ -1320,6 +1330,10 @@ class WeatherWindow:
 
         >>> # Raw window counts instead of availability
         >>> ww.availability_table(metric="availability", stat="count")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/weather_window_availability_table.csv
         """
         self._require_fit()
 
@@ -1487,6 +1501,9 @@ class WeatherWindow:
         >>> ww.plot_temporal_raster()
         >>> ww.plot_temporal_raster(years=[2019, 2020, 2021])
         >>> ww.plot_temporal_raster(xlim=("05-01", "09-30"))
+
+        .. image:: /files_v2/weather_window_plot_temporal_raster.png
+           :width: 600
         """
         self._require_fit()
         import matplotlib.pyplot as plt
@@ -1696,6 +1713,9 @@ class WeatherWindow:
         >>> ww.plot_timeseries(
         ...     start_times=["1960-01-19 23:00", "1960-01-20 06:00"],
         ... )
+
+        .. image:: /files_v2/weather_window_plot_timeseries.png
+           :width: 600
         """
         self._require_fit()
         import matplotlib.pyplot as plt
