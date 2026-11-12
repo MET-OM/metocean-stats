@@ -639,6 +639,15 @@ class TimeSeries:
         -------
         np.ndarray
             The bin centres used.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.smooth_discrete_geometric("TP")
+
+        .. image:: /files_v2/timeseries_smooth_discrete_geometric.png
+           :width: 600
         """
         var = self._resolve_variable(variable, self.primary)
         out = out or var.col
@@ -690,6 +699,16 @@ class TimeSeries:
         pd.DataFrame
             Statistics as rows, variables as columns. Column headers use
             the Variable symbol and unit for readability.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.describe()
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_describe.csv
         """
         cols = [self.primary] + self.secondary
         percentiles = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
@@ -752,6 +771,16 @@ class TimeSeries:
         pd.DataFrame
             Groups as rows (+ "All"), statistics as columns, in the
             standardised order produced by `utils.aggregate_statistics`.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.statistics(by="direction", stats=["P5", "P25", "P50", "P75", "P90", "P99", "Max"])
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_statistics_direction.csv
         """
         if by == "direction":
             self._require_direction("statistics", direction=direction)
@@ -834,6 +863,16 @@ class TimeSeries:
         pd.DataFrame
             Thresholds as index, groups + "All" as columns. Values in percent
             (float), or as rounded-down strings if `rounding` is given.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.nonexceedance(variable="HS", by="month", step=1, rounding=1)
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_nonexceedance_month.csv
         """
         if by == "direction":
             self._require_direction("nonexceedance", direction=direction)
@@ -934,6 +973,16 @@ class TimeSeries:
         -------
         pd.DataFrame
             Row groups as index, variable groups as columns, values as counts or %.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.frequency_table()
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_frequency_table.csv
         """
         _KEYWORDS = {"month", "season", "direction", "year"}
 
@@ -1049,6 +1098,16 @@ class TimeSeries:
             Rows are groups, columns are statistics (min, mean, max, ...).
             An "All" row with overall statistics is appended.
             Dropped year blocks are listed in a warning.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.block_maxima(year_start=7, by="month")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_block_maxima_month.csv
         """
         stats  = stats or ["min", "mean", "max"]
         var    = self._resolve_variable(variable, default=self.primary)
@@ -1227,6 +1286,16 @@ class TimeSeries:
         Event identification assumes a regular time step. NaN values are never
         part of an event, so they end any ongoing event.
         ``timestep_hours`` is used to convert event lengths to hours.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.persistence(threshold=4.0, by="month")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_persistence_month.csv
         """
         if by == "direction":
             self._require_direction("persistence")
@@ -1429,6 +1498,15 @@ class TimeSeries:
         AttributeError
             If ``by="direction"`` but no direction variable was provided.
 
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.trends(by="month")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_trends_month.csv
         """
         from scipy.stats import linregress, theilslopes, kendalltau
 
@@ -1691,6 +1769,18 @@ class TimeSeries:
         it as empty, rather than the bucket being silently absent from
         panels or the legend. This guarantees out-of-range data is always
         visibly represented and never silently dropped or hidden.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.plot_rose(
+                magnitude="W10", direction="DIRM", by="month",
+                mag_step=5, mag_max=25, ncols=3, cmap="viridis",
+            )
+
+        .. image:: /files_v2/timeseries_plot_rose_month.png
+           :width: 600
         """
         # ------------------------------------------------------------------ #
         # Resolve magnitude and direction columns                              #
@@ -1983,6 +2073,16 @@ class TimeSeries:
         pd.DataFrame
             Row groups as index, variable groups as columns. Cell values are
             the requested statistic. NaN where a cell has no observations.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.statistics_2d(row="month", col="direction", stat="mean")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/timeseries_statistics_2d_month_direction.csv
         """
 
         if row == "direction" or col == "direction":
@@ -2133,6 +2233,15 @@ class TimeSeries:
             Returns
             -------
             plt.Axes
+
+            Examples
+            --------
+            .. code-block:: python
+
+                ts.plot_statistics(variable="T2m", by="year")
+
+            .. image:: /files_v2/timeseries_plot_statistics_year.png
+               :width: 600
             """
             # ------------------------------------------------------------------ #
             # Validate table request                                               #
@@ -2240,7 +2349,6 @@ class TimeSeries:
                 title_by       = by
 
             ax.set_xlabel(col_axis_label)
-            ax.set_title(f"{var.name} — statistics by {title_by}")
 
             ax.legend(
                 loc="upper right",
@@ -2407,6 +2515,18 @@ class TimeSeries:
         expressed as a monotonic edge), so both are shown centred on each
         cell instead. Every row and column label is always shown. No plot
         title is set.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            ts.plot_statistics_2d(
+                row="HS", col="TP", step_row=0.5, step_col=1, norm="log",
+                cmap="Blues", stat_cells="density", fmt_cells=".2f", margins=True,
+            )
+
+        .. image:: /files_v2/timeseries_plot_statistics_2d.png
+           :width: 600
         """
 
         _STAT_LABELS: dict[str, dict] = {

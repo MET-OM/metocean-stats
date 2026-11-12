@@ -824,6 +824,15 @@ class UnivariateEVA:
         ------
         ValueError
             If the models are not fitted, or `by` is not recognised.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_value_comparison(by="all", return_periods=[1, 10, 100])
+
+        .. image:: /files_v2/univariate_eva_plot_return_value_comparison.png
+           :width: 600
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
@@ -1041,6 +1050,17 @@ class UnivariateEVA:
         ------
         ValueError
             If the models are not fitted, or `by` is not recognised.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_value_confidence(
+                by="all", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. image:: /files_v2/univariate_eva_plot_return_value_confidence.png
+           :width: 600
         """
 
         if not self._fitted_models:
@@ -1117,6 +1137,16 @@ class UnivariateEVA:
             ``c``, ``loc`` and ``scale`` renamed to Shape, Location and
             Scale. For POT models, the table also includes peaks per year and
             the threshold. For IDM models it includes entries per year.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.table_model_parameters(by="direction", method="AM", dist="GEV")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/univariate_eva_table_model_parameters_direction.csv
         """
         if not self._fitted_models:
             raise ValueError("Models not fitted. Run .fit() first.")
@@ -1190,6 +1220,18 @@ class UnivariateEVA:
         For "month" and "direction" the table is also stored as
         `rve_monthly` or `rve_sectors`, together with the model as
         `rve_monthly_model` or `rve_sectors_model`.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.table_return_values_final(
+                by="direction", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/univariate_eva_table_return_values_final_direction.csv
         """
         
         if not self._fitted_models:
@@ -1269,6 +1311,17 @@ class UnivariateEVA:
         Returns
         -------
         matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            uni.plot_return_values_final(
+                by="direction", method="AM", dist="GEV", return_periods=[1, 10, 100],
+            )
+
+        .. image:: /files_v2/univariate_eva_plot_return_values_final_direction.png
+           :width: 600
         """
         if by == "direction":
             self._require_direction("plot_return_values_final(by='direction')")

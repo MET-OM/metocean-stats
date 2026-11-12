@@ -58,6 +58,17 @@ def test_eva_get_extremes(pts):
     pts.EVA.get_extremes()
 
 
+def test_eva_table_return_values(pts_eva):
+    """Regression test: table_return_values used to crash forwarding
+    grouping='monthly' straight to UnivariateEVA.table_return_values_final,
+    which takes by='month' since the grouping/by rename."""
+    pts_eva.EVA.table_return_values(10, "monthly", "AM", "genextreme")
+
+
+def test_eva_plot_return_values(pts_eva):
+    pts_eva.EVA.plot_return_values([10], "omni", "AM", "genextreme")
+
+
 def test_eva_fit(pts):
     pts.EVA.get_extremes()
     pts.EVA.fit(AM_dist=["genextreme"], POT_dist=["genpareto"])

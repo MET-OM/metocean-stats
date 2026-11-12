@@ -281,6 +281,16 @@ class BivariateEVA:
         The omni row of `RVE` is looked up as "Omni", "Yearly" or "Annual",
         in that order. Subsets whose model failed to fit are plotted with
         their data only and marked "(failed to fit)".
+
+        Examples
+        --------
+        .. code-block:: python
+
+            rve = joint.table_return_values(by="direction", return_periods=[1, 10, 100])
+            joint.plot_isodensity_contours(by="direction", RVE=rve)
+
+        .. image:: /files_v2/bivariate_eva_plot_isodensity_contours_direction.png
+           :width: 600
         """
         if by == "direction":
             self._require_direction("plot_isodensity_contours(by='direction')")
@@ -362,6 +372,17 @@ class BivariateEVA:
         dict of pandas.DataFrame
             One table per subset. A subset whose model failed to fit gets a
             single NaN row labelled "(failed to fit)".
+
+        Examples
+        --------
+        .. code-block:: python
+
+            rve = joint.table_return_values(by="direction", return_periods=[1, 10, 100])
+            tables = joint.table_isodensity_contours(by="direction", RVE=rve)
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/bivariate_eva_table_isodensity_contours_direction.csv
         """
         if by == "direction":
             self._require_direction("table_isodensity_contours(by='direction')")
@@ -435,6 +456,17 @@ class BivariateEVA:
         pandas.DataFrame
             One row per subset. Subsets without a fitted model keep the
             primary variable values and have NaN for the secondary variable.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            rve = joint.table_return_values(by="direction", return_periods=[1, 10, 100])
+            joint.table_conditional_return_values(by="direction", RVE=rve)
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/bivariate_eva_table_conditional_return_values_direction.csv
         """
         if by == "direction":
             self._require_direction("table_conditional_return_values(by='direction')")
@@ -499,6 +531,16 @@ class BivariateEVA:
         pandas.DataFrame
             One row per subset. Columns are ``"{rp}-year {symbol}"`` for each
             return period and variable. Subsets without a fitted model are NaN.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            joint.table_return_values(by="direction", return_periods=[1, 10, 100])
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/bivariate_eva_table_return_values_direction.csv
         """
         if by == "direction":
             self._require_direction("table_return_values(by='direction')")
@@ -555,6 +597,16 @@ class BivariateEVA:
         -------
         pandas.DataFrame
             One row per subset. Subsets without a fitted model are NaN.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            joint.table_model_parameters(by="direction")
+
+        .. csv-table::
+           :header-rows: 1
+           :file: /files_v2/bivariate_eva_table_model_parameters_direction.csv
         """
         if by == "direction":
             self._require_direction("table_model_parameters(by='direction')")
@@ -609,6 +661,15 @@ class BivariateEVA:
         -----
         Subsets whose model failed to fit are left blank and marked
         "(failed to fit)".
+
+        Examples
+        --------
+        .. code-block:: python
+
+            joint.plot_marginal_quantiles(by="direction")
+
+        .. image:: /files_v2/bivariate_eva_plot_marginal_quantiles_direction.png
+           :width: 600
         """
         if by == "direction":
             self._require_direction("plot_marginal_quantiles(by='direction')")
@@ -682,6 +743,15 @@ class BivariateEVA:
         -----
         Subsets whose model failed to fit are left blank and marked
         "(failed to fit)".
+
+        Examples
+        --------
+        .. code-block:: python
+
+            joint.plot_dependence_functions(by="direction")
+
+        .. image:: /files_v2/bivariate_eva_plot_dependence_functions_direction.png
+           :width: 600
         """
         if by == "direction":
             self._require_direction("plot_dependence_functions(by='direction')")
