@@ -759,6 +759,8 @@ class TimeSeriesValidation:
         y: tuple[str, str],
         bin_size: float | None = None,
         cmap: str = "viridis",
+        norm: "mcolors.Normalize | None" = None,
+        lim: float | None = None,
         figsize: tuple[float, float] = (7, 7),
         ax: "plt.Axes | None" = None,
     ) -> "plt.Axes":
@@ -780,7 +782,18 @@ class TimeSeriesValidation:
             10, 25, 50} that gives the number of bins closest to 150 across the
             axis range is used.
         cmap : str, default "viridis"
-            Matplotlib colormap name, applied on a logarithmic scale.
+            Matplotlib colormap name.
+        norm : matplotlib.colors.Normalize, optional
+            Norm applied to the 2-D histogram colors, e.g.
+            ``matplotlib.colors.PowerNorm(0.5)``. Defaults to
+            ``LogNorm(vmin=1, vmax=<max bin count>)``.
+        lim : float, optional
+            Shared upper limit for both axes (and the 1:1 line), in the units
+            of the variables. Useful for keeping several `plot_scatter` calls
+            on the same scale. Defaults to 1.05 times the largest data value
+            (the previous, data-dependent behaviour). A warning is raised if
+            `lim` is below the largest data value, since data beyond it is cut
+            off from the plot.
         figsize : tuple[float, float], default (7, 7)
             Figure size in inches. Ignored when `ax` is supplied.
         ax : matplotlib.axes.Axes, optional
@@ -799,11 +812,16 @@ class TimeSeriesValidation:
         ValueError
             If fewer than two complete pairs are available.
 
+        Warns
+        -----
+        UserWarning
+            If `lim` is below the largest data value.
+
         Notes
         -----
-        Only pairs where both values are non-NaN are used. The axes run from
-        zero to 1.05 times the largest value. The metrics use `x` as the
-        reference:
+        Only pairs where both values are non-NaN are used. By default the axes
+        run from zero to 1.05 times the largest value; pass `lim` to fix this
+        instead. The metrics use `x` as the reference:
 
         - Bias: mean of ``y - x``.
         - MAE and RMSE: mean absolute and root-mean-square of ``y - x``.
@@ -852,7 +870,16 @@ class TimeSeriesValidation:
         # Axis limits — equal, starting at zero                               #
         # ------------------------------------------------------------------ #
         data_max  = max(x_vals.max(), y_vals.max())
-        axis_max  = data_max * 1.05
+        if lim is None:
+            axis_max = data_max * 1.05
+        else:
+            if data_max > lim:
+                warnings.warn(
+                    f"lim={lim:g} is below the largest data value ({data_max:g}); "
+                    "data beyond lim is cut off from the plot.",
+                    UserWarning,
+                )
+            axis_max = lim
         axis_min  = 0.0
 
         # ------------------------------------------------------------------ #
@@ -887,7 +914,8 @@ class TimeSeriesValidation:
         # ------------------------------------------------------------------ #
         # Draw histogram                                                       #
         # ------------------------------------------------------------------ #
-        norm = mcolors.LogNorm(vmin=1, vmax=H_masked.max())
+        if norm is None:
+            norm = mcolors.LogNorm(vmin=1, vmax=H_masked.max())
         cm   = plt.get_cmap(cmap)
 
         pcm = ax.pcolormesh(
@@ -912,7 +940,8 @@ class TimeSeriesValidation:
 
         cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046)
         cbar.set_label(cbar_label)
-        cbar.ax.yaxis.set_major_formatter(mticker.LogFormatterSciNotation())
+        if isinstance(norm, mcolors.LogNorm):
+            cbar.ax.yaxis.set_major_formatter(mticker.LogFormatterSciNotation())
 
         # ------------------------------------------------------------------ #
         # 1:1 line                                                             #
@@ -951,8 +980,7 @@ class TimeSeriesValidation:
         # ------------------------------------------------------------------ #
         # Dummy patch for histogram legend entry                               #
         # ------------------------------------------------------------------ #
-        mid_log   = np.sqrt(norm.vmin * norm.vmax)   # geometric mean
-        mid_color = cm(norm(mid_log))
+        mid_color = cm(0.5)   # colormap midpoint, independent of the norm used
         data_patch = mpatches.Patch(
             facecolor=mid_color,
             edgecolor="none",
