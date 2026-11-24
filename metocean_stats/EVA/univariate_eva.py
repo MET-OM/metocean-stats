@@ -878,6 +878,7 @@ class UnivariateEVA:
             self,
             method:typing.Literal["AM","POT","IDM"],
             model:pyex.EVA,
+            dist_label:str,
             return_periods:list[float],
             return_period_size:str="365.2425D",
             duration=None,
@@ -897,6 +898,10 @@ class UnivariateEVA:
             Extremes method of the model.
         model : pyextremes.EVA
             Fitted model.
+        dist_label : str
+            Distribution name shown in the legend in place of "Fitted",
+            e.g. "GEV" -- lets the fitted curve be identified when
+            comparing plots for different distributions.
         return_periods : list of float
             Return periods, in years, used for the table.
         return_period_size : str or pandas.Timedelta, default "365.2425D"
@@ -935,7 +940,7 @@ class UnivariateEVA:
 
         # Plotting
         table = {}
-        legend = [f"{method}","Fitted"]
+        legend = [f"{method}",dist_label]
         exposure_fraction = len(model.data)/len(self.data_omni)
         for i,alpha in enumerate(alphas):
             rv,cl,cu = self._get_return_value(model,plot_rp,return_period_size,duration=duration,
@@ -1069,6 +1074,7 @@ class UnivariateEVA:
         if by == "direction":
             self._require_direction("plot_return_value_confidence(by='direction')")
 
+        dist_label = self.dist_name_map(dist)
         dist = self.dist_name_map(dist,False)
         if table_flip: titlepos = 1 + table_scale*(1+2*len(alphas))
         else: titlepos = 1 + table_scale*len(return_periods)
@@ -1080,7 +1086,7 @@ class UnivariateEVA:
                 raise TypeError(f"Expected a single matplotlib.Axes object as ax, got {type(ax)}")
             model = self.models_omni[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                method,model,dist_label,return_periods,duration=duration,poisson_correction=poisson_correction,
                 alphas=alphas,samples=samples,
                 cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax)
             ax.set_title("Omni",y=titlepos)
@@ -1099,7 +1105,7 @@ class UnivariateEVA:
         for i,(subset,subset_models) in enumerate(models.items()):
             model = subset_models[(method,dist)]
             self._subplot_return_value_confidence(
-                method,model,return_periods,duration=duration,poisson_correction=poisson_correction,
+                method,model,dist_label,return_periods,duration=duration,poisson_correction=poisson_correction,
                 alphas=alphas,samples=samples,
                 cmap=cmap,table_scale=table_scale,table_flip=table_flip,ax=ax[i])
             ax[i].set_title(f"{subset}",y=titlepos)
