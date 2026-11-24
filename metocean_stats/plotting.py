@@ -1091,6 +1091,256 @@ def plot_rose(
 
     return ax
 
+def plot_scatter(
+        df: pd.DataFrame,
+        x: str,
+        y: str,
+        bin_size: float | None = None,
+        cmap: str = "viridis",
+        norm: "mcolors.Normalize | None" = None,
+        lim: float | None = None,
+        figsize: tuple[float, float] = (7, 7),
+        ax: "plt.Axes | None" = None,
+    ) -> "plt.Axes":
+    """
+    Scatter plot of two columns of a DataFrame, drawn as a 2-D histogram.
+
+    The plot has a 1:1 reference line, a quantile-quantile (Q-Q) overlay,
+    a metrics box and a logarithmic colorbar.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Source data. Rows where either `x` or `y` is NaN are dropped.
+    x : str
+        Column name for the x-axis, typically the reference.
+    y : str
+        Column name for the y-axis, typically the comparison.
+    bin_size : float, optional
+        Edge length of the square histogram bins, in the units of the
+        variables. If None, the value from {0.05, 0.1, 0.25, 0.5, 1, 2, 5,
+        10, 25, 50} that gives the number of bins closest to 150 across the
+        axis range is used.
+    cmap : str, default "viridis"
+        Matplotlib colormap name.
+    norm : matplotlib.colors.Normalize, optional
+        Norm applied to the 2-D histogram colors, e.g.
+        ``matplotlib.colors.PowerNorm(0.5)``. Defaults to
+        ``LogNorm(vmin=1, vmax=<max bin count>)``.
+    lim : float, optional
+        Shared upper limit for both axes (and the 1:1 line), in the units
+        of the variables. Useful for keeping several `plot_scatter` calls
+        on the same scale. Defaults to 1.05 times the largest data value.
+        A warning is raised if `lim` is below the largest data value,
+        since data beyond it is cut off from the plot.
+    figsize : tuple[float, float], default (7, 7)
+        Figure size in inches. Ignored when `ax` is supplied.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. A new figure is created if None.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+
+    Raises
+    ------
+    ValueError
+        If fewer than two complete (non-NaN) pairs are available.
+
+    Warns
+    -----
+    UserWarning
+        If `lim` is below the largest data value.
+
+    Notes
+    -----
+    Axis labels, a title, and units are not set here -- add them on the
+    returned Axes afterwards, e.g. ``ax.set_xlabel(...)``.
+
+    Only pairs where both values are non-NaN are used. By default the axes
+    run from zero to 1.05 times the largest value; pass `lim` to fix this
+    instead. The metrics use `x` as the reference:
+
+    - Bias: mean of ``y - x``.
+    - MAE and RMSE: mean absolute and root-mean-square of ``y - x``.
+    - SI: RMSE divided by the mean of `x`.
+    - CORR: Pearson correlation coefficient.
+
+    The Q-Q points pair the quantiles of `x` and `y` at log-spaced
+    percentile levels, which gives more detail in the tails. The colorbar
+    label gives the bin size, for example "entries per 0.25 x 0.25 bin".
+    """
+    from .utils import scatter_metrics
+
+    paired = df[[x, y]].dropna()
+    x_vals = paired[x].to_numpy(dtype=float)
+    y_vals = paired[y].to_numpy(dtype=float)
+
+    if len(x_vals) < 2:
+        raise ValueError(
+            "Fewer than 2 non-NaN paired rows -- cannot produce scatter plot."
+        )
+
+    metrics = scatter_metrics(x_vals, y_vals)
+    n = metrics["n"]
+
+    # ------------------------------------------------------------------ #
+    # Axis limits — equal, starting at zero                               #
+    # ------------------------------------------------------------------ #
+    data_max = max(x_vals.max(), y_vals.max())
+    if lim is None:
+        axis_max = data_max * 1.05
+    else:
+        if data_max > lim:
+            warnings.warn(
+                f"lim={lim:g} is below the largest data value ({data_max:g}); "
+                "data beyond lim is cut off from the plot.",
+                UserWarning,
+            )
+        axis_max = lim
+    axis_min = 0.0
+
+    # ------------------------------------------------------------------ #
+    # Bin size selection                                                   #
+    # ------------------------------------------------------------------ #
+    _NICE = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 25.0, 50.0]
+
+    if bin_size is None:
+        span = axis_max - axis_min
+        bin_size = min(_NICE, key=lambda b: abs(span / b - 150))
+
+    # ------------------------------------------------------------------ #
+    # 2-D histogram                                                        #
+    # ------------------------------------------------------------------ #
+    bins = np.arange(axis_min, axis_max + bin_size, bin_size)
+
+    H, xedges, yedges = np.histogram2d(x_vals, y_vals, bins=[bins, bins])
+    H = H.T  # imshow/pcolormesh expects (row=y, col=x)
+
+    # Mask empty bins so they stay white / transparent
+    H_masked = np.ma.masked_where(H == 0, H)
+
+    # ------------------------------------------------------------------ #
+    # Figure / axes                                                        #
+    # ------------------------------------------------------------------ #
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.get_figure()
+
+    # ------------------------------------------------------------------ #
+    # Draw histogram                                                       #
+    # ------------------------------------------------------------------ #
+    if norm is None:
+        norm = mcolors.LogNorm(vmin=1, vmax=H_masked.max())
+    cm = plt.get_cmap(cmap)
+
+    pcm = ax.pcolormesh(
+        xedges, yedges, H_masked,
+        cmap=cm,
+        norm=norm,
+        zorder=2,
+    )
+
+    # ------------------------------------------------------------------ #
+    # Colorbar                                                             #
+    # ------------------------------------------------------------------ #
+    cbar_label = f"entries per {bin_size:g} × {bin_size:g} bin"
+
+    cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046)
+    cbar.set_label(cbar_label)
+    if isinstance(norm, mcolors.LogNorm):
+        cbar.ax.yaxis.set_major_formatter(mticker.LogFormatterSciNotation())
+
+    # ------------------------------------------------------------------ #
+    # 1:1 line                                                             #
+    # ------------------------------------------------------------------ #
+    ax.plot(
+        [axis_min, axis_max],
+        [axis_min, axis_max],
+        color="black",
+        linewidth=1.2,
+        linestyle="--",
+        zorder=4,
+        label="1:1",
+    )
+
+    # ------------------------------------------------------------------ #
+    # Q-Q line (log-spaced quantiles for better tail resolution)          #
+    # ------------------------------------------------------------------ #
+    base = 1.2
+    n_levels = int(np.floor(np.log(n) / np.log(base)))
+    lower_half = [50 / base**k for k in range(n_levels + 1)]
+    upper_half = [100 - p for p in lower_half if p != 50][::-1]
+    percentiles = np.array(sorted(set(lower_half + upper_half)))
+
+    qq_x = np.percentile(x_vals, percentiles, method="closest_observation")
+    qq_y = np.percentile(y_vals, percentiles, method="closest_observation")
+
+    ax.scatter(
+        qq_x, qq_y,
+        color="darkorange",
+        s=22,
+        zorder=5,
+        linewidths=0,
+        label="Q-Q",
+    )
+
+    # ------------------------------------------------------------------ #
+    # Dummy patch for histogram legend entry                               #
+    # ------------------------------------------------------------------ #
+    mid_color = cm(0.5)  # colormap midpoint, independent of the norm used
+    data_patch = mpatches.Patch(
+        facecolor=mid_color,
+        edgecolor="none",
+        label=f"Data  (N = {n:,})",
+    )
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles=[data_patch] + handles,
+        labels=[f"Data  (N = {n:,})"] + labels,
+        loc="lower right",
+        framealpha=0.85,
+        edgecolor="0.7",
+    )
+
+    # ------------------------------------------------------------------ #
+    # Metrics text box                                                     #
+    # ------------------------------------------------------------------ #
+    metrics_text = (
+        f"Bias : {metrics['bias']:+.3f}\n"
+        f"MAE  : {metrics['mae']:.3f}\n"
+        f"RMSE : {metrics['rmse']:.3f}\n"
+        f"SI   : {metrics['si']:.3f}\n"
+        f"CORR : {metrics['corr']:.3f}"
+    )
+
+    ax.text(
+        0.03, 0.97,
+        metrics_text,
+        transform=ax.transAxes,
+        verticalalignment="top",
+        horizontalalignment="left",
+        fontfamily="monospace",
+        bbox=dict(
+            boxstyle="round,pad=0.4",
+            facecolor="white",
+            edgecolor="0.7",
+            alpha=0.90,
+        ),
+        zorder=6,
+    )
+
+    # ------------------------------------------------------------------ #
+    # Axis formatting                                                      #
+    # ------------------------------------------------------------------ #
+    ax.set_xlim(axis_min, axis_max)
+    ax.set_ylim(axis_min, axis_max)
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(True, linestyle=":", linewidth=0.6, color="0.75", zorder=1)
+
+    return ax
+
 def plot_scatter_diagram(
         data: pd.DataFrame, 
         var1 = "TP",

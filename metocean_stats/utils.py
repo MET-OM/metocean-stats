@@ -567,6 +567,43 @@ def aggregate_statistics(
     return result
 
 
+def scatter_metrics(x_vals: np.ndarray, y_vals: np.ndarray) -> dict:
+    """
+    Standard pairwise comparison metrics between a reference array (`x_vals`)
+    and a candidate array (`y_vals`), e.g. observations vs. model.
+
+    Shared by any scatter/collocation comparison (e.g.
+    `plotting.plot_scatter`), so the metric definitions stay in one place.
+
+    Parameters
+    ----------
+    x_vals, y_vals : np.ndarray
+        Equal-length 1D arrays of paired, non-NaN values. `x_vals` is
+        treated as the reference; differences are `y_vals - x_vals`.
+
+    Returns
+    -------
+    dict
+        - ``"bias"``: mean of ``y_vals - x_vals``.
+        - ``"mae"``: mean absolute error.
+        - ``"rmse"``: root mean square error.
+        - ``"si"``: scatter index, RMSE divided by the mean of `x_vals`
+          (NaN if that mean is zero).
+        - ``"corr"``: Pearson correlation coefficient.
+        - ``"n"``: number of pairs.
+    """
+    diff = y_vals - x_vals
+    mean_x = float(np.mean(x_vals))
+    return {
+        "bias": float(np.mean(diff)),
+        "mae": float(np.mean(np.abs(diff))),
+        "rmse": float(np.sqrt(np.mean(diff ** 2))),
+        "si": float(np.sqrt(np.mean(diff ** 2)) / mean_x) if mean_x != 0 else np.nan,
+        "corr": float(np.corrcoef(x_vals, y_vals)[0, 1]),
+        "n": int(len(x_vals)),
+    }
+
+
 def table_to_latex(
         table: pd.DataFrame,
         filename: str,

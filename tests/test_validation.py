@@ -1,6 +1,15 @@
+import importlib
+import sys
+
 import pytest
 
 from metocean_stats.validation import TimeSeriesValidation
+
+
+def test_import_warns_deprecated():
+    sys.modules.pop("metocean_stats.validation", None)
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        importlib.import_module("metocean_stats.validation")
 
 
 @pytest.fixture

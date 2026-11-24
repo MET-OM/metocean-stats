@@ -44,6 +44,13 @@ from .timeseries import TimeSeries, Variable
 from .plotting import plot_rose
 from .utils import infer_step, bin_edges
 
+warnings.warn(
+    "metocean_stats.validation (TimeSeriesValidation) is deprecated and "
+    "may be changed or removed completely in the future.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 def _fmt_timedelta(td: pd.Timedelta) -> str:
     """Format a Timedelta into a human-readable string."""
     if pd.isna(td):
