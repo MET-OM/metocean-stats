@@ -78,6 +78,19 @@ def test_eva_plot_return_value_comparison_nearest_level(pts_eva):
         pts_eva.EVA.plot_return_value_comparison(level=23.0, by="all", return_periods=[1, 10])
 
 
+def test_eva_plot_return_value_confidence(pts_eva):
+    pts_eva.EVA.plot_return_value_confidence(
+        level=25.0, by="all", method="AM", dist="genextreme", return_periods=[1, 10], samples=20,
+    )
+
+
+def test_eva_plot_return_value_confidence_nearest_level(pts_eva):
+    with pytest.warns(UserWarning, match="nearest fitted level"):
+        pts_eva.EVA.plot_return_value_confidence(
+            level=23.0, by="all", method="AM", dist="genextreme", return_periods=[1, 10], samples=20,
+        )
+
+
 def test_eva_fit(pts):
     pts.EVA.get_extremes()
     pts.EVA.fit(AM_dist=["genextreme"], POT_dist=["genpareto"])

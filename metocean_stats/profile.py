@@ -2610,6 +2610,70 @@ class ProfileEVA:
             nfigs=nfigs, **kwargs,
         )
 
+    def plot_return_value_confidence(
+        self,
+        level: float,
+        by: Literal["all", "direction", "month"],
+        method: str,
+        dist: str,
+        return_periods: list[float],
+        ax: "plt.Axes | list[plt.Axes] | None" = None,
+        ncols: int = 3,
+        nfigs: int = 1,
+        **kwargs,
+    ) -> "plt.Axes | np.ndarray[plt.Axes]":
+        """
+        Return-value confidence-band plot at the single fitted level
+        closest to `level` -- the bootstrapped counterpart of
+        `plot_return_value_comparison`.
+
+        Levels cannot be interpolated here, for the same reason as
+        `plot_return_value_comparison`: this always snaps to the nearest
+        actually-fitted level, with a warning if that isn't an exact
+        match.
+
+        All parameters other than `level` are passed straight through to
+        `UnivariateEVA.plot_return_value_confidence` -- see that method
+        for the full set of accepted keyword arguments (``duration``,
+        ``poisson_correction``, ``alphas``, ``cmap``, ``table_scale``,
+        ``table_flip``, ``samples``).
+
+        Parameters
+        ----------
+        level : float
+            Level to diagnose, as any numeric value -- not necessarily
+            one that was actually fitted. Resolved to the nearest fitted
+            level.
+        by, method, dist, return_periods, ax, ncols, nfigs, **kwargs
+            Passed straight through to
+            `UnivariateEVA.plot_return_value_confidence`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.EVA.plot_return_value_confidence(level=10, by="all", method="AM", dist="GEV", return_periods=[1, 10, 100])
+
+        .. image:: /files_v2/profile_eva_plot_return_value_confidence.png
+           :width: 600
+        """
+        resolved_level = self._nearest_fitted_level(level)
+        if resolved_level != level:
+            warnings.warn(
+                f"level={level} has no fitted model -- using the nearest "
+                f"fitted level, {resolved_level}.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self.models[resolved_level].plot_return_value_confidence(
+            by=by, method=method, dist=dist, return_periods=return_periods,
+            ax=ax, ncols=ncols, nfigs=nfigs, **kwargs,
+        )
+
     # ---------------------------------------------------------------------- #
     # Turkstra profiles
     # ---------------------------------------------------------------------- #
