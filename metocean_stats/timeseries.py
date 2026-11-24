@@ -742,6 +742,8 @@ class TimeSeries:
         seasons: dict[str, list[int]] = None,
         step: float = None,
         direction: str = None,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> pd.DataFrame:
         """
         Aggregated statistics grouped by month, season, direction, or year.
@@ -765,6 +767,16 @@ class TimeSeries:
         direction : str, optional
             Direction variable to use instead of the default direction variable
             set at initialisation. Only used when by="direction".
+        interp : str, default "nearest"
+            Interpolation method for "median" and percentile statistics (see
+            `utils.aggregate_statistics`). Defaults to "nearest" so a reported
+            quantile is always an actual observed value, not an interpolated
+            one in between.
+        min_samples : int, default 100
+            Minimum valid sample count a group must have to compute its
+            "median"/percentile statistics; below this, those are NaN for
+            that group. Other statistics (count, min, max, mean, std, "%")
+            are always computed regardless of group size.
 
         Returns
         -------
@@ -798,7 +810,8 @@ class TimeSeries:
         n_total = len(self.data)
 
         df = pd.DataFrame(
-            {label: aggregate_statistics(s, stats, total=n_total) for label, s in groups.items()}
+            {label: aggregate_statistics(s, stats, total=n_total, interp=interp, min_samples=min_samples)
+             for label, s in groups.items()}
         ).T
         _by_names = {"direction": "sector"}
         if by in self._variables:
@@ -2016,6 +2029,8 @@ class TimeSeries:
         seasons_row: dict[str, list[int]] = None,
         seasons_col: dict[str, list[int]] = None,
         observed: bool = False,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> pd.DataFrame:
         """
         2D summary statistics table: one variable aggregated across two
@@ -2067,6 +2082,14 @@ class TimeSeries:
             (the default) means every category of a fixed-domain grouping
             (month, season, hour, day, week) is always a row/column, even
             if empty; True restricts to categories actually present.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile ``stat``, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed value.
+        min_samples : int, default 100
+            Minimum sample count a cell must have to compute a
+            "median"/percentile ``stat``; below this, that cell is NaN.
+            Only applies to those two kinds of ``stat``.
 
         Returns
         -------
@@ -2092,7 +2115,7 @@ class TimeSeries:
             row=row, col=col, variable=variable, stat=stat,
             step_row=step_row, step_col=step_col, margins=margins,
             sectors=sectors, seasons_row=seasons_row, seasons_col=seasons_col,
-            observed=observed,
+            observed=observed, interp=interp, min_samples=min_samples,
         )
         return df
 
@@ -2108,6 +2131,8 @@ class TimeSeries:
         seasons_row: dict[str, list[int]] = None,
         seasons_col: dict[str, list[int]] = None,
         observed: bool = False,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> "tuple[pd.DataFrame, dict, dict]":
         """
         Shared implementation behind `statistics_2d` (which only returns the
@@ -2138,7 +2163,7 @@ class TimeSeries:
         # Parse stat                                                           #
         # ------------------------------------------------------------------ #
         def _apply_stat(s: pd.Series) -> float:
-            return aggregate_statistics(s, [stat], total=n_total)[stat]
+            return aggregate_statistics(s, [stat], total=n_total, interp=interp, min_samples=min_samples)[stat]
 
         # ------------------------------------------------------------------ #
         # Build row and col groups via the shared grouping primitive           #
@@ -2194,6 +2219,8 @@ class TimeSeries:
             table: bool = False,
             figsize: "tuple[float, float] | None" = None,
             ax: "plt.Axes | None" = None,
+            interp: str = "nearest",
+            min_samples: int = 100,
         ) -> "plt.Axes":
             """
             Line plot of ``statistics``: aggregated statistics for one variable
@@ -2229,6 +2256,12 @@ class TimeSeries:
                 Figure size. Ignored when ``ax`` is supplied.
             ax : plt.Axes, optional
                 Axes to draw on. If None, a new figure is created.
+            interp : str, default "nearest"
+                Interpolation method for "median"/percentile statistics,
+                passed straight through to ``statistics``.
+            min_samples : int, default 100
+                Minimum per-group sample count to compute "median"/percentile
+                statistics, passed straight through to ``statistics``.
 
             Returns
             -------
@@ -2271,6 +2304,7 @@ class TimeSeries:
             df = self.statistics(
                 by=by, variable=variable, stats=stats,
                 sectors=sectors, seasons=seasons, step=step,
+                interp=interp, min_samples=min_samples,
             ).T
             df = df.drop(columns="All", errors="ignore")
 
@@ -2422,6 +2456,8 @@ class TimeSeries:
         text_color: "typing.Literal['auto'] | str" = "auto",
         ax: "plt.Axes | None" = None,
         figsize: "tuple[float, float] | None" = None,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> "plt.Axes":
         """
         Heatmap of ``statistics_2d``: one variable aggregated across two
@@ -2499,6 +2535,12 @@ class TimeSeries:
             Axes to draw on. If None, a new figure is created.
         figsize : tuple[float, float], optional
             Figure size in inches. Ignored when ``ax`` is supplied.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile ``stat_cells``/
+            ``stat_margins``, passed through to `utils.aggregate_statistics`.
+        min_samples : int, default 100
+            Minimum sample count a cell/margin must have to compute a
+            "median"/percentile statistic; below this it is NaN.
 
         Returns
         -------
@@ -2557,7 +2599,7 @@ class TimeSeries:
             row=row, col=col, variable=variable, stat=stat_cells,
             step_row=step_row, step_col=step_col, margins=False,
             sectors=sectors, seasons_row=seasons_row, seasons_col=seasons_col,
-            observed=observed,
+            observed=observed, interp=interp, min_samples=min_samples,
         )
 
         margin_col = margin_row = corner = None
@@ -2569,7 +2611,7 @@ class TimeSeries:
                 row=row, col=col, variable=variable, stat=stat_margins,
                 step_row=step_row, step_col=step_col, margins=True,
                 sectors=sectors, seasons_row=seasons_row, seasons_col=seasons_col,
-                observed=observed,
+                observed=observed, interp=interp, min_samples=min_samples,
             )
             margin_col = df_m.loc[df.index, "All"]      # per-row summary -> right
             margin_row = df_m.loc["All", df.columns]     # per-col summary -> top

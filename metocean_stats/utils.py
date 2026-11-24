@@ -480,6 +480,8 @@ def aggregate_statistics(
         series: pd.Series,
         stats: list[str],
         total: int | None = None,
+        interp: str = "linear",
+        min_samples: int = 1,
     ) -> dict:
     """
     Compute named statistics of a series.
@@ -504,6 +506,18 @@ def aggregate_statistics(
     total : int, optional
         Denominator for ``"%"`` / ``"density"``. Required only if `stats`
         includes one of those tokens.
+    interp : str, default "linear"
+        Interpolation method passed to `pandas.Series.quantile` for
+        ``"median"`` and percentile statistics (median is just the 50th
+        percentile). Any value accepted there, e.g. ``"nearest"`` to force
+        quantiles onto actual observed values rather than interpolating
+        between them.
+    min_samples : int, default 1
+        Minimum valid (non-NaN) sample count required to compute
+        ``"median"``/percentile statistics; below this, NaN is returned
+        instead. Only applies to those two kinds -- count, min, max, mean,
+        std and "%"/density are unaffected and always computed regardless
+        of sample size.
 
     Returns
     -------
@@ -524,6 +538,8 @@ def aggregate_statistics(
     parsed = {name: _parse_stat(name) for name in stats}
     ordered_names = sorted(parsed, key=lambda name: _stat_sort_key(parsed[name]))
 
+    enough_samples = series.count() >= min_samples
+
     result = {}
     for name in ordered_names:
         kind, pct = parsed[name]
@@ -538,9 +554,9 @@ def aggregate_statistics(
         elif kind == "std":
             result[name] = series.std()
         elif kind == "median":
-            result[name] = series.median()
+            result[name] = series.quantile(0.5, interpolation=interp) if enough_samples else np.nan
         elif kind == "percentile":
-            result[name] = series.quantile(pct / 100.0)
+            result[name] = series.quantile(pct / 100.0, interpolation=interp) if enough_samples else np.nan
         elif kind == "percent_of_total":
             if total is None:
                 raise ValueError(
