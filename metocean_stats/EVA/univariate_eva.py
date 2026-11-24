@@ -758,7 +758,13 @@ class UnivariateEVA:
 
         # Ticks and grid
         ax.semilogx()
-        ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+        # Plain ScalarFormatter shows decimals when the xlim spans less than
+        # a decade (e.g. ticks at 0.9, 1.2) -- round to whole years instead,
+        # unless `return_periods` itself asked for fractional years (e.g.
+        # [0.1, 1, 10]), in which case every tick keeps one decimal place.
+        all_whole = all(float(rp).is_integer() for rp in return_periods)
+        tick_fmt = (lambda x,_: f"{x:.0f}") if all_whole else (lambda x,_: f"{x:.1f}")
+        ax.xaxis.set_major_formatter(mticker.FuncFormatter(tick_fmt))
         ax.grid(True,which="both")
         ax.grid(True,which="minor",linestyle="--")
 
