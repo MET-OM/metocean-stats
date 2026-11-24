@@ -40,6 +40,18 @@ def test_plot_isodensity_contours_with_explicit_ax(bvm_fit, rve):
     bvm_fit.plot_isodensity_contours(by="all", RVE=rve, ax=ax)
 
 
+def test_plot_contours(bvm_fit):
+    for by in ("all", "month", "direction"):
+        bvm_fit.plot_contours(by=by, periods=[10, 100])
+
+
+def test_table_contours(bvm_fit):
+    for by in ("month", "direction"):
+        tables = bvm_fit.table_contours(by=by, return_period=100)
+        any_table = next(iter(tables.values()))
+        assert list(any_table.columns) == ["100-yr $T_p$$_L$", "100-yr $T_p$$_H$"]
+
+
 def test_table_isodensity_contours(bvm_fit, rve):
     bvm_fit.table_isodensity_contours(by="month", RVE=rve)
 
@@ -113,6 +125,11 @@ def test_plot_marginal_quantiles_with_explicit_axes(bvm_fit):
     n = len(bvm_fit.data_monthly)
     fig, axes = plt.subplots(2 * n, 1)
     bvm_fit.plot_marginal_quantiles(by="month", axes=axes.ravel())
+
+
+def test_plot_marginal_quantiles_subsample(bvm_fit):
+    for by in ("all", "month", "direction"):
+        bvm_fit.plot_marginal_quantiles(by=by, subsample=5)
 
 
 def test_plot_dependence_functions(bvm_fit):
