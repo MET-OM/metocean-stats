@@ -586,8 +586,12 @@ def _draw_pcolormesh(ax, transform, *, lon2d, lat2d, z, cmap, vmin, vmax, label,
     return pc
 
 
+# Small opaque box so a label stays legible over busy map backgrounds.
+_DEFAULT_TEXT_BBOX = dict(boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=1.0)
+
+
 def _draw_points(ax, transform, *, lons, lats, texts, markers, colors, markersizes,
-                  text_offsets, text_kwargs_list, labels, **kwargs):
+                  text_offsets, text_kwargs_list, text_backgrounds, labels, **kwargs):
     """Draw one or more points of interest. All the per-point arguments here
     are already-broadcast lists of equal length (see _broadcast_point_params);
     this function just loops over them and draws each one, using **kwargs
@@ -602,6 +606,7 @@ def _draw_points(ax, transform, *, lons, lats, texts, markers, colors, markersiz
         markersize = markersizes[idx]
         text_offset = text_offsets[idx]
         text_kwargs = text_kwargs_list[idx]
+        text_background = text_backgrounds[idx]
         label = labels[idx]
 
         kw = dict(marker=marker, color=color, markersize=markersize, linestyle="none", transform=transform)
@@ -613,9 +618,12 @@ def _draw_points(ax, transform, *, lons, lats, texts, markers, colors, markersiz
         txt = None
         if text:
             dx, dy = text_offset
+            text_kwargs = text_kwargs or {}
+            if text_background and "bbox" not in text_kwargs:
+                text_kwargs = {**text_kwargs, "bbox": _DEFAULT_TEXT_BBOX}
             txt = ax.text(
                 lon + dx, lat + dy, text, transform=transform,
-                **{"fontsize": 9, "ha": "left", "va": "bottom", **(text_kwargs or {})},
+                **{"fontsize": 9, "ha": "left", "va": "bottom", **text_kwargs},
             )
         artists.append((point, txt))
     return artists if n > 1 else artists[0]
@@ -1136,7 +1144,7 @@ class Spatial:
 
     def add_points_of_interest(self, lons, lats, texts=None, *, markers="o", colors="k",
                                  markersizes=6, text_offsets=(0.02, 0.02), text_kwargs=None,
-                                 labels=None, **kwargs):
+                                 text_background=True, labels=None, **kwargs):
         """
         Queue one or more points of interest, such as stations or platforms.
 
@@ -1155,7 +1163,13 @@ class Spatial:
         text_offsets : tuple of float or list of tuple, default (0.02, 0.02)
             Offset of each label from its point, as ``(dx, dy)`` in degrees.
         text_kwargs : dict or list of dict, optional
-            Keyword arguments for `matplotlib.axes.Axes.text`.
+            Keyword arguments for `matplotlib.axes.Axes.text`. A ``bbox`` key
+            here always takes precedence over `text_background`.
+        text_background : bool or list of bool, default True
+            If True, draw a small opaque white box behind each label so it
+            stays legible over busy map backgrounds (bathymetry, imagery,
+            coastlines, ...). Ignored for a point whose `text_kwargs` already
+            sets its own ``bbox``.
         labels : str or list of str, optional
             Legend labels.
         **kwargs
@@ -1209,14 +1223,16 @@ class Spatial:
         broadcast = _broadcast_point_params(
             n,
             texts=texts, markers=markers, colors=colors, markersizes=markersizes,
-            text_offsets=text_offsets_in, text_kwargs=text_kwargs, labels=labels,
+            text_offsets=text_offsets_in, text_kwargs=text_kwargs,
+            text_background=text_background, labels=labels,
         )
 
         return self._add_layer(
             _draw_points, lons=list(lons_arr), lats=list(lats_arr),
             texts=broadcast["texts"], markers=broadcast["markers"], colors=broadcast["colors"],
             markersizes=broadcast["markersizes"], text_offsets=broadcast["text_offsets"],
-            text_kwargs_list=broadcast["text_kwargs"], labels=broadcast["labels"], **kwargs,
+            text_kwargs_list=broadcast["text_kwargs"], text_backgrounds=broadcast["text_background"],
+            labels=broadcast["labels"], **kwargs,
         )
 
     def add_coastline(self, *, resolution=None, color="black", linewidth=1.0, **kwargs):
