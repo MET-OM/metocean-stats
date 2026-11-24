@@ -998,6 +998,8 @@ class ProfileTimeSeries:
         seasons: dict[str, list[int]] | None = None,
         levels: list[float] | None = None,
         interp: str = "nearest",
+        stat_interp: str = "nearest",
+        min_samples: int = 100,
     ) -> pd.DataFrame:
         """
         Aggregated statistic(s) for one profile variable, with level
@@ -1062,6 +1064,16 @@ class ProfileTimeSeries:
             anything else interpolates numerically between computed
             levels via pandas/scipy. Ignored if `levels` is None. See
             `_resolve_level_axis` for details.
+        stat_interp : str, default "nearest"
+            Interpolation method for "median"/percentile `stat`, passed to
+            `utils.aggregate_statistics`. Unrelated to `interp` above (which
+            resolves *levels*, not quantiles); defaults to "nearest" so a
+            reported quantile is always an actual observed value.
+        min_samples : int, default 100
+            Minimum valid sample count a level/group must have to compute a
+            "median"/percentile `stat`; below this, NaN is returned instead.
+            Other statistics (count, min, max, mean, std) are always
+            computed regardless of sample size.
 
         Returns
         -------
@@ -1110,7 +1122,9 @@ class ProfileTimeSeries:
                 if level not in group_df.columns or group_df[level].dropna().empty:
                     rows[level] = {s: np.nan for s in stats_}
                     continue
-                rows[level] = aggregate_statistics(group_df[level].dropna(), stats_)
+                rows[level] = aggregate_statistics(
+                    group_df[level].dropna(), stats_, interp=stat_interp, min_samples=min_samples,
+                )
             return pd.DataFrame(rows).T
 
         if by == "all":
@@ -1263,6 +1277,8 @@ class ProfileTimeSeries:
         seasons: dict[str, list[int]] | None = None,
         levels: list[float] | None = None,
         interp: str = "nearest",
+        stat_interp: str = "nearest",
+        min_samples: int = 100,
         ncols: int = 3,
         plot_kwargs: dict | None = None,
         ax: "np.ndarray[plt.Axes] | None" = None,
@@ -1320,6 +1336,13 @@ class ProfileTimeSeries:
             Max columns in the subplot grid, when by != "all". Defaults
             to 3, matching `plot_return_values`'s default. Unused for
             by="all" (always a single Axes).
+        stat_interp : str, default "nearest"
+            Interpolation method for "median"/percentile `stat`. Passed
+            straight through to `statistics()`. Unrelated to `interp`
+            above (which resolves *levels*, not quantiles).
+        min_samples : int, default 100
+            Minimum sample count to compute a "median"/percentile `stat`.
+            Passed straight through to `statistics()`.
         plot_kwargs : dict, optional
             Passed through to ax.plot() for every line.
         ax : matplotlib.axes.Axes or array of Axes, optional
@@ -1362,7 +1385,10 @@ class ProfileTimeSeries:
         # by="all": single Axes, one line per stat -- unchanged behaviour.#
         # --------------------------------------------------------------- #
         if by == "all":
-            table = self.statistics(var=var, by="all", stat=stats, levels=levels, interp=interp)
+            table = self.statistics(
+                var=var, by="all", stat=stats, levels=levels, interp=interp,
+                stat_interp=stat_interp, min_samples=min_samples,
+            )
 
             if ax is None:
                 _, ax = plt.subplots()
@@ -1401,6 +1427,7 @@ class ProfileTimeSeries:
             s: self.statistics(
                 var=var, by=by, stat=s, direction=direction,
                 sectors=sectors, seasons=seasons, levels=levels, interp=interp,
+                stat_interp=stat_interp, min_samples=min_samples,
             ).drop(columns="All", errors="ignore")
             for s in stats
         }
@@ -2510,6 +2537,79 @@ class ProfileEVA:
             _extend_xlim_to_zero(ax)
             _extend_ylim_to_zero(ax)
         return ax_arr
+
+    def _nearest_fitted_level(self, level: float) -> float:
+        """Closest level with at least one fitted model, or raise."""
+        fitted = [lv for lv, m in self.models.items() if m._fitted_models]
+        if not fitted:
+            raise ValueError(
+                "No fitted model for any level -- call get_extremes() and "
+                "fit() first."
+            )
+        return min(fitted, key=lambda lv: abs(lv - level))
+
+    def plot_return_value_comparison(
+        self,
+        level: float,
+        by: Literal["all", "direction", "month"],
+        return_periods: list[float],
+        ax: "plt.Axes | list[plt.Axes] | None" = None,
+        ncols: int = 3,
+        nfigs: int = 1,
+        **kwargs,
+    ) -> "plt.Axes | np.ndarray[plt.Axes]":
+        """
+        Diagnostic return-value comparison plot (observed vs. fitted) at
+        the single fitted level closest to `level`.
+
+        Levels cannot be interpolated here -- each level has its own
+        independently-fitted model(s), and there is no meaningful "model
+        halfway between two fitted levels" to draw a comparison for. This
+        always snaps to the nearest actually-fitted level instead, with a
+        warning if that isn't an exact match.
+
+        All parameters other than `level` are passed straight through to
+        `UnivariateEVA.plot_return_value_comparison` -- see that method
+        for the full set of accepted `**kwargs` (``duration_POT``,
+        ``duration_IDM``, ``poisson_correction``, ``scatter_kwargs_*``,
+        ``plot_kwargs_*``, ``table_kwargs``, ``legend_kwargs``, ...).
+
+        Parameters
+        ----------
+        level : float
+            Level to diagnose, as any numeric value -- not necessarily
+            one that was actually fitted. Resolved to the nearest fitted
+            level.
+        by, return_periods, ax, ncols, nfigs, **kwargs
+            Passed straight through to
+            `UnivariateEVA.plot_return_value_comparison`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes or numpy.ndarray of matplotlib.axes.Axes
+
+        Examples
+        --------
+        .. code-block:: python
+
+            pts.EVA.plot_return_value_comparison(level=10, by="all", return_periods=[1, 10, 100])
+
+        .. image:: /files_v2/profile_eva_plot_return_value_comparison.png
+           :width: 600
+        """
+        resolved_level = self._nearest_fitted_level(level)
+        if resolved_level != level:
+            warnings.warn(
+                f"level={level} has no fitted model -- using the nearest "
+                f"fitted level, {resolved_level}.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self.models[resolved_level].plot_return_value_comparison(
+            by=by, return_periods=return_periods, ax=ax, ncols=ncols,
+            nfigs=nfigs, **kwargs,
+        )
+
     # ---------------------------------------------------------------------- #
     # Turkstra profiles
     # ---------------------------------------------------------------------- #

@@ -1071,6 +1071,7 @@ class TimeSeries:
         seasons: dict[str, list[int]] = None,
         step: float = None,
         direction: str = None,
+        interp: str = "nearest",
     ) -> pd.DataFrame:
         """
         Statistics of block maxima grouped by year, month, season, direction,
@@ -1104,6 +1105,10 @@ class TimeSeries:
         direction : str, optional
             Direction variable to use instead of the default direction variable
             set at initialisation. Only used when by="direction".
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile statistics, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed block maximum.
 
         Returns
         -------
@@ -1223,16 +1228,16 @@ class TimeSeries:
         if by == "year":
             # Simple case: one value per year
             for label, max_val in maxima_series.items():
-                records[label] = aggregate_statistics(pd.Series([max_val]), stats)
-            records["All"] = aggregate_statistics(maxima_series, stats)
+                records[label] = aggregate_statistics(pd.Series([max_val]), stats, interp=interp)
+            records["All"] = aggregate_statistics(maxima_series, stats, interp=interp)
         else:
             # Complex case: multiple maxima per group
             for label, max_series in maxima_series.items():
-                records[label] = aggregate_statistics(max_series, stats)
+                records[label] = aggregate_statistics(max_series, stats, interp=interp)
             
             # "All": concatenate all maxima across all groups
             all_maxima = pd.concat(list(maxima_series.values()))
-            records["All"] = aggregate_statistics(all_maxima, stats)
+            records["All"] = aggregate_statistics(all_maxima, stats, interp=interp)
 
         df = pd.DataFrame(records).T  # Transpose: groups as rows, stats as columns
 
@@ -1251,6 +1256,7 @@ class TimeSeries:
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         by_step: float = None,
+        interp: str = "nearest",
     ) -> pd.DataFrame:
         """
         Statistics of exceedance events: periods where the variable is
@@ -1284,6 +1290,10 @@ class TimeSeries:
             Custom season map. Used only when by="season".
         by_step : float, optional
             Bin width when by is a variable name. Inferred if not provided.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile statistics, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed duration.
 
         Returns
         -------
@@ -1383,7 +1393,7 @@ class TimeSeries:
 
         for label in ordered_labels:
             grp_durations        = events.loc[events["group"] == label, "duration"]
-            records[label]       = aggregate_statistics(grp_durations, stats)
+            records[label]       = aggregate_statistics(grp_durations, stats, interp=interp)
             event_counts[label]  = len(grp_durations)
 
         # ------------------------------------------------------------------ #
@@ -1400,7 +1410,7 @@ class TimeSeries:
                 records[label]["Yearly"] = event_counts[label] / n_years
 
         # "Yearly" summary row: always total events / n_years regardless of `by`
-        yearly_row           = aggregate_statistics(events["duration"], stats)
+        yearly_row           = aggregate_statistics(events["duration"], stats, interp=interp)
         yearly_row["Yearly"] = len(events) / n_years
         records["Yearly"]    = yearly_row
 
@@ -1437,6 +1447,7 @@ class TimeSeries:
         step: "float | None" = None,
         min_years: int = 5,
         min_entries_per_year: int = 100,
+        interp: str = "nearest",
     ) -> "pd.DataFrame":
         """
         Inter-annual trend analysis grouped by month, season, direction, or a
@@ -1494,6 +1505,10 @@ class TimeSeries:
         min_entries_per_year : int, default 100
             Minimum number of non-NaN samples a given year must contain
             within the group to be included in the trend fit.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile ``stat``, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed value.
 
         Returns
         -------
@@ -1574,11 +1589,11 @@ class TimeSeries:
         # Statistic helper                                                     #
         # ------------------------------------------------------------------ #
         def _apply_stat(s: "pd.Series") -> float:
-            return float(aggregate_statistics(s, [stat])[stat])
+            return float(aggregate_statistics(s, [stat], interp=interp)[stat])
 
         # Fail fast (and with a consistent message) on an unrecognised `stat`,
         # rather than deferring to the first per-group-per-year call below.
-        aggregate_statistics(pd.Series([1.0, 2.0]), [stat])
+        aggregate_statistics(pd.Series([1.0, 2.0]), [stat], interp=interp)
 
         # ------------------------------------------------------------------ #
         # NaN row — returned for groups with insufficient data                #
@@ -2703,10 +2718,21 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         # Colorbar                                                             #
         # ------------------------------------------------------------------ #
+        # When margins=True, a right-margin table is rendered later with
+        # bbox=(1, 0, corner_frac, 1) -- i.e. it occupies a strip of width
+        # `corner_frac`, expressed as a *fraction of the main axes' own
+        # width* (axes-fraction coordinates). `make_axes_locatable`/
+        # `append_axes` percentage-string sizes use the exact same
+        # reference (the parent axes' width), so reserving `pad` as that
+        # same fraction (plus a small fixed gap) guarantees the colorbar
+        # is locked flush against the right edge of the margin table,
+        # regardless of column count, instead of a fixed guessed pad that
+        # overlaps whenever the margin table happens to be wide.
+        corner_frac = 1 / len(df.columns)
         if margins:
             from mpl_toolkits.axes_grid1 import make_axes_locatable
             divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="4%", pad=0.55)
+            cax = divider.append_axes("right", size="4%", pad=f"{corner_frac * 100 + 2:.2f}%")
             cbar = ax.figure.colorbar(mesh, cax=cax)
         else:
             cbar = ax.figure.colorbar(mesh, ax=ax, pad=0.02)
@@ -2773,8 +2799,8 @@ class TimeSeries:
             def _fmt_or_blank(v):
                 return "" if (v is None or (isinstance(v, float) and np.isnan(v))) else format(v, fmt_margins)
 
-            n_cols = len(df.columns)
-            corner_frac = 1 / n_cols
+            # corner_frac already computed above (also drives the colorbar's
+            # reserved pad, so both stay in lockstep).
             top_height  = 1 / len(df.index)
 
             top_row   = [[_fmt_or_blank(v) for v in margin_row.values] + [_fmt_or_blank(corner)]]

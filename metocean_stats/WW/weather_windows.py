@@ -607,6 +607,8 @@ class WeatherWindow:
         sectors: int = None,
         seasons: dict[str, list[int]] = None,
         step: float = None,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> pd.DataFrame:
         """
         Aggregate a weather window metric over groups.
@@ -630,6 +632,15 @@ class WeatherWindow:
             Default DJF, MAM, JJA, SON.
         step : float, optional
             Bin width when ``by`` is a column. Inferred if None.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile statistics, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed value.
+        min_samples : int, default 100
+            Minimum valid sample count a group must have to compute a
+            "median"/percentile statistic; below this, NaN is returned
+            instead. Other statistics (count, min, max, mean, std, "%")
+            are always computed regardless of group size.
 
         Returns
         -------
@@ -692,7 +703,8 @@ class WeatherWindow:
         n_total = len(self.result)
 
         df = pd.DataFrame({
-            label: aggregate_statistics(s, stats, total=n_total) for label, s in groups.items()
+            label: aggregate_statistics(s, stats, total=n_total, interp=interp, min_samples=min_samples)
+            for label, s in groups.items()
         }).T
         df.index.name = by
         df.columns.name = metric
@@ -954,6 +966,8 @@ class WeatherWindow:
         figsize: tuple = None,
         colormap: str = "tab10",
         show_table: bool = True,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ):
         """
         Plot statistics of a weather window metric per group.
@@ -987,6 +1001,12 @@ class WeatherWindow:
             Matplotlib colormap for the lines. Default "tab10".
         show_table : bool, optional
             Draw the summary table below the axes. Default True.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile statistics, passed
+            straight through to ``statistics``.
+        min_samples : int, default 100
+            Minimum per-group sample count to compute "median"/percentile
+            statistics, passed straight through to ``statistics``.
 
         Returns
         -------
@@ -1060,6 +1080,8 @@ class WeatherWindow:
             sectors=sectors,
             seasons=seasons,
             step=step,
+            interp=interp,
+            min_samples=min_samples,
         ).T
 
         # Transpose so: index = categories (Jan, Feb, …), columns = stats
@@ -1260,6 +1282,8 @@ class WeatherWindow:
         sectors: int = None,
         seasons_row: dict[str, list[int]] = None,
         seasons_col: dict[str, list[int]] = None,
+        interp: str = "nearest",
+        min_samples: int = 100,
     ) -> pd.DataFrame:
         """
         Tabulate a weather window metric over two grouping axes.
@@ -1293,6 +1317,13 @@ class WeatherWindow:
             Season definitions for ``row``.
         seasons_col : dict of str to list of int, optional
             Season definitions for ``col``.
+        interp : str, default "nearest"
+            Interpolation method for "median"/percentile ``stat``, passed
+            through to `utils.aggregate_statistics`. Defaults to "nearest"
+            so a reported quantile is always an actual observed value.
+        min_samples : int, default 100
+            Minimum valid sample count a cell must have to compute a
+            "median"/percentile ``stat``; below this, that cell is NaN.
 
         Returns
         -------
@@ -1360,8 +1391,8 @@ class WeatherWindow:
         # ------------------------------------------------------------------
         # Fail fast on an unrecognised `stat`, consistent with the shared parser.
         # ------------------------------------------------------------------
-        aggregate_statistics(pd.Series([1.0, 2.0]), [stat])
-        agg_fn = lambda s: aggregate_statistics(s, [stat])[stat]
+        aggregate_statistics(pd.Series([1.0, 2.0]), [stat], interp=interp)
+        agg_fn = lambda s: aggregate_statistics(s, [stat], interp=interp, min_samples=min_samples)[stat]
 
         # ------------------------------------------------------------------
         # Get groups for each axis
