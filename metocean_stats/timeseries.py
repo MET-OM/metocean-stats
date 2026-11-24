@@ -2560,7 +2560,7 @@ class TimeSeries:
             observed=observed,
         )
 
-        margin_col = margin_row = None
+        margin_col = margin_row = corner = None
         if margins:
             # Independent statistics_2d call using stat_margins — margins
             # are NOT derived from the per-cell stat_cells values, since
@@ -2573,6 +2573,7 @@ class TimeSeries:
             )
             margin_col = df_m.loc[df.index, "All"]      # per-row summary -> right
             margin_row = df_m.loc["All", df.columns]     # per-col summary -> top
+            corner     = df_m.loc["All", "All"]          # grand total -> top-right
 
         var       = self._resolve_variable(variable, default=self.primary)
         stat_display, with_variable = _stat_label(stat_cells)
@@ -2730,12 +2731,26 @@ class TimeSeries:
             def _fmt_or_blank(v):
                 return "" if (v is None or (isinstance(v, float) and np.isnan(v))) else format(v, fmt_margins)
 
-            top_row   = [[_fmt_or_blank(v) for v in margin_row.values]]
+            n_cols = len(df.columns)
+            corner_frac = 1 / n_cols
+            top_height  = 1 / len(df.index)
+
+            top_row   = [[_fmt_or_blank(v) for v in margin_row.values] + [_fmt_or_blank(corner)]]
             right_col = [[_fmt_or_blank(v)] for v in margin_col.values[::-1]]
 
-            ax.table(top_row, loc="top", cellLoc="center")
-            ax.table(right_col, loc="right", cellLoc="center",
-                    bbox=(1, 0, 1 / len(df.columns), 1))
+            right_table = ax.table(right_col, loc="right", cellLoc="center",
+                    bbox=(1, 0, corner_frac, 1))
+            top_table = ax.table(
+                top_row, cellLoc="center",
+                bbox=(0, 1, 1 + corner_frac, top_height),
+            )
+
+            # Match the top margin's font size to whatever the right margin
+            # auto-sized itself to, so the two stay visually consistent.
+            ax.figure.canvas.draw()  # force layout so auto-fit sizes are populated
+            right_fontsize = next(iter(right_table.get_celld().values())).get_fontsize()
+            top_table.auto_set_font_size(False)
+            top_table.set_fontsize(right_fontsize)
 
         return ax
 
