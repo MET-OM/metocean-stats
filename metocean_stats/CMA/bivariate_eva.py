@@ -168,6 +168,30 @@ class BivariateEVA:
                 f"{data_interval:.2f}h, not {state_duration:.2f}h.")
         return state_duration
 
+    def _exposure_fraction(self,by:typing.Literal["month","direction"],subset:str) -> float:
+        """
+        Fraction of all `data_omni` observations found in one month/sector
+        subset -- i.e. that subset's empirical rate of events relative to
+        the omni rate.
+
+        This is the same correction `UnivariateEVA` applies to POT/IDM
+        subset models via `exposure_fraction` (see
+        `UnivariateEVA._get_return_value`): a subset's candidate-event rate
+        is the omni rate scaled by its share of the data, so an event as
+        rare as the nominal `return_period` *from that subset specifically*
+        corresponds to an effective return period of
+        ``return_period * exposure_fraction`` in the subset's own fitted
+        distribution (fewer events arrive from a narrow month/sector per
+        year, so a locally-X-year event there is more common than this
+        subset's data would suggest if treated as if it were the whole
+        year). The omni subset itself ("Yearly"/"Omni") always has
+        fraction 1.0 -- no correction applies there.
+        """
+        if subset in ("Yearly","Omni"):
+            return 1.0
+        groups = self.data_monthly if by == "month" else self.data_sectors
+        return len(groups[subset]) / len(self.data_omni)
+
     def fit(
             self,
             sector_errors:typing.Literal["ignore","raise"] = "ignore",
@@ -268,9 +292,19 @@ class BivariateEVA:
             data:pd.DataFrame = None,
             state_duration:float = None,
             contour_method:str = "IFORM",
+            exposure_fraction:float = 1.0,
             **kwargs,
         ):
-        """Draw environmental contours for one subset, or its data if the model is missing."""
+        """
+        Draw environmental contours for one subset, or its data if the
+        model is missing.
+
+        `periods` are the nominal (displayed) return periods; the actual
+        contour is computed at ``period * exposure_fraction`` (see
+        `_exposure_fraction`) so subset models are properly corrected for
+        their empirical rate of events, while the legend/labels still show
+        the nominal periods the caller asked for.
+        """
         if ax is None: fig,ax = plt.subplots()
 
         if model is None:
@@ -280,8 +314,11 @@ class BivariateEVA:
                 ax.set_ylabel(self.var1)
             return ax
 
+        effective_periods = [p*exposure_fraction for p in periods]
+        kwargs.setdefault("labels", [f"{p}-year" for p in periods])
+
         model.reset_labels()
-        model.plot_contours(ax,periods=periods,state_duration=state_duration,method=contour_method,**kwargs)
+        model.plot_contours(ax,periods=effective_periods,state_duration=state_duration,method=contour_method,**kwargs)
         model.plot_dependent_percentiles(ax)
         model.plot_data_density(ax)
         model.plot_DNVGL_steepness_criterion(ax)
@@ -446,7 +483,11 @@ class BivariateEVA:
         Notes
         -----
         Subsets whose model failed to fit are plotted with their data only
-        and marked "(failed to fit)".
+        and marked "(failed to fit)". Each period in `periods` is corrected
+        per subset by that subset's share of `data_omni` before computing
+        the contour (same as `table_return_values` -- see its Notes and
+        `_exposure_fraction`); the legend still shows the nominal period
+        passed in, e.g. "10-year", not the corrected value used internally.
 
         Examples
         --------
@@ -490,7 +531,8 @@ class BivariateEVA:
             model = models.get(key)  # None if this fit failed/was skipped
             self._subplot_contours(
                 ax=ax[i],model=model,periods=periods,data=data,
-                state_duration=state_duration,contour_method=contour_method,**contour_kwargs)
+                state_duration=state_duration,contour_method=contour_method,
+                exposure_fraction=self._exposure_fraction(by,key),**contour_kwargs)
 
             title = "Month:" if by == "month" else "Sector:"
             title += f" {key}"
@@ -653,6 +695,12 @@ class BivariateEVA:
             var2 contour's low/high bound as columns. A subset whose model
             failed to fit gets a single NaN row labelled "(failed to fit)".
 
+        Notes
+        -----
+        `return_period` is corrected per subset by that subset's share of
+        `data_omni`, same as `table_return_values` -- see its Notes and
+        `_exposure_fraction`.
+
         Examples
         --------
         .. code-block:: python
@@ -686,8 +734,9 @@ class BivariateEVA:
             if model is None:
                 tables[subset] = None  # filled in with a blank row below
                 continue
+            effective_return_period = return_period * self._exposure_fraction(by,subset)
             table = model.table_contour(
-                return_period=return_period, range_values=range_values,
+                return_period=effective_return_period, range_values=range_values,
                 range_dim=0, range_interval=range_interval,
                 state_duration=state_duration, n_samples=n_samples,
                 contour_method=contour_method,
@@ -809,6 +858,17 @@ class BivariateEVA:
             One row per subset. Columns are ``"{rp}-year {symbol}"`` for each
             return period and variable. Subsets without a fitted model are NaN.
 
+        Notes
+        -----
+        A month/sector subset only sees a fraction of all events (fewer
+        candidate storms arrive from a single month or a narrow directional
+        sector than from the whole record), so its return period is
+        corrected by that subset's share of `data_omni` before being handed
+        to the contour method -- mirroring `UnivariateEVA`'s
+        `exposure_fraction` correction for POT/IDM subset models. The omni
+        subset ("Yearly"/"Omni") is unaffected (fraction 1.0). See
+        `_exposure_fraction`.
+
         Examples
         --------
         .. code-block:: python
@@ -841,10 +901,11 @@ class BivariateEVA:
             if model is None:
                 table[subset] = {c: np.nan for c in col_names}
                 continue
+            fraction = self._exposure_fraction(by,subset)
             row = {}
             for rp in return_periods:
                 hstp = model.get_contour_maximum(
-                    rp,state_duration=state_duration,contour_method=contour_method)
+                    rp*fraction,state_duration=state_duration,contour_method=contour_method)
                 row[f"{rp}-year {self.var1_symbol}"] = hstp[self.var1]
                 row[f"{rp}-year {self.var2_symbol}"] = hstp[self.var2]
             table[subset] = row
