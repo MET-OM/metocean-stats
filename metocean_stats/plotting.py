@@ -1091,6 +1091,77 @@ def plot_rose(
 
     return ax
 
+def _qq_percentiles(
+        qq_quantiles: "list[float] | None",
+        qq_spacing: str,
+        qq_n: int,
+        qq_cutoff: float,
+    ) -> np.ndarray:
+    """
+    Build the percentile levels (0-100) used for a Q-Q overlay.
+
+    If `qq_quantiles` is given, it is used as-is (sorted, deduplicated).
+    Otherwise `qq_n` percentile levels are generated according to
+    `qq_spacing`, bounded by `qq_cutoff`:
+
+    - "linear": `qq_n` levels evenly spaced across
+      ``[100 - qq_cutoff, qq_cutoff]``.
+    - "log": `qq_n` levels spaced evenly in log10 of the exceedance
+      probability (``100 - percentile``), from ``p=0`` (exceedance=100)
+      to ``p=qq_cutoff`` (exceedance=``100 - qq_cutoff``). This is the
+      natural placement for a variable concentrated at small values with
+      a long tail (e.g. wave height): levels land close together at low
+      percentiles and increasingly close together approaching the tail
+      (e.g. ..., 90, 99, 99.5, 99.9, ... up to `qq_cutoff`), rather than
+      bunching up uselessly close to 100 the way evenly-spaced percentiles
+      would. Emphasizes one (upper) tail only.
+    - "bi-log": the same log-in-exceedance spacing as "log", applied
+      independently from the median towards each tail and mirrored, so
+      the range is ``[100 - qq_cutoff, qq_cutoff]`` -- emphasizes both
+      tails symmetrically (the default).
+
+    `qq_cutoff` exists because going closer to the extremes (p -> 100)
+    makes quantile estimates increasingly underdetermined (too few
+    samples that far into the tail) -- it caps how far "log"/"bi-log"
+    push towards the tail(s), and bounds "linear" the same way for
+    consistency.
+
+    Raises
+    ------
+    ValueError
+        If `qq_quantiles` contains a value outside [0, 100], `qq_n` < 2,
+        `qq_cutoff` is not in (50, 100), or `qq_spacing` is not recognised.
+    """
+    if qq_quantiles is not None:
+        pct = np.atleast_1d(np.asarray(qq_quantiles, dtype=float))
+        if np.any((pct < 0) | (pct > 100)):
+            raise ValueError(
+                f"qq_quantiles must all be in [0, 100], got {qq_quantiles!r}."
+            )
+        return np.unique(pct)
+
+    if qq_n < 2:
+        raise ValueError(f"qq_n must be at least 2, got {qq_n}.")
+    if not (50 < qq_cutoff < 100):
+        raise ValueError(f"qq_cutoff must be in (50, 100), got {qq_cutoff}.")
+
+    if qq_spacing == "linear":
+        return np.linspace(100 - qq_cutoff, qq_cutoff, qq_n)
+
+    if qq_spacing == "log":
+        exceedance = np.logspace(np.log10(100.0), np.log10(100.0 - qq_cutoff), qq_n)
+        return np.sort(100.0 - exceedance)
+
+    if qq_spacing == "bi-log":
+        half = int(np.ceil(qq_n / 2))
+        exceedance = np.logspace(np.log10(50.0), np.log10(100.0 - qq_cutoff), half)
+        return np.unique(np.concatenate([exceedance, 100.0 - exceedance]))
+
+    raise ValueError(
+        f"qq_spacing must be 'linear', 'log', or 'bi-log', got {qq_spacing!r}."
+    )
+
+
 def plot_scatter(
         df: pd.DataFrame,
         x: str,
@@ -1101,6 +1172,11 @@ def plot_scatter(
         lim: float | None = None,
         figsize: tuple[float, float] = (7, 7),
         ax: "plt.Axes | None" = None,
+        interp: str = "nearest",
+        qq_quantiles: "list[float] | None" = None,
+        qq_spacing: Literal["linear", "log", "bi-log"] = "bi-log",
+        qq_n: int = 41,
+        qq_cutoff: float = 99.9,
     ) -> "plt.Axes":
     """
     Scatter plot of two columns of a DataFrame, drawn as a 2-D histogram.
@@ -1137,6 +1213,37 @@ def plot_scatter(
         Figure size in inches. Ignored when `ax` is supplied.
     ax : matplotlib.axes.Axes, optional
         Axes to draw on. A new figure is created if None.
+    interp : str, default "nearest"
+        ``method`` passed to ``numpy.percentile`` when computing the Q-Q
+        points. "nearest" (the default) always picks an actually observed
+        value from each array, so a Q-Q point is a genuine pair of order
+        statistics rather than something linearly interpolated between
+        two of them. Pass e.g. "linear" to allow interpolation instead.
+    qq_quantiles : list[float], optional
+        Explicit percentile levels (0-100) to use for the Q-Q overlay,
+        overriding `qq_spacing`/`qq_n`/`qq_cutoff` entirely.
+    qq_spacing : {"linear", "log", "bi-log"}, default "bi-log"
+        How to auto-generate `qq_n` percentile levels (bounded by
+        `qq_cutoff`) when `qq_quantiles` is not given:
+
+        - "linear": evenly spaced across ``[100 - qq_cutoff, qq_cutoff]``.
+        - "log": evenly spaced in log10 of the exceedance probability
+          (``100 - percentile``), from 0 up to `qq_cutoff` -- the natural
+          placement for a variable concentrated at small values with a
+          long tail, emphasizing the upper tail only.
+        - "bi-log": the "log" spacing applied from the median towards
+          each tail and mirrored, over ``[100 - qq_cutoff, qq_cutoff]`` --
+          emphasizes both tails symmetrically. This was the only
+          behaviour before `qq_spacing` existed.
+    qq_n : int, default 41
+        Total number of Q-Q percentile levels to generate when
+        `qq_quantiles` is not given. Ignored otherwise.
+    qq_cutoff : float, default 99.9
+        Percentile (must be in ``(50, 100)``) at which to stop placing
+        quantiles towards the tail(s) -- quantile estimates get
+        increasingly underdetermined closer to 100, so this caps it.
+        The lowest level placed is always ``100 - qq_cutoff``. Ignored
+        when `qq_quantiles` is given.
 
     Returns
     -------
@@ -1145,7 +1252,8 @@ def plot_scatter(
     Raises
     ------
     ValueError
-        If fewer than two complete (non-NaN) pairs are available.
+        If fewer than two complete (non-NaN) pairs are available, or the
+        Q-Q parameters are invalid (see `qq_quantiles`/`qq_n`/`qq_cutoff`).
 
     Warns
     -----
@@ -1166,9 +1274,9 @@ def plot_scatter(
     - SI: RMSE divided by the mean of `x`.
     - CORR: Pearson correlation coefficient.
 
-    The Q-Q points pair the quantiles of `x` and `y` at log-spaced
-    percentile levels, which gives more detail in the tails. The colorbar
-    label gives the bin size, for example "entries per 0.25 x 0.25 bin".
+    The Q-Q points pair the quantiles of `x` and `y` (see `qq_spacing`,
+    `qq_n`, `qq_cutoff`, `qq_quantiles`). The colorbar label gives the
+    bin size, for example "entries per 0.25 x 0.25 bin".
     """
     from .utils import scatter_metrics
 
@@ -1266,16 +1374,12 @@ def plot_scatter(
     )
 
     # ------------------------------------------------------------------ #
-    # Q-Q line (log-spaced quantiles for better tail resolution)          #
+    # Q-Q line                                                             #
     # ------------------------------------------------------------------ #
-    base = 1.2
-    n_levels = int(np.floor(np.log(n) / np.log(base)))
-    lower_half = [50 / base**k for k in range(n_levels + 1)]
-    upper_half = [100 - p for p in lower_half if p != 50][::-1]
-    percentiles = np.array(sorted(set(lower_half + upper_half)))
+    percentiles = _qq_percentiles(qq_quantiles, qq_spacing, qq_n, qq_cutoff)
 
-    qq_x = np.percentile(x_vals, percentiles, method="closest_observation")
-    qq_y = np.percentile(y_vals, percentiles, method="closest_observation")
+    qq_x = np.percentile(x_vals, percentiles, method=interp)
+    qq_y = np.percentile(y_vals, percentiles, method=interp)
 
     ax.scatter(
         qq_x, qq_y,
