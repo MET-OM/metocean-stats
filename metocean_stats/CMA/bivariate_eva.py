@@ -126,21 +126,21 @@ class BivariateEVA:
         and the return-period label (e.g. "10-year") for each one.
 
         `BivariateEVA.table_return_values` lays out columns as one var1
-        column and one var2 column per return period (e.g. "10-year H_s",
-        "10-year T_p"); only the var1 half is used here. A plain,
+        column and one var2 column per return period (e.g. "10-year $H_s$",
+        "10-year $T_p$"); only the var1 half is used here. A plain,
         single-variable table (e.g. from
         `UnivariateEVA.table_return_values_final`, with columns like
         "10-year" and no variable suffix) has no such columns to match, so
         every column is assumed to already be a var1 (primary variable)
         return value instead.
         """
-        suffix = f" {self.var1_symbol}"
+        suffix = f" ${self.var1_symbol}$"
         var1_cols = [c for c in RVE.columns if c.endswith(suffix)]
         if var1_cols:
             rp_labels = [c[:-len(suffix)] for c in var1_cols]
             return var1_cols, rp_labels
 
-        var2_suffix = f" {self.var2_symbol}"
+        var2_suffix = f" ${self.var2_symbol}$"
         if not any(c.endswith(var2_suffix) for c in RVE.columns):
             # No var1 or var2 suffixed columns anywhere - treat the whole
             # table as var1 return values keyed by return period.
@@ -148,7 +148,7 @@ class BivariateEVA:
             return var1_cols, var1_cols
 
         raise ValueError(
-            f"Could not find any '{self.var1_symbol}' columns in RVE. "
+            f"Could not find any '${self.var1_symbol}$' columns in RVE. "
             f"Available columns: {list(RVE.columns)}."
         )
 
@@ -616,12 +616,12 @@ class BivariateEVA:
             table = model.table_isodensity_contour(
                 points=rve.values,range_interval=range_interval,**kwargs)
             if replace_cols:
-                table.index.name = f"${self.var1_symbol}$"
                 if 2*len(var1_cols) == table.shape[1]-1:
                     table = table.set_index(table.columns[0])
                 if 2*len(var1_cols) != table.shape[1]:
                     raise ValueError(f"Expected {len(var1_cols)} columns, "
                         f"2 per return value, but got {table.shape[1]}")
+                table.index.name = f"${self.var1_symbol}$"
                 table.columns = [f"{rp.replace('year','yr')} ${self.var2_symbol}$$_{lh}$"
                                 for rp in rp_labels for lh in ["L","H"]]
             tables[subset] = table
@@ -643,7 +643,7 @@ class BivariateEVA:
     def table_contours(
             self,
             by:typing.Literal["month","direction"],
-            return_period:float,
+            return_periods:list[float],
             range_values=None,
             range_interval:float=0.5,
             state_duration:float=None,
@@ -652,24 +652,30 @@ class BivariateEVA:
             replace_cols=True,
             ):
         """
-        Tables of environmental contour points per subset, for one return period.
+        Tables of environmental contour points per subset, for one or more
+        return periods combined into a single table per subset.
 
         Like `table_isodensity_contours`, but for an environmental contour
         (e.g. IFORM, ISORM) instead of an isodensity contour. Unlike that
-        method, no return-value table is needed first -- the contour is
-        computed directly from `return_period`.
+        method, no return-value table is needed first -- every contour is
+        computed directly from `return_periods`.
 
         Parameters
         ----------
         by : {"month", "direction"}
             Subsets to tabulate. "direction" requires a direction variable. The
             omni model is added as "Yearly" for month and "Omni" for direction.
-        return_period : float
-            Return period, in years.
+        return_periods : list of float
+            Return periods, in years. One pair of columns is added per
+            period, in the given order.
         range_values : float or list of float, optional
-            Values of the primary variable (var1) at which to sample the
-            contour. Defaults to an even grid spanning the contour, spaced
-            by `range_interval`.
+            Values of the primary variable (var1) at which to sample each
+            contour. Defaults to an even grid spanning that contour, spaced
+            by `range_interval` -- computed independently per return period
+            (each period's contour spans a different range), so the
+            combined table's index is the union of every period's grid;
+            a period whose contour doesn't reach a given var1 value leaves
+            NaN there rather than extrapolating.
         range_interval : float, default 0.5
             Spacing of the auto-generated `range_values` grid. Ignored if
             `range_values` is given.
@@ -686,18 +692,23 @@ class BivariateEVA:
             `table_contour`: "IFORM", "ISORM", "HighestDensity",
             "DirectSampling", "ConstantAndExceedance", "ConstantOrExceedance".
         replace_cols : bool, default True
-            Rename the index and columns for display.
+            Rename the var2 columns and the var1 index name for display
+            (e.g. ``"100-yr $T_p$$_L$"``, index name ``"$H_s$"``). var1 is
+            always used as the index (needed to combine periods into one
+            table), regardless of this flag -- only the labelling is
+            affected.
 
         Returns
         -------
         dict of pandas.DataFrame
-            One table per subset, each with var1 as the index and the
-            var2 contour's low/high bound as columns. A subset whose model
-            failed to fit gets a single NaN row labelled "(failed to fit)".
+            One table per subset, with var1 as the index and, for each
+            return period, a low/high bound column pair for var2. A subset
+            whose model failed to fit gets a single NaN row labelled
+            "(failed to fit)".
 
         Notes
         -----
-        `return_period` is corrected per subset by that subset's share of
+        Each return period is corrected per subset by that subset's share of
         `data_omni`, same as `table_return_values` -- see its Notes and
         `_exposure_fraction`.
 
@@ -705,7 +716,7 @@ class BivariateEVA:
         --------
         .. code-block:: python
 
-            joint.table_contours(by="direction", return_period=100)
+            joint.table_contours(by="direction", return_periods=[1, 10, 100, 10000])
 
         .. csv-table::
            :header-rows: 1
@@ -734,17 +745,24 @@ class BivariateEVA:
             if model is None:
                 tables[subset] = None  # filled in with a blank row below
                 continue
-            effective_return_period = return_period * self._exposure_fraction(by,subset)
-            table = model.table_contour(
-                return_period=effective_return_period, range_values=range_values,
-                range_dim=0, range_interval=range_interval,
-                state_duration=state_duration, n_samples=n_samples,
-                contour_method=contour_method,
-            )
+            fraction = self._exposure_fraction(by,subset)
+
+            period_tables = []
+            for return_period in return_periods:
+                period_table = model.table_contour(
+                    return_period=return_period*fraction, range_values=range_values,
+                    range_dim=0, range_interval=range_interval,
+                    state_duration=state_duration, n_samples=n_samples,
+                    contour_method=contour_method,
+                )
+                period_table = period_table.set_index(period_table.columns[0])
+                if replace_cols:
+                    period_table.columns = [f"{return_period}-yr ${self.var2_symbol}$$_{lh}$" for lh in ["L","H"]]
+                period_tables.append(period_table)
+
+            table = pd.concat(period_tables, axis=1).sort_index()
             if replace_cols:
-                table = table.rename(columns={table.columns[0]: f"${self.var1_symbol}$"})
-                table = table.set_index(table.columns[0])
-                table.columns = [f"{return_period}-yr ${self.var2_symbol}$$_{lh}$" for lh in ["L","H"]]
+                table.index.name = f"${self.var1_symbol}$"
             tables[subset] = table
             if template_cols is None:
                 template_cols = table.columns
@@ -855,8 +873,9 @@ class BivariateEVA:
         Returns
         -------
         pandas.DataFrame
-            One row per subset. Columns are ``"{rp}-year {symbol}"`` for each
-            return period and variable. Subsets without a fitted model are NaN.
+            One row per subset. Columns are ``"{rp}-year ${symbol}$"`` for
+            each return period and variable. Subsets without a fitted model
+            are NaN.
 
         Notes
         -----
@@ -893,7 +912,7 @@ class BivariateEVA:
 
         state_duration = self._resolve_state_duration(state_duration)
 
-        col_names = [f"{rp}-year {v}" for rp in return_periods for v in (self.var1_symbol, self.var2_symbol)]
+        col_names = [f"{rp}-year ${v}$" for rp in return_periods for v in (self.var1_symbol, self.var2_symbol)]
 
         table = {}
         for subset in all_keys:
@@ -906,8 +925,8 @@ class BivariateEVA:
             for rp in return_periods:
                 hstp = model.get_contour_maximum(
                     rp*fraction,state_duration=state_duration,contour_method=contour_method)
-                row[f"{rp}-year {self.var1_symbol}"] = hstp[self.var1]
-                row[f"{rp}-year {self.var2_symbol}"] = hstp[self.var2]
+                row[f"{rp}-year ${self.var1_symbol}$"] = hstp[self.var1]
+                row[f"{rp}-year ${self.var2_symbol}$"] = hstp[self.var2]
             table[subset] = row
 
         return pd.DataFrame.from_dict(table,orient="index")

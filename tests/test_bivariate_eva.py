@@ -47,9 +47,13 @@ def test_plot_contours(bvm_fit):
 
 def test_table_contours(bvm_fit):
     for by in ("month", "direction"):
-        tables = bvm_fit.table_contours(by=by, return_period=100)
+        tables = bvm_fit.table_contours(by=by, return_periods=[10, 100])
         any_table = next(iter(tables.values()))
-        assert list(any_table.columns) == ["100-yr $T_p$$_L$", "100-yr $T_p$$_H$"]
+        assert list(any_table.columns) == [
+            "10-yr $T_p$$_L$", "10-yr $T_p$$_H$",
+            "100-yr $T_p$$_L$", "100-yr $T_p$$_H$",
+        ]
+        assert any_table.index.name == "$H_s$"
 
 
 def test_table_isodensity_contours(bvm_fit, rve):
