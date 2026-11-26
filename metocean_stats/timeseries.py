@@ -1165,14 +1165,21 @@ class TimeSeries:
         # ------------------------------------------------------------------ #
         # STEP 2: Extract maxima per year, then group by secondary criterion#
         # ------------------------------------------------------------------ #
+        # True annual maxima -- one value per year, over the whole year --
+        # used for the "All" row regardless of `by`, since that row must
+        # always be stats of the actual annual maxima, not a pool of
+        # per-month/per-sector maxima (which double- and under-count
+        # relative to one genuine extreme per year).
+        annual_maxima = pd.Series(
+            {year_label: year_df[var.col].max()
+            for year_label, year_df in year_groups.items()},
+            name=var.col
+        )
+
         if by == "year":
             # Simple case: just one maximum per year
-            maxima_series = pd.Series(
-                {year_label: year_df[var.col].max() 
-                for year_label, year_df in year_groups.items()},
-                name=var.col
-            )
-            
+            maxima_series = annual_maxima
+
         else:
             # Complex case: extract max per (year, secondary_group) combination
             maxima_dict = {}
@@ -1229,15 +1236,14 @@ class TimeSeries:
             # Simple case: one value per year
             for label, max_val in maxima_series.items():
                 records[label] = aggregate_statistics(pd.Series([max_val]), stats, interp=interp)
-            records["All"] = aggregate_statistics(maxima_series, stats, interp=interp)
         else:
             # Complex case: multiple maxima per group
             for label, max_series in maxima_series.items():
                 records[label] = aggregate_statistics(max_series, stats, interp=interp)
-            
-            # "All": concatenate all maxima across all groups
-            all_maxima = pd.concat(list(maxima_series.values()))
-            records["All"] = aggregate_statistics(all_maxima, stats, interp=interp)
+
+        # "All": stats of the true annual maxima, not a pool of the
+        # per-month/per-sector maxima above.
+        records["All"] = aggregate_statistics(annual_maxima, stats, interp=interp)
 
         df = pd.DataFrame(records).T  # Transpose: groups as rows, stats as columns
 
