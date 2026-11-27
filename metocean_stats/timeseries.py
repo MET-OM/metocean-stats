@@ -1182,49 +1182,54 @@ class TimeSeries:
 
         else:
             # Complex case: extract max per (year, secondary_group) combination
-            maxima_dict = {}
-            
-            for year_label, year_df in year_groups.items():
-                # Get secondary groups within this year
+            def _secondary_groups(df: pd.DataFrame) -> dict[str, pd.Series]:
                 if by == "direction":
                     self._require_direction("block_maxima", direction=direction)
                     dir_col = direction or self.direction.col
                     meta = groupby_with_metadata(
-                        year_df[[var.col, dir_col]].dropna(),
+                        df[[var.col, dir_col]].dropna(),
                         by="direction", var=var.col, var_dir=dir_col,
                         sectors=sectors or self.sectors,
                     )
-                    secondary_groups = dict(zip(meta["label"], meta["data"]))
                 elif by in ("month", "season"):
                     meta = groupby_with_metadata(
-                        year_df[[var.col]].dropna(),
+                        df[[var.col]].dropna(),
                         by=by, var=var.col, seasons=seasons,
                     )
-                    secondary_groups = dict(zip(meta["label"], meta["data"]))
                 elif by in self._variables:
                     # Bin by another variable
                     meta = groupby_with_metadata(
-                        year_df[[by, var.col]].dropna(),
+                        df[[by, var.col]].dropna(),
                         by=by, var=var.col, step=step,
                     )
-                    secondary_groups = dict(zip(meta["label"], meta["data"]))
                 else:
                     raise ValueError(
                         f"'by' must be one of 'year', 'month', 'season', 'direction', "
                         f"or a variable name. Got '{by}'."
                     )
-                
+                return dict(zip(meta["label"], meta["data"]))
+
+            # Canonical group order (e.g. ascending compass sectors), computed
+            # once from the full record -- not per year -- so the final row
+            # order is always correct even if the first year(s) processed
+            # happen to be missing data for an early group (which would
+            # otherwise push it to the back, to wherever it first appears).
+            canonical_order = list(_secondary_groups(self.data).keys())
+
+            maxima_dict = {}
+
+            for year_label, year_df in year_groups.items():
                 # Extract maximum for each secondary group
-                for sec_label, sec_data in secondary_groups.items():
+                for sec_label, sec_data in _secondary_groups(year_df).items():
                     if len(sec_data) > 0:
                         maxima_dict[sec_label] = maxima_dict.get(sec_label, [])
                         maxima_dict[sec_label].append(sec_data.max())
-            
+
             # Now maxima_dict contains {group_label: [max_year1, max_year2, ...]}
-            # Convert to series of all maxima per group
+            # Convert to series of all maxima per group, in canonical order.
             maxima_series = {
-                label: pd.Series(values, name=var.col)
-                for label, values in maxima_dict.items()
+                label: pd.Series(maxima_dict[label], name=var.col)
+                for label in canonical_order if label in maxima_dict
             }
 
         # ------------------------------------------------------------------ #
